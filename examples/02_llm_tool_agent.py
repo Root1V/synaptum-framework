@@ -2,16 +2,16 @@ import asyncio
 import json
 from typing import Any, Dict, List
 
-from agentium.core.message import Message
-from agentium.core.context import AgentContext
-from agentium.core.agent import Agent
-from agentium.core.runtime import AgentRuntime
-from agentium.messaging.in_memory_bus import InMemoryMessageBus
+from synaptum.core.message import Message
+from synaptum.core.context import AgentContext
+from synaptum.core.agent import Agent
+from synaptum.core.runtime import AgentRuntime
+from synaptum.messaging.in_memory_bus import InMemoryMessageBus
 
-from agentium.llm.client import LLMClient, LLMResponse
-from agentium.tools.base import Tool
-from agentium.tools.registry import ToolRegistry
-from agentium.agents.llm_tool_agent import LLMToolAgent, LLMToolAgentConfig
+from synaptum.llm.client import LLMClient, LLMResponse
+from synaptum.tools.base import Tool
+from synaptum.tools.registry import ToolRegistry
+from synaptum.agents.llm_tool_agent import LLMToolAgent, LLMToolAgentConfig
 
 
 class FakeLLMClient(LLMClient):
@@ -100,7 +100,7 @@ async def main():
         recipient="llm_agent",
         type="user.input",
         payload={"text": "¿Cuánto es 12.5*(3+1)?"},
-        metadata={"reply_to": "client"},
+        reply_to="client",
     ))
 
     await rt.run_until_idle()

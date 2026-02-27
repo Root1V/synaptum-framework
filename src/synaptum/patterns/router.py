@@ -4,7 +4,6 @@ from typing import Dict, List
 from ..core.agent import Agent
 from ..core.message import Message
 from ..core.context import AgentContext
-from ..agents.llm_tool_agent import LLMToolAgent
 
 
 @dataclass
@@ -23,12 +22,11 @@ class RouterPattern(Agent):
     - El specialist responde al router -> router responde al caller
 
     Mensajes:
-    - Entrada: user.input {text} metadata.reply_to
+    - Entrada: user.input {text} reply_to=<caller>
     - Router pregunta al router_llm: user.input + lista de specialists
-      metadata.reply_to = self.agent_id (para que la respuesta vuelva al router pattern)
-      metadata.route_req_id = <id>
+      reply_to=self.agent_id, metadata.route_req_id=<id>
     - Router recibe agent.output del router_llm y reenvía a specialist
-      metadata.reply_to = self.agent_id y metadata.route_req_id
+      reply_to=self.agent_id, metadata.route_req_id=<id>
     - Router recibe agent.output del specialist y lo entrega al caller original
     """
     def __init__(self, cfg: RouterPatternConfig):
@@ -52,7 +50,7 @@ class RouterPattern(Agent):
         else:
             text = str(message.payload)
 
-        caller = message.metadata.get("reply_to") or message.sender
+        caller = message.reply_to or message.sender
         route_req_id = message.id  # simple: usar id original como correlación
         self._pending[route_req_id] = {"caller": caller, "original_msg_id": message.id, "text": text}
 
@@ -68,13 +66,13 @@ class RouterPattern(Agent):
             recipient=self.cfg.router_llm_agent_id,
             type="user.input",
             payload={"text": prompt},
-            metadata={"reply_to": self.agent_id, "route_req_id": route_req_id},
+            reply_to=self.agent_id,
+            metadata={"route_req_id": route_req_id},
         ))
 
     async def _handle_agent_output(self, message: Message) -> None:
-        route_req_id = message.metadata.get("route_req_id") or message.metadata.get("in_reply_to")
-        if not isinstance(route_req_id, str) or route_req_id not in self._pending:
-            # puede ser respuesta final de specialist hacia caller, pero sin correlación
+        route_req_id = message.metadata.get("route_req_id", "")
+        if not route_req_id or route_req_id not in self._pending:
             return
 
         pending = self._pending[route_req_id]
@@ -95,7 +93,8 @@ class RouterPattern(Agent):
                 recipient=chosen,
                 type="user.input",
                 payload={"text": pending["text"]},
-                metadata={"reply_to": self.agent_id, "route_req_id": route_req_id},
+                reply_to=self.agent_id,
+                metadata={"route_req_id": route_req_id},
             ))
             return
 

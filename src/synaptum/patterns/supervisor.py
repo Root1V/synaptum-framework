@@ -38,7 +38,7 @@ class SupervisorPattern(Agent):
 
     async def _start_run(self, message: Message) -> None:
         text = str(message.payload.get("text")) if isinstance(message.payload, dict) else str(message.payload)
-        caller = message.metadata.get("reply_to") or message.sender
+        caller = message.reply_to or message.sender
         run_key = message.id
 
         self._runs[run_key] = {
@@ -64,12 +64,13 @@ class SupervisorPattern(Agent):
             recipient=self.cfg.supervisor_llm_agent_id,
             type="user.input",
             payload={"text": prompt},
-            metadata={"reply_to": self.agent_id, "run_key": run_key},
+            reply_to=self.agent_id,
+            metadata={"run_key": run_key},
         ))
 
     async def _handle_output(self, message: Message) -> None:
-        run_key = message.metadata.get("run_key") or message.metadata.get("route_req_id") or message.metadata.get("in_reply_to")
-        if not isinstance(run_key, str) or run_key not in self._runs:
+        run_key = message.metadata.get("run_key", "")
+        if not run_key or run_key not in self._runs:
             return
 
         run = self._runs[run_key]
@@ -90,7 +91,8 @@ class SupervisorPattern(Agent):
                     recipient=worker,
                     type="user.input",
                     payload={"text": inp},
-                    metadata={"reply_to": self.agent_id, "run_key": run_key, "worker": worker},
+                    reply_to=self.agent_id,
+                    metadata={"run_key": run_key, "worker": worker},
                 ))
             return
 
@@ -109,7 +111,8 @@ class SupervisorPattern(Agent):
                     recipient=self.cfg.supervisor_llm_agent_id,
                     type="user.input",
                     payload={"text": synth_prompt},
-                    metadata={"reply_to": self.agent_id, "run_key": run_key},
+                    reply_to=self.agent_id,
+                    metadata={"run_key": run_key},
                 ))
             return
 

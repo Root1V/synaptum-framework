@@ -5,7 +5,7 @@ from typing import Dict, Optional
 from .agent import Agent
 from .context import AgentContext
 from .message import Message
-from .messaging.bus import MessageBus
+from ..messaging.bus import MessageBus
 
 
 @dataclass

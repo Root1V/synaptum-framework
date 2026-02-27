@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Callable, Dict, Optional
 
 from ..core.agent import Agent
 from ..core.message import Message
@@ -37,7 +38,7 @@ class GraphPattern(Agent):
 
     async def _start(self, message: Message) -> None:
         task = str(message.payload.get("text")) if isinstance(message.payload, dict) else str(message.payload)
-        caller = message.metadata.get("reply_to") or message.sender
+        caller = message.reply_to or message.sender
         run_key = message.id
 
         self._runs[run_key] = {
@@ -60,11 +61,12 @@ class GraphPattern(Agent):
             recipient=node.agent_id,
             type="user.input",
             payload={"text": prompt},
-            metadata={"reply_to": self.agent_id, "run_key": run_key, "node": current},
+            reply_to=self.agent_id,
+            metadata={"run_key": run_key, "node": current},
         ))
 
     async def _handle_output(self, message: Message) -> None:
-        run_key = message.metadata.get("run_key") or message.metadata.get("in_reply_to")
+        run_key = message.metadata.get("run_key", "")
         if not isinstance(run_key, str) or run_key not in self._runs:
             return
 

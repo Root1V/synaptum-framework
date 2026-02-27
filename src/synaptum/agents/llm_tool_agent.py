@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..core.agent import Agent
 from ..core.message import Message
@@ -28,7 +28,7 @@ class LLMToolAgent(Agent):
     - publica mensajes
 
     Convención de mensajes:
-    - Recibe: type="user.input" payload={"text": "..."} metadata={"reply_to": "some_agent"}
+    - Recibe: type="user.input" payload={"text": "..."} reply_to="some_agent"
     - Responde: type="agent.output" payload={"text": "..."} -> recipient = reply_to
     """
     def __init__(
@@ -54,18 +54,22 @@ class LLMToolAgent(Agent):
         else:
             text = str(message.payload)
 
-        reply_to = message.metadata.get("reply_to")
-        if not isinstance(reply_to, str) or not reply_to:
-            reply_to = message.sender  # fallback
+        reply_to = message.reply_to or message.sender
 
         output = await self._run_tool_loop(text, context=context)
+
+        # Propagar toda la metadata del mensaje entrante opáqamente.
+        # reply_to es campo propio de Message, no está en metadata,
+        # por lo que no hay nada que filtrar.
+        out_meta: Dict[str, Any] = dict(message.metadata)
+        out_meta["in_reply_to"] = message.id
 
         await self.runtime.publish(Message(
             sender=self.agent_id,
             recipient=reply_to,
             type="agent.output",
             payload={"text": output},
-            metadata={"in_reply_to": message.id},
+            metadata=out_meta,
         ))
 
     async def _run_tool_loop(self, user_text: str, context: AgentContext) -> str:

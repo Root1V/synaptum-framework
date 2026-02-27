@@ -1,17 +1,17 @@
 import asyncio
 
-from agentium.core.message import Message
-from agentium.core.agent import Agent
-from agentium.core.runtime import AgentRuntime
-from agentium.messaging.in_memory_bus import InMemoryMessageBus
-from agentium.core.context import AgentContext
+from synaptum.core.message import Message
+from synaptum.core.agent import Agent
+from synaptum.core.runtime import AgentRuntime
+from synaptum.messaging.in_memory_bus import InMemoryMessageBus
+from synaptum.core.context import AgentContext
 
 
 class EchoAgent(Agent):
     async def on_message(self, message: Message, context: AgentContext) -> None:
         if message.type == "user.input":
             txt = message.payload.get("text") if isinstance(message.payload, dict) else str(message.payload)
-            reply_to = message.metadata.get("reply_to") or message.sender
+            reply_to = message.reply_to or message.sender
             await self.runtime.publish(Message(
                 sender=self.agent_id,
                 recipient=reply_to,
@@ -44,7 +44,7 @@ async def main():
         recipient="echo",
         type="user.input",
         payload={"text": "hola"},
-        metadata={"reply_to": "client"},
+        reply_to="client",
     ))
 
     await rt.run_until_idle()

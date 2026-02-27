@@ -17,3 +17,4 @@ class LLMClient(ABC):
     @abstractmethod
     async def chat(self, messages: List[Dict[str, Any]], **kwargs) -> LLMResponse:
         raise NotImplementedError
+    
