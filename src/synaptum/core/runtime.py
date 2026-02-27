@@ -41,7 +41,11 @@ class AgentRuntime:
 
     def register(self, agent: Agent) -> None:
         self._agents[agent.agent_id] = agent
-        agent._attach_runtime(self)
+        
+        if hasattr(agent, "_bind_runtime"):
+            agent._bind_runtime(self)
+        else: 
+            agent._attach_runtime(self)
 
         async def handler(msg: Message) -> None:
             await agent.on_message(msg, self._context)
@@ -52,7 +56,7 @@ class AgentRuntime:
         await self._bus.publish(message)
 
     async def start(self, run_id: str, metadata: Optional[dict] = None) -> None:
-        self._context = AgentContext(run_id=run_id, metadata=metadata or {})
+        self._context = AgentContext(run_id=run_id, metadata=metadata or {}, agent_registry=self._agents)
         for a in self._agents.values():
             await a.on_start(self._context)
 

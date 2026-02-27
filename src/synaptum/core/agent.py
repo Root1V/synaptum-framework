@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from uuid import uuid4
 from .message import Message
 from .context import AgentContext
 from .state import AgentState
@@ -11,9 +12,14 @@ class Agent(ABC):
     - El agente PUBLICA mensajes (vía runtime/bus).
     """
     def __init__(self, agent_id: str):
+        self._id: str = str(uuid4())
         self.agent_id = agent_id
         self.state = AgentState()
         self._runtime = None  # seteado por runtime.register()
+
+    @property
+    def id(self) -> str:
+        return self._id
 
     def _attach_runtime(self, runtime) -> None:
         self._runtime = runtime
