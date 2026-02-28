@@ -11,7 +11,7 @@ class PromptProvider(ABC):
 
     Implementaciones concretas pueden cargar prompts desde memoria,
     archivos YAML/JSON, bases de datos, o servicios remotos
-    (ej. Langfuse, Langsmith, Promptlayer).
+    (ej. Langfuse, Langsmith, Promptlayer, AWS).
     """
 
     @abstractmethod

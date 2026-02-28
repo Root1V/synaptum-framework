@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .provider import PromptProvider
 from .template import PromptTemplate
+from .in_memory import InMemoryPromptProvider
 
 
 class PromptRegistry:
@@ -58,7 +59,6 @@ class PromptRegistry:
         sin necesidad de crear un InMemoryPromptProvider explícito.
         Crea uno interno si no existe.
         """
-        from .in_memory import InMemoryPromptProvider
 
         for provider in self._providers:
             if isinstance(provider, InMemoryPromptProvider):

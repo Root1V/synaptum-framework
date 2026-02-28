@@ -76,7 +76,7 @@ class FilePromptProvider(PromptProvider):
 
     def _load_yaml(self) -> dict[str, PromptTemplate]:
         try:
-            import yaml  # optional dependency
+            import yaml 
         except ImportError as exc:
             raise ImportError(
                 "PyYAML es necesario para FilePromptProvider con YAML. "
