@@ -7,6 +7,22 @@ load_dotenv()
 from synaptum.agents.simple_agent import SimpleAgent
 from synaptum.core.runtime import AgentRuntime
 from synaptum.messaging.in_memory_bus import InMemoryMessageBus
+from synaptum.prompts import InMemoryPromptProvider, PromptTemplate
+
+
+# --- Definición de prompts ---------------------------------------------------
+# En producción esto vendría de un archivo YAML o proveedor remoto.
+prompt_provider = InMemoryPromptProvider({
+    "calculator.system": PromptTemplate(
+        content=(
+            "You are an arithmetic calculator agent. "
+            "You receive messages with a sum expression like '3 + 6 + 2' "
+            "and reply with only the numeric result."
+        ),
+        version="1.0",
+        description="System prompt for the arithmetic calculator agent.",
+    ),
+})
 
 
 async def client_handler(agent: SimpleAgent, msg, ctx):
@@ -18,12 +34,16 @@ async def main():
     bus = InMemoryMessageBus()
     rt = AgentRuntime(bus)
 
-    calculator = SimpleAgent("calculator", system_prompt="I am a calculator agent that sums three numbers. I receive messages with payloads like '3 +6 + 2' and I reply with messages with payloads like result '11' ")
+    calculator = SimpleAgent(
+        "calculator",
+        prompt_name="calculator.system",
+        prompt_provider=prompt_provider,
+    )
     client = SimpleAgent("client", handler=client_handler)
-    
+
     rt.register(calculator)
     rt.register(client)
-    
+
     await rt.start(run_id="run-calculator")
 
     await client._ref.send(
