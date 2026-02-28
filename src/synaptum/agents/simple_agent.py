@@ -1,4 +1,5 @@
 # simple/simple_agent.py
+import warnings
 from typing import Awaitable, Callable, Optional
 
 from ..llm.client import LLMClient
@@ -6,28 +7,83 @@ from ..llm.llama_client import LlamaClient
 from ..core.context import AgentContext
 from ..core.agent import Agent
 from ..core.message import Message
+from ..prompts.template import PromptTemplate
+from ..prompts.provider import PromptProvider
 from .agent_ref import AgentRef
 
 
-Handler = Callable[["SimpleAgent", Message, AgentContext], Awaitable[None] ]
+Handler = Callable[["SimpleAgent", Message, AgentContext], Awaitable[None]]
 
 
 class SimpleAgent(Agent):
+    """
+    Agente simple basado en LLM.
+
+    Formas de configurar el system prompt (en orden de prioridad):
+
+    1. ``prompt`` — PromptTemplate directa (recomendado para código).
+    2. ``prompt_name`` + ``prompt_provider`` — resolución por nombre
+       desde un proveedor externo (recomendado para producción).
+    3. ``system_prompt`` (str) — compatibilidad hacia atrás, deprecated.
+
+    Examples::
+
+        # Forma 1 — template directa
+        agent = SimpleAgent(
+            "calculator",
+            prompt=PromptTemplate(
+                content="Eres una calculadora. Suma los números.",
+                version="1.1",
+                description="Calculadora aritmética",
+            ),
+        )
+
+        # Forma 2 — provider externo
+        provider = FilePromptProvider("prompts/agents.yaml")
+        agent = SimpleAgent(
+            "calculator",
+            prompt_name="calculator.system",
+            prompt_provider=provider,
+        )
+    """
 
     def __init__(
         self,
         agent_id: str,
         *,
         llm: Optional[LLMClient] = None,
+        prompt: Optional[PromptTemplate] = None,
+        prompt_name: Optional[str] = None,
+        prompt_provider: Optional[PromptProvider] = None,
+        # --- backward compat ---
         system_prompt: Optional[str] = None,
-        handler: Optional[Handler] = None
+        handler: Optional[Handler] = None,
     ):
         super().__init__(agent_id)
 
         self._llm = llm or LlamaClient()
-        self._system_prompt = system_prompt
         self._custom_handler = handler
         self._ref: Optional[AgentRef] = None
+
+        # Resolver el PromptTemplate efectivo
+        if prompt is not None:
+            self._prompt: Optional[PromptTemplate] = prompt
+        elif prompt_name is not None:
+            if prompt_provider is None:
+                raise ValueError(
+                    "'prompt_provider' es obligatorio cuando se usa 'prompt_name'."
+                )
+            self._prompt = prompt_provider.get(prompt_name)
+        elif system_prompt is not None:
+            warnings.warn(
+                "'system_prompt' está deprecated. Usa 'prompt=PromptTemplate(content=...)' "
+                "o 'prompt_name' + 'prompt_provider'.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            self._prompt = PromptTemplate(content=system_prompt)
+        else:
+            self._prompt = None
 
     # inyectado por el runtime
     def _bind_runtime(self, bus):
@@ -53,9 +109,9 @@ class SimpleAgent(Agent):
             raise RuntimeError("AgentRef no inyectado en SimpleAgent")
         
         messages = []
-        if self._system_prompt:
+        if self._prompt is not None:
             messages.append(
-                {"role": "system", "content": self._system_prompt}
+                {"role": "system", "content": self._prompt.render()}
             )
 
         user_text = ""
