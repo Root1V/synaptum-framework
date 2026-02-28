@@ -2,6 +2,7 @@
 from typing import Awaitable, Callable, Optional
 
 from ..llm.client import LLMClient
+from ..llm.llama_client import LlamaClient
 from ..core.context import AgentContext
 from ..core.agent import Agent
 from ..core.message import Message
@@ -23,7 +24,7 @@ class SimpleAgent(Agent):
     ):
         super().__init__(agent_id)
 
-        self._llm = llm
+        self._llm = llm or LlamaClient()
         self._system_prompt = system_prompt
         self._custom_handler = handler
         self._ref: Optional[AgentRef] = None
