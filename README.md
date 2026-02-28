@@ -33,8 +33,8 @@ Synaptum sits between your LLM SDK and your agent platform. It gives you the min
 │   │  / Platform  │                                                       │
 │   │  Application │                                                       │
 │   └──────┬───────┘                                                       │
-│          │ uses                                                           │
-│          ▼                                                                │
+│          │ uses                                                          │
+│          ▼                                                               │
 │   ┌──────────────────────────────────────────┐                           │
 │   │              S Y N A P T U M             │                           │
 │   │                                          │                           │
@@ -44,19 +44,19 @@ Synaptum sits between your LLM SDK and your agent platform. It gives you the min
 │          │                           │                                   │
 │          │ reads prompts from        │ calls                             │
 │          ▼                           ▼                                   │
-│   ┌──────────────┐          ┌─────────────────────┐                     │
-│   │  Prompt Store│          │   Axonium SDK        │                     │
-│   │              │          │                      │                     │
-│   │  YAML / DB / │          │  LLM adapter layer   │                     │
-│   │  Remote API  │          └──────────┬───────────┘                     │
+│   ┌──────────────┐          ┌─────────────────────┐                      │
+│   │  Prompt Store│          │   Axonium SDK       │                      │
+│   │              │          │                     │                      │
+│   │  YAML / DB / │          │  LLM adapter layer  │                      │
+│   │  Remote API  │          └──────────┬──────────┘                      │
 │   └──────────────┘                     │ invokes                         │
 │                                        ▼                                 │
-│                            ┌─────────────────────┐                      │
-│                            │    LLM Server        │                      │
-│                            │                      │                      │
-│                            │  llama.cpp / vLLM /  │                      │
-│                            │  OpenAI-compatible   │                      │
-│                            └─────────────────────┘                      │
+│                            ┌─────────────────────┐                       │
+│                            │    LLM Server       │                       │
+│                            │                     │                       │
+│                            │  llama.cpp / vLLM / │                       │
+│                            │  OpenAI-compatible  │                       │
+│                            └─────────────────────┘                       │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -66,44 +66,44 @@ Synaptum sits between your LLM SDK and your agent platform. It gives you the min
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            Synaptum Framework                               │
 │                                                                             │
-│  ┌──────────────────────┐      ┌───────────────────────────────────────┐   │
-│  │     AgentRuntime     │      │           Message Bus                 │   │
-│  │                      │      │                                       │   │
-│  │  - register(agent)   │─────▶│  publish(msg) ──▶ queue              │   │
-│  │  - start(run_id)     │      │  subscribe(name, handler)            │   │
-│  │  - run_until_idle()  │◀─────│  deliver(msg) ──▶ handlers           │   │
-│  │  - prompts provider  │      │                                       │   │
-│  └──────────┬───────────┘      └───────────────────────────────────────┘   │
+│  ┌──────────────────────┐      ┌───────────────────────────────────────┐    │
+│  │     AgentRuntime     │      │           Message Bus                 │    │
+│  │                      │      │                                       │    │
+│  │  - register(agent)   │─────▶│  publish(msg) ──▶ queue               │    │
+│  │  - start(run_id)     │      │  subscribe(name, handler)             │    │
+│  │  - run_until_idle()  │◀─────│  deliver(msg) ──▶ handlers            │    │
+│  │  - prompts provider  │      │                                       │    │
+│  └──────────┬───────────┘      └───────────────────────────────────────┘    │
 │             │ injects                          ▲                            │
 │             │ PromptProvider                   │ messages                   │
 │             ▼                                  │                            │
-│  ┌──────────────────────┐      ┌───────────────┴───────────────────────┐   │
-│  │   Prompt System      │      │              Agents                   │   │
-│  │                      │      │                                       │   │
-│  │  PromptRegistry      │      │  SimpleAgent      LLMToolAgent        │   │
-│  │  FilePromptProvider  │      │  ┌────────────┐  ┌────────────────┐  │   │
-│  │  InMemoryProvider    │      │  │ name       │  │ name           │  │   │
-│  │                      │      │  │ prompt     │  │ system_prompt  │  │   │
-│  │  PromptTemplate      │      │  │ handler()  │  │ tools          │  │   │
-│  │  - content           │      │  │ on_message │  │ on_message     │  │   │
-│  │  - version           │      │  └─────┬──────┘  └───────┬────────┘  │   │
-│  │  - variables         │      │        │                  │           │   │
-│  └──────────────────────┘      └────────┼──────────────────┼───────────┘   │
-│                                         │                  │               │
-│  ┌──────────────────────┐               │                  │               │
-│  │    LLM Layer         │◀──────────────┘                  │               │
-│  │                      │                                  │               │
-│  │  LLMClient (ABC)     │                                  │               │
-│  │  LlamaClient         │      ┌───────────────────────────┘               │
-│  │  (axonium SDK)       │      │                                           │
-│  └──────────────────────┘      ▼                                           │
-│                         ┌──────────────────────┐                           │
-│                         │   Patterns           │                           │
-│                         │                      │                           │
-│                         │  RouterPattern       │                           │
-│                         │  SupervisorPattern   │                           │
-│                         │  GraphPattern        │                           │
-│                         └──────────────────────┘                           │
+│  ┌──────────────────────┐      ┌───────────────┴───────────────────────┐    │
+│  │   Prompt System      │      │              Agents                   │    │
+│  │                      │      │                                       │    │
+│  │  PromptRegistry      │      │  SimpleAgent      LLMToolAgent        │    │
+│  │  FilePromptProvider  │      │  ┌────────────┐  ┌────────────────┐   │    │
+│  │  InMemoryProvider    │      │  │ name       │  │ name           │   │    │
+│  │                      │      │  │ prompt     │  │ system_prompt  │   │    │
+│  │  PromptTemplate      │      │  │ handler()  │  │ tools          │   │    │
+│  │  - content           │      │  │ on_message │  │ on_message     │   │    │
+│  │  - version           │      │  └─────┬──────┘  └────────┬───────┘   │    │
+│  │  - variables         │      │        │                  │           │    │
+│  └──────────────────────┘      └────────┼──────────────────┼───────────┘    │
+│                                         │                  │                │
+│  ┌──────────────────────┐               │                  │                │
+│  │    LLM Layer         │◀──────────────┘                  │                │
+│  │                      │                                  │                │
+│  │  LLMClient (ABC)     │                                  │                │
+│  │  LlamaClient         │      ┌───────────────────────────┘                │
+│  │  (axonium SDK)       │      │                                            │
+│  └──────────────────────┘      ▼                                            │
+│                         ┌──────────────────────┐                            │
+│                         │   Patterns           │                            │
+│                         │                      │                            │
+│                         │  RouterPattern       │                            │
+│                         │  SupervisorPattern   │                            │
+│                         │  GraphPattern        │                            │
+│                         └──────────────────────┘                            │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -156,9 +156,37 @@ summarizer.system:
 
 ---
 
-## Quick Start
+## Built On
 
-### Installation
+Synaptum's LLM layer is powered by **[Axonium SDK](https://github.com/Root1V/axonium-sdk.git)** — a lightweight Python SDK that provides a unified, observable adapter interface for local LLM inference servers (llama.cpp, vLLM, and any OpenAI-compatible endpoint). Axonium handles HTTP transport, authentication, observability instrumentation, and async I/O, so Synaptum can remain focused on agent orchestration.
+
+> Synaptum's `LLMClient` abstraction is intentionally decoupled from Axonium. You can replace `LlamaClient` with any custom implementation — see [Extending Synaptum](#extending-synaptum).
+
+---
+
+## Installation
+
+### Prerequisites
+
+| Requirement | Version | Notes |
+|---|---|---|
+| Python | ≥ 3.13 | Uses `asyncio`, `dataclasses`, `typing` |
+| [uv](https://docs.astral.sh/uv/) | any | Recommended package manager |
+| LLM Server | — | llama.cpp / vLLM / any OpenAI-compatible endpoint |
+
+### Option A — Install as a dependency (recommended)
+
+```bash
+uv add git+https://github.com/Root1V/synaptum-framework.git
+```
+
+Or with pip:
+
+```bash
+pip install git+https://github.com/Root1V/synaptum-framework.git
+```
+
+### Option B — Clone for local development
 
 ```bash
 git clone https://github.com/Root1V/synaptum-framework.git
@@ -166,33 +194,47 @@ cd synaptum-framework
 uv sync
 ```
 
-### Minimal agent (no LLM)
+### Environment setup
+
+Create a `.env` file in your project root (see [`.env.example`](.env.example)):
+
+```dotenv
+LLAMA_BASE_URL=http://localhost:8080   # your LLM server URL
+LLAMA_API_KEY=your-api-key-here        # leave empty if not required
+LLAMA_MODEL=your-model-name            # e.g. llama-3.2-3b-instruct
+```
+
+Then load it at the top of your application:
 
 ```python
-import asyncio
-from synaptum import AgentRuntime, SimpleAgent, Message
-from synaptum.messaging.in_memory_bus import InMemoryMessageBus
-
-async def echo_handler(agent, msg, ctx):
-    if msg.type == "ping":
-        await agent._ref.send(to=msg.reply_to, type="pong", payload=msg.payload)
-
-async def main():
-    bus = InMemoryMessageBus()
-    rt = AgentRuntime(bus)
-    rt.register(SimpleAgent("echo", handler=echo_handler))
-    await rt.start(run_id="demo")
-    ...
-
-asyncio.run(main())
+from dotenv import load_dotenv
+load_dotenv()
 ```
+
+### Verify
+
+```bash
+uv run python -c "import synaptum; print('Synaptum OK')"
+```
+
+---
+
+## Quick Start
 
 ### LLM agent with prompt from file
 
 ```python
+import asyncio
+from dotenv import load_dotenv
+load_dotenv()
+
 from synaptum import AgentRuntime, SimpleAgent
 from synaptum.prompts import FilePromptProvider
 from synaptum.messaging.in_memory_bus import InMemoryMessageBus
+
+async def client_handler(agent, msg, ctx):
+    if msg.type == "agent.output":
+        print("Result:", msg.payload["answer"])
 
 async def main():
     bus = InMemoryMessageBus()
@@ -202,8 +244,20 @@ async def main():
     rt.register(SimpleAgent("client", handler=client_handler))
 
     await rt.start(run_id="run-1")
-    ...
+
+    await rt.publish(Message(
+        sender="client", recipient="analyst",
+        type="request", payload={"text": "Summarize the AI market in 2025"},
+        reply_to="client",
+    ))
+
+    await rt.run_until_idle()
+    await rt.stop()
+
+asyncio.run(main())
 ```
+
+> More examples covering messaging, routing, supervisor/worker, pipelines, pub/sub and more are available in the [`examples/`](examples/) directory.
 
 ---
 
@@ -288,15 +342,73 @@ class DBPromptProvider(PromptProvider):
 
 ---
 
-## Running the Examples
+## Changelog
 
-```bash
-# Single agent — request/reply with LLM
-uv run python examples/patterns/06_request_reply.py
+### [0.2.0] — 2026-02-28
 
-# Supervisor/Worker queue — dynamic task dispatching
-uv run python examples/patterns/07_supervisor_worker_queue.py
-```
+- **Prompt Management System** — new `synaptum.prompts` module with `PromptTemplate`, `PromptProvider` ABC, `InMemoryPromptProvider`, `FilePromptProvider` (YAML/JSON, lazy + cached) and `PromptRegistry` (priority chain)
+- **Runtime-level prompt injection** — `AgentRuntime` now accepts `prompts: PromptProvider`; agents declare `prompt_name` and the runtime resolves the template at registration time
+- **Smart LLM init** — `SimpleAgent` only instantiates `LlamaClient` when a prompt is present; passive agents have no LLM overhead
+- **Rename `agent_id` → `name`** — cleaner API aligned with AutoGen, CrewAI, and LangGraph conventions; `agent.id` remains the internal UUID
+- **Axonium SDK ≥ 0.6.0** — replaced `run_in_executor` workaround with native `await adapter.async_chat()`
+
+### [0.1.0] — 2026-02-27 *(initial release)*
+
+- Core primitives: `Agent` ABC, `Message`, `AgentRuntime`, `AgentContext`
+- `SimpleAgent` and `LLMToolAgent` implementations
+- `InMemoryMessageBus` with async publish/subscribe/deliver
+- `LlamaClient` wrapping Axonium SDK
+- Patterns: `RouterPattern`, `SupervisorPattern`, `GraphPattern`
+- Pluggable `MemoryStore` and `ToolRegistry`
+- Example suite covering echo, tool-use, router, supervisor/worker, graph, pipeline, pub/sub, blackboard and debate/critique patterns
+
+---
+
+## 🙌 Acknowledgements
+
+If you find Synaptum useful in your work, consider:
+
+- ⭐ **Starring the repository** — it helps others discover the project
+- 📢 **Sharing it with your team** — especially if you're building LLM-powered systems
+- 🤝 **Contributing improvements or reporting issues** — any feedback is welcome
+
+For citations or references in technical documentation:
+
+| Field | Value |
+|---|---|
+| **Project** | Synaptum |
+| **Repository** | https://github.com/Root1V/synaptum-framework |
+| **Author** | Emeric Espiritu Santiago |
+| **Contact** | emericespiritusantiago@gmail.com |
+| **License** | MIT |
+
+Synaptum is built on top of **[Axonium SDK](https://github.com/Root1V/axonium-sdk.git)** — if you use the LLM layer directly, consider acknowledging that project as well.
+
+---
+
+## 🤝 Contributing
+
+Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are greatly appreciated.
+
+1. **Fork** the repository
+2. **Create a branch** for your feature or bug fix:
+   ```bash
+   git checkout -b feature/my-new-feature
+   # or
+   git checkout -b bugfix/fix-some-bug
+   ```
+3. **Make your changes** — ensure code is well-commented and follows the project style
+4. **Run the examples** to verify nothing is broken:
+   ```bash
+   uv run python examples/patterns/06_request_reply.py
+   ```
+5. **Submit a pull request** with a clear description of your changes
+
+You can also open an [issue](https://github.com/Root1V/synaptum-framework/issues) to:
+
+- Report a bug
+- Suggest an enhancement
+- Propose a new feature or architecture improvement
 
 ---
 
