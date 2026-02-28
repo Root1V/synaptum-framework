@@ -10,7 +10,11 @@ from synaptum.messaging.in_memory_bus import InMemoryMessageBus
 from synaptum.prompts import FilePromptProvider, InMemoryPromptProvider, PromptTemplate
 
 
-# --- Opción A: prompts definidos en código (útil para tests y prototipos) ----
+# --- Prompt provider: se configura UNA vez a nivel de aplicación -------------
+#
+# Opción A — desde un archivo YAML (recomendado para producción):
+#
+# Opción B — en memoria (útil para tests y prototipos):
 # prompt_provider = InMemoryPromptProvider({
 #     "calculator.system": PromptTemplate(
 #         content=(
@@ -23,41 +27,32 @@ from synaptum.prompts import FilePromptProvider, InMemoryPromptProvider, PromptT
 #     ),
 # })
 
-# --- Opción B: prompts cargados desde un archivo YAML (recomendado) ----------
-# El archivo prompts.yaml vive junto a los ejemplos y puede ser versionado,
-# editado sin tocar código, e incluso sustituido por un proveedor remoto.
-prompt_provider = FilePromptProvider("examples/patterns/prompts.yaml")
-
 
 async def client_handler(agent: SimpleAgent, msg, ctx):
     if msg.type == "agent.output":
         print("CLIENT GOT result:", msg.payload["answer"])
 
-
 async def main():
     bus = InMemoryMessageBus()
-    rt = AgentRuntime(bus)
+    prompt_provider = FilePromptProvider("examples/prompts/calculator.yaml")
+    runtime = AgentRuntime(bus, prompts=prompt_provider)
 
-    calculator = SimpleAgent(
-        "calculator",
-        prompt_name="calculator.system",
-        prompt_provider=prompt_provider,
-    )
-    client = SimpleAgent("client", handler=client_handler)
+    calculator = SimpleAgent(name="calculator", prompt_name="calculator.system")
+    client = SimpleAgent(name="client", handler=client_handler)
 
-    rt.register(calculator)
-    rt.register(client)
+    runtime.register(calculator)
+    runtime.register(client)
 
-    await rt.start(run_id="run-calculator")
+    await runtime.start(run_id="run-calculator")
 
     await client._ref.send(
         to="calculator",
-        payload={"text": "37 + 13 + 18"},
+        payload={"text": "37 + 13 + 18 + 67 + 434 -3"},
         type="request",
         reply_to="client",
     )
 
-    await rt.run_until_idle()
-    await rt.stop()
+    await runtime.run_until_idle()
+    await runtime.stop()
 
 asyncio.run(main())

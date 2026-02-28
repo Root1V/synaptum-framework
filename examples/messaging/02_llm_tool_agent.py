@@ -81,7 +81,7 @@ async def main():
     llm = FakeLLMClient()
     agent = LLMToolAgent(
         config=LLMToolAgentConfig(
-            agent_id="llm_agent",
+            name="llm_agent",
             system_prompt="Eres un agente que usa tools cuando sea útil.",
         ),
         llm=llm,

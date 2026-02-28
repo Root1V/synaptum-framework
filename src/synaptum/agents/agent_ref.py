@@ -8,13 +8,13 @@ from ..core.message import Message
 
 class AgentRef:
 
-    def __init__(self, agent_id: str, bus: MessageBus):
-        self.agent_id = agent_id
+    def __init__(self, name: str, bus: MessageBus):
+        self.name = name
         self._bus = bus
 
     async def send(self, to: str, payload: Any, type: str = "event", reply_to: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> str:
         msg = Message(
-            sender=self.agent_id,
+            sender=self.name,
             recipient=to,
             type=type,
             payload=payload,

@@ -13,7 +13,7 @@ class EchoAgent(Agent):
             txt = message.payload.get("text") if isinstance(message.payload, dict) else str(message.payload)
             reply_to = message.reply_to or message.sender
             await self.runtime.publish(Message(
-                sender=self.agent_id,
+                sender=self.name,
                 recipient=reply_to,
                 type="agent.output",
                 payload={"text": f"echo: {txt}"},

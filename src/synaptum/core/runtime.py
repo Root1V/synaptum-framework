@@ -6,6 +6,7 @@ from .agent import Agent
 from .context import AgentContext
 from .message import Message
 from ..messaging.bus import MessageBus
+from ..prompts.provider import PromptProvider
 
 
 @dataclass
@@ -27,9 +28,15 @@ class AgentRuntime:
     - No crea threads
     - No crea event loop oculto
     """
-    def __init__(self, bus: MessageBus, config: Optional[RuntimeConfig] = None):
+    def __init__(
+        self,
+        bus: MessageBus,
+        config: Optional[RuntimeConfig] = None,
+        prompts: Optional[PromptProvider] = None,
+    ):
         self._bus = bus
         self._config = config or RuntimeConfig()
+        self._prompts = prompts
         self._agents: Dict[str, Agent] = {}
         self._context: Optional[AgentContext] = None
 
@@ -40,17 +47,21 @@ class AgentRuntime:
         return self._context
 
     def register(self, agent: Agent) -> None:
-        self._agents[agent.agent_id] = agent
-        
+        self._agents[agent.name] = agent
+
         if hasattr(agent, "_bind_runtime"):
             agent._bind_runtime(self)
-        else: 
+        else:
             agent._attach_runtime(self)
+
+        # Inyecta el PromptProvider del runtime si el agente lo necesita
+        if self._prompts is not None and hasattr(agent, "_inject_prompt_registry"):
+            agent._inject_prompt_registry(self._prompts)
 
         async def handler(msg: Message) -> None:
             await agent.on_message(msg, self._context)
 
-        self._bus.subscribe(agent.agent_id, handler)
+        self._bus.subscribe(agent.name, handler)
 
     async def publish(self, message: Message) -> None:
         await self._bus.publish(message)

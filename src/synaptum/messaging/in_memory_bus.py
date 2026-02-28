@@ -12,8 +12,8 @@ class InMemoryMessageBus(MessageBus):
         self._subscribers: DefaultDict[str, List[MessageHandler]] = defaultdict(list)
         self._queue: asyncio.Queue[Message] = asyncio.Queue()
 
-    def subscribe(self, agent_id: str, handler: MessageHandler) -> None:
-        self._subscribers[agent_id].append(handler)
+    def subscribe(self, name: str, handler: MessageHandler) -> None:
+        self._subscribers[name].append(handler)
 
     async def publish(self, message: Message) -> None:
         await self._queue.put(message)

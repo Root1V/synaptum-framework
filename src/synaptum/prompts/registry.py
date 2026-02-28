@@ -5,7 +5,7 @@ from .template import PromptTemplate
 from .in_memory import InMemoryPromptProvider
 
 
-class PromptRegistry:
+class PromptRegistry(PromptProvider):
     """
     Registro central de prompts para el runtime.
 

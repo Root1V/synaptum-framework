@@ -8,9 +8,9 @@ from ..core.context import AgentContext
 
 @dataclass
 class GraphNode:
-    agent_id: str
+    name: str
     prompt_builder: Callable[[str], str]
-    next_node: Callable[[str], Optional[str]]  # output_text -> next agent_id or None
+    next_node: Callable[[str], Optional[str]]  # output_text -> next agent name or None
 
 
 class GraphPattern(Agent):
@@ -21,9 +21,9 @@ class GraphPattern(Agent):
     - Recibe agent.output, decide transición, y continúa hasta None
     - Entrega el último output al caller
     """
-    def __init__(self, agent_id: str, start_agent_id: str, nodes: Dict[str, GraphNode]):
-        super().__init__(agent_id=agent_id)
-        self.start_agent_id = start_agent_id
+    def __init__(self, name: str, start_name: str, nodes: Dict[str, GraphNode]):
+        super().__init__(name)
+        self.start_name = start_name
         self.nodes = nodes
         self._runs: Dict[str, Dict] = {}  # run_key -> state
 
@@ -45,7 +45,7 @@ class GraphPattern(Agent):
             "caller": caller,
             "original_msg_id": message.id,
             "task": task,
-            "current": self.start_agent_id,
+            "current": self.start_name,
         }
 
         await self._send_to_current(run_key)
@@ -57,11 +57,11 @@ class GraphPattern(Agent):
         prompt = node.prompt_builder(run["task"])
 
         await self.runtime.publish(Message(
-            sender=self.agent_id,
-            recipient=node.agent_id,
+            sender=self.name,
+            recipient=node.name,
             type="user.input",
             payload={"text": prompt},
-            reply_to=self.agent_id,
+            reply_to=self.name,
             metadata={"run_key": run_key, "node": current},
         ))
 
@@ -83,7 +83,7 @@ class GraphPattern(Agent):
             # fin -> devolver al caller
             caller = run["caller"]
             await self.runtime.publish(Message(
-                sender=self.agent_id,
+                sender=self.name,
                 recipient=caller,
                 type="agent.output",
                 payload={"text": out_text},
@@ -95,7 +95,7 @@ class GraphPattern(Agent):
         if nxt not in self.nodes:
             caller = run["caller"]
             await self.runtime.publish(Message(
-                sender=self.agent_id,
+                sender=self.name,
                 recipient=caller,
                 type="agent.output",
                 payload={"text": out_text},

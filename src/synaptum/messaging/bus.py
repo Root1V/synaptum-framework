@@ -17,7 +17,7 @@ class MessageBus(ABC):
     """
 
     @abstractmethod
-    def subscribe(self, agent_id: str, handler: MessageHandler) -> None:
+    def subscribe(self, name: str, handler: MessageHandler) -> None:
         raise NotImplementedError
 
     @abstractmethod

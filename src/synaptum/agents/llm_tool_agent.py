@@ -14,7 +14,7 @@ from ..agents.decision import DecisionParser
 
 @dataclass
 class LLMToolAgentConfig:
-    agent_id: str
+    name: str
     system_prompt: str
     max_steps: int = 6
     temperature: float = 0.2
@@ -38,7 +38,7 @@ class LLMToolAgent(Agent):
         tools: ToolRegistry,
         parser: Optional[DecisionParser] = None,
     ):
-        super().__init__(agent_id=config.agent_id)
+        super().__init__(config.name)
         self.cfg = config
         self.llm = llm
         self.tools = tools
@@ -65,7 +65,7 @@ class LLMToolAgent(Agent):
         out_meta["in_reply_to"] = message.id
 
         await self.runtime.publish(Message(
-            sender=self.agent_id,
+            sender=self.name,
             recipient=reply_to,
             type="agent.output",
             payload={"text": output},
@@ -74,7 +74,7 @@ class LLMToolAgent(Agent):
 
     async def _run_tool_loop(self, user_text: str, context: AgentContext) -> str:
         # historial desde state (por agente) usando key estable
-        hist_key = f"history:{self.agent_id}"
+        hist_key = f"history:{self.name}"
         history: List[Dict[str, str]] = self.state.get(hist_key, [])
         if not isinstance(history, list):
             history = []

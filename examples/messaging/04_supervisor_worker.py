@@ -53,24 +53,24 @@ async def main():
     tools = ToolRegistry()
 
     supervisor_llm = LLMToolAgent(
-        LLMToolAgentConfig(agent_id="supervisor_llm", system_prompt="Eres supervisor."),
+        LLMToolAgentConfig(name="supervisor_llm", system_prompt="Eres supervisor."),
         llm=FakeSupervisorLLM(),
         tools=tools,
     )
     research = LLMToolAgent(
-        LLMToolAgentConfig(agent_id="research", system_prompt="Eres research."),
+        LLMToolAgentConfig(name="research", system_prompt="Eres research."),
         llm=FakeWorkerLLM("research"),
         tools=tools,
     )
     writer = LLMToolAgent(
-        LLMToolAgentConfig(agent_id="writer", system_prompt="Eres writer."),
+        LLMToolAgentConfig(name="writer", system_prompt="Eres writer."),
         llm=FakeWorkerLLM("writer"),
         tools=tools,
     )
 
     supervisor_pattern = SupervisorPattern(SupervisorPatternConfig(
-        agent_id="supervisor_pattern",
-        supervisor_llm_agent_id="supervisor_llm",
+        name="supervisor_pattern",
+        supervisor_llm_name="supervisor_llm",
         workers=["research", "writer"],
     ))
 

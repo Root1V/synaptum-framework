@@ -39,18 +39,18 @@ async def main():
 
     nodes = {
         "node1": GraphNode(
-            agent_id="node1",
+            name="node1",
             prompt_builder=lambda task: f"Paso1: {task}",
             next_node=lambda out: "node2",
         ),
         "node2": GraphNode(
-            agent_id="node2",
+            name="node2",
             prompt_builder=lambda task: f"Paso2: usa lo anterior -> {task}",
             next_node=lambda out: None,
         )
     }
 
-    graph = GraphPattern(agent_id="graph", start_agent_id="node1", nodes=nodes)
+    graph = GraphPattern(name="graph", start_name="node1", nodes=nodes)
     client = ClientAgent("client")
 
     for a in [a1, a2, graph, client]:

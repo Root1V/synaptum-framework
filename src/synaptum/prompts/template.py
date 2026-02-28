@@ -10,7 +10,7 @@ class PromptTemplate:
 
     Attributes:
         content:     Texto del prompt. Puede contener variables con sintaxis
-                     Python estándar: "Eres un agente llamado {agent_id}."
+                     Python estándar: "Eres un agente llamado {name}."
         version:     Versión semántica del template para trazabilidad.
         description: Descripción legible del propósito del prompt.
         variables:   Valores por defecto para las variables del template.

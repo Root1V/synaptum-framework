@@ -49,24 +49,24 @@ async def main():
     tools = ToolRegistry()  # vacío (demo)
 
     router_llm_agent = LLMToolAgent(
-        LLMToolAgentConfig(agent_id="router_llm", system_prompt="Eres router."),
+        LLMToolAgentConfig(name="router_llm", system_prompt="Eres router."),
         llm=FakeRouterLLM(),
         tools=tools,
     )
     math_agent = LLMToolAgent(
-        LLMToolAgentConfig(agent_id="math", system_prompt="Eres math."),
+        LLMToolAgentConfig(name="math", system_prompt="Eres math."),
         llm=FakeMathLLM(),
         tools=tools,
     )
     general_agent = LLMToolAgent(
-        LLMToolAgentConfig(agent_id="general", system_prompt="Eres general."),
+        LLMToolAgentConfig(name="general", system_prompt="Eres general."),
         llm=FakeGeneralLLM(),
         tools=tools,
     )
 
     router_pattern = RouterPattern(RouterPatternConfig(
-        agent_id="router_pattern",
-        router_llm_agent_id="router_llm",
+        name="router_pattern",
+        router_llm_name="router_llm",
         specialists=["math", "general"],
     ))
 

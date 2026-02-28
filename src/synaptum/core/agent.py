@@ -11,9 +11,9 @@ class Agent(ABC):
     - El agente NO retorna output.
     - El agente PUBLICA mensajes (vía runtime/bus).
     """
-    def __init__(self, agent_id: str):
+    def __init__(self, name: str):
         self._id: str = str(uuid4())
-        self.agent_id = agent_id
+        self.name = name
         self.state = AgentState()
         self._runtime = None  # seteado por runtime.register()
 

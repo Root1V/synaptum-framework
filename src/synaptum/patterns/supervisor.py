@@ -9,9 +9,9 @@ from ..core.context import AgentContext
 
 @dataclass
 class SupervisorPatternConfig:
-    agent_id: str
-    supervisor_llm_agent_id: str
-    workers: List[str]  # agent_ids
+    name: str
+    supervisor_llm_name: str
+    workers: List[str]  # agent names
 
 
 class SupervisorPattern(Agent):
@@ -23,7 +23,7 @@ class SupervisorPattern(Agent):
     - Pide al supervisor_llm síntesis final y la entrega al caller
     """
     def __init__(self, cfg: SupervisorPatternConfig):
-        super().__init__(agent_id=cfg.agent_id)
+        super().__init__(cfg.name)
         self.cfg = cfg
         self._runs: Dict[str, Dict] = {}  # run_key -> state
 
@@ -53,18 +53,18 @@ class SupervisorPattern(Agent):
 
         prompt = (
             "Crea un plan de subtareas y asigna cada subtarea a un worker.\n"
-            f"Workers disponibles (agent_id): {self.cfg.workers}\n"
+            f"Workers disponibles: {self.cfg.workers}\n"
             "Responde SOLO con JSON {\"final\":\"PLAN_JSON:<json>\"}.\n"
-            "El <json> debe ser: {\"tasks\":[{\"worker\":\"agent_id\",\"input\":\"...\"}, ...]}.\n"
+            "El <json> debe ser: {\"tasks\":[{\"worker\":\"<name>\",\"input\":\"...\"}, ...]}.\n"
             f"Tarea:\n{text}"
         )
 
         await self.runtime.publish(Message(
-            sender=self.agent_id,
-            recipient=self.cfg.supervisor_llm_agent_id,
+            sender=self.name,
+            recipient=self.cfg.supervisor_llm_name,
             type="user.input",
             payload={"text": prompt},
-            reply_to=self.agent_id,
+            reply_to=self.name,
             metadata={"run_key": run_key},
         ))
 
@@ -76,7 +76,7 @@ class SupervisorPattern(Agent):
         run = self._runs[run_key]
         txt = str(message.payload.get("text", "")).strip() if isinstance(message.payload, dict) else str(message.payload).strip()
 
-        if run["phase"] == "planning" and message.sender == self.cfg.supervisor_llm_agent_id:
+        if run["phase"] == "planning" and message.sender == self.cfg.supervisor_llm_name:
             plan = self._parse_plan(txt, fallback_task=run["task_text"])
             run["plan"] = plan
             run["phase"] = "executing"
@@ -87,11 +87,11 @@ class SupervisorPattern(Agent):
                 inp = t["input"]
                 run["pending_workers"].add(worker)
                 await self.runtime.publish(Message(
-                    sender=self.agent_id,
+                    sender=self.name,
                     recipient=worker,
                     type="user.input",
                     payload={"text": inp},
-                    reply_to=self.agent_id,
+                    reply_to=self.name,
                     metadata={"run_key": run_key, "worker": worker},
                 ))
             return
@@ -107,16 +107,16 @@ class SupervisorPattern(Agent):
                 run["phase"] = "synthesizing"
                 synth_prompt = self._build_synth_prompt(run["task_text"], run["plan"], run["worker_results"])
                 await self.runtime.publish(Message(
-                    sender=self.agent_id,
-                    recipient=self.cfg.supervisor_llm_agent_id,
+                    sender=self.name,
+                    recipient=self.cfg.supervisor_llm_name,
                     type="user.input",
                     payload={"text": synth_prompt},
-                    reply_to=self.agent_id,
+                    reply_to=self.name,
                     metadata={"run_key": run_key},
                 ))
             return
 
-        if run["phase"] == "synthesizing" and message.sender == self.cfg.supervisor_llm_agent_id:
+        if run["phase"] == "synthesizing" and message.sender == self.cfg.supervisor_llm_name:
             caller = run["caller"]
             await self.runtime.publish(Message(
                 sender=self.agent_id,

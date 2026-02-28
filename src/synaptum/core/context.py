@@ -18,9 +18,9 @@ class AgentContext:
     def set(self, key: str, value: Any) -> None:
         self.metadata[key] = value
 
-    def agent_ids(self, prefix: Optional[str] = None) -> List[str]:
-        """Returns IDs of all registered agents, optionally filtered by prefix."""
-        ids = list(self._agent_registry.keys())
+    def agent_names(self, prefix: Optional[str] = None) -> List[str]:
+        """Returns names of all registered agents, optionally filtered by prefix."""
+        names = list(self._agent_registry.keys())
         if prefix:
-            ids = [aid for aid in ids if aid.startswith(prefix)]
-        return ids
+            names = [n for n in names if n.startswith(prefix)]
+        return names

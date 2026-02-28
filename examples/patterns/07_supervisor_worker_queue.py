@@ -5,6 +5,7 @@ from synaptum.agents.simple_agent import SimpleAgent
 from synaptum.core.message import Message
 from synaptum.core.runtime import AgentRuntime
 from synaptum.messaging.in_memory_bus import InMemoryMessageBus
+from synaptum.prompts.file_provider import FilePromptProvider
 
 # estado del supervisor: por cada run guarda caller, cola de tareas, workers libres y resultados
 _sup_state: dict = {}
@@ -12,7 +13,7 @@ _sup_state: dict = {}
 async def supervisor_handler(agent: SimpleAgent, msg: Message, ctx):
     if msg.type == "start":
         # descubrir workers dinámicamente desde el contexto
-        worker_ids = ctx.agent_ids(prefix="worker")
+        worker_ids = ctx.agent_names(prefix="worker")
         tasks = deque(msg.payload["tasks"])
         run_key = msg.id
         _sup_state[run_key] = {
@@ -70,7 +71,7 @@ async def worker_handler(agent: SimpleAgent, msg: Message, ctx):
     await agent._ref.send(
         to="supervisor",
         type="result",
-        payload={"worker": agent.agent_id, "result": result, "run_key": run_key},
+        payload={"worker": agent.name, "result": result, "run_key": run_key},
     )
 
 
@@ -82,19 +83,20 @@ async def client_handler(agent: SimpleAgent, msg: Message, ctx):
 
 async def main():
     bus = InMemoryMessageBus()
-    rt = AgentRuntime(bus)
+    runtime = AgentRuntime(bus)
 
     supervisor = SimpleAgent("supervisor", handler=supervisor_handler)
-    # 3 workers para 8 tareas → distribución dinámica
+    
+
     workers = [SimpleAgent(f"worker-{i}", handler=worker_handler) for i in range(3)]
     client = SimpleAgent("client", handler=client_handler)
 
-    rt.register(supervisor)
+    runtime.register(supervisor)
     for worker in workers:
-        rt.register(worker)
-    rt.register(client)
+        runtime.register(worker)
+    runtime.register(client)
 
-    await rt.start(run_id="run-supervisor-worker")
+    await runtime.start(run_id="run-supervisor-worker")
 
     await client._ref.send(
         to="supervisor",
@@ -103,7 +105,7 @@ async def main():
         reply_to="client",
     )
 
-    await rt.run_until_idle()
-    await rt.stop()
+    await runtime.run_until_idle()
+    await runtime.stop()
 
 asyncio.run(main())

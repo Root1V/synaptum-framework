@@ -8,9 +8,9 @@ from ..core.context import AgentContext
 
 @dataclass
 class RouterPatternConfig:
-    agent_id: str
-    router_llm_agent_id: str
-    specialists: List[str]  # agent_ids
+    name: str
+    router_llm_name: str
+    specialists: List[str]  # agent names
 
 
 class RouterPattern(Agent):
@@ -30,7 +30,7 @@ class RouterPattern(Agent):
     - Router recibe agent.output del specialist y lo entrega al caller original
     """
     def __init__(self, cfg: RouterPatternConfig):
-        super().__init__(agent_id=cfg.agent_id)
+        super().__init__(cfg.name)
         self.cfg = cfg
         self._pending: Dict[str, Dict] = {}  # route_req_id -> {"caller":..., "original_msg_id":...}
 
@@ -56,17 +56,17 @@ class RouterPattern(Agent):
 
         prompt = (
             "Elige el mejor especialista para esta tarea.\n"
-            f"Especialistas disponibles (agent_id): {self.cfg.specialists}\n"
-            "Responde SOLO con JSON {\"final\":\"<agent_id>\"}.\n"
+            f"Especialistas disponibles: {self.cfg.specialists}\n"
+            "Responde SOLO con JSON {\"final\":\"<name>\"}.\n"
             f"Tarea:\n{text}"
         )
 
         await self.runtime.publish(Message(
-            sender=self.agent_id,
-            recipient=self.cfg.router_llm_agent_id,
+            sender=self.name,
+            recipient=self.cfg.router_llm_name,
             type="user.input",
             payload={"text": prompt},
-            reply_to=self.agent_id,
+            reply_to=self.name,
             metadata={"route_req_id": route_req_id},
         ))
 
@@ -82,18 +82,18 @@ class RouterPattern(Agent):
         else:
             txt = str(message.payload).strip()
 
-        # Caso A: viene del router_llm => txt debe ser agent_id
-        if message.sender == self.cfg.router_llm_agent_id:
+        # Caso A: viene del router_llm => txt debe ser el name del specialist
+        if message.sender == self.cfg.router_llm_name:
             chosen = txt
             if chosen not in self.cfg.specialists:
                 chosen = self.cfg.specialists[0]
 
             await self.runtime.publish(Message(
-                sender=self.agent_id,
+                sender=self.name,
                 recipient=chosen,
                 type="user.input",
                 payload={"text": pending["text"]},
-                reply_to=self.agent_id,
+                reply_to=self.name,
                 metadata={"route_req_id": route_req_id},
             ))
             return
@@ -101,7 +101,7 @@ class RouterPattern(Agent):
         # Caso B: viene del specialist => entregar al caller y cerrar
         caller = pending["caller"]
         await self.runtime.publish(Message(
-            sender=self.agent_id,
+            sender=self.name,
             recipient=caller,
             type="agent.output",
             payload={"text": txt},
