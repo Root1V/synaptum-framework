@@ -113,40 +113,57 @@ class SimpleAgent(Agent):
         # 👉 comportamiento por defecto
         await self._default_handler(message, context)
 
+    async def think(self, user_message: str, **kwargs) -> str:
+        """
+        Reason about a user message using the agent's LLM and return the response.
+
+        Builds the message array internally (system prompt + user turn) so
+        callers never need to access ``_llm`` or ``_prompt`` directly.
+
+        Args:
+            user_message: The input text for the agent to reason about.
+            **kwargs: Extra keyword arguments forwarded to the LLM client.
+
+        Returns:
+            The LLM's response as a plain string.
+
+        Raises:
+            RuntimeError: If the agent has no LLM configured (passive agent).
+        """
+        if self._llm is None:
+            raise RuntimeError(
+                f"Agent '{self.name}' has no LLM configured. "
+                "Pass a 'prompt' or 'prompt_name' to enable LLM support."
+            )
+
+        messages = []
+        if self._prompt is not None:
+            messages.append({"role": "system", "content": self._prompt.render()})
+        messages.append({"role": "user", "content": user_message})
+
+        result = await self._llm.chat(messages, **kwargs)
+        return result.content
+
     async def _default_handler(self, message: Message, context: AgentContext) -> None:
 
         # agente pasivo si no tiene LLM
         if self._llm is None:
             return
-        
+
         if self._ref is None:
             raise RuntimeError("AgentRef no inyectado en SimpleAgent")
-        
-        messages = []
-        if self._prompt is not None:
-            messages.append(
-                {"role": "system", "content": self._prompt.render()}
-            )
 
-        user_text = ""
         if isinstance(message.payload, dict) and "text" in message.payload:
             user_text = str(message.payload["text"])
         else:
             user_text = str(message.payload)
-        
-        messages.append(
-            {"role": "user", "content": user_text}
-        )
 
-        result = await self._llm.chat(messages)
-        answer = result.content
+        answer = await self.think(user_text)
 
         # 👉 por defecto responde al sender
         await self._ref.send(
             to=message.reply_to,
-            payload={
-                "answer": answer
-            },
+            payload={"answer": answer},
             type="agent.output",
             metadata={"in_reply_to": message.id}
         )
