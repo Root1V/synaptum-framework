@@ -1,6 +1,10 @@
 # simple/simple_agent.py
 import warnings
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable, Optional, Type, Union
+
+from pydantic import BaseModel
+
+from ..core.state import AgentState
 
 from ..llm.client import LLMClient
 from ..llm.llama_client import LlamaClient
@@ -25,6 +29,19 @@ class SimpleAgent(Agent):
     2. ``prompt_name`` + ``prompt_provider`` — resolución por nombre
        desde un proveedor externo (recomendado para producción).
     3. ``system_prompt`` (str) — compatibilidad hacia atrás, deprecated.
+
+    Structured output::
+
+        class RouteDecision(BaseModel):
+            department: str = Field(description="Target specialist department")
+
+        agent = SimpleAgent(
+            "router",
+            prompt_name="bank.router.system",
+            output_model=RouteDecision,
+        )
+        # think() returns a RouteDecision instance, never a raw string
+        result: RouteDecision = await agent.think(case_text)
 
     Examples::
 
@@ -55,6 +72,7 @@ class SimpleAgent(Agent):
         prompt: Optional[PromptTemplate] = None,
         prompt_name: Optional[str] = None,
         prompt_provider: Optional[PromptProvider] = None,
+        output_model: Optional[Type[BaseModel]] = None,
         # --- backward compat ---
         system_prompt: Optional[str] = None,
         handler: Optional[Handler] = None,
@@ -64,6 +82,8 @@ class SimpleAgent(Agent):
         self._custom_handler = handler
         self._ref: Optional[AgentRef] = None
         self._pending_prompt_name: Optional[str] = None
+        self._output_model: Optional[Type[BaseModel]] = output_model
+        self.state = AgentState()  # per-instance state store for handlers
 
         # Resolver el PromptTemplate efectivo
         if prompt is not None:
@@ -113,19 +133,27 @@ class SimpleAgent(Agent):
         # 👉 comportamiento por defecto
         await self._default_handler(message, context)
 
-    async def think(self, user_message: str, **kwargs) -> str:
+    async def think(
+        self, user_message: str, **kwargs
+    ) -> Union[str, BaseModel]:
         """
-        Reason about a user message using the agent's LLM and return the response.
+        Reason about a user message using the agent's LLM.
 
         Builds the message array internally (system prompt + user turn) so
         callers never need to access ``_llm`` or ``_prompt`` directly.
 
+        If the agent was configured with ``output_model``, the LLM is asked to
+        respond as a JSON object matching that Pydantic schema and the method
+        returns a validated model instance instead of a plain string.
+
         Args:
             user_message: The input text for the agent to reason about.
-            **kwargs: Extra keyword arguments forwarded to the LLM client.
+            **kwargs: Extra keyword arguments forwarded to the LLM client
+                      (e.g. ``temperature``, ``max_tokens``).
 
         Returns:
-            The LLM's response as a plain string.
+            A plain ``str`` when no ``output_model`` is configured, or a
+            validated ``BaseModel`` instance when one is set.
 
         Raises:
             RuntimeError: If the agent has no LLM configured (passive agent).
@@ -141,7 +169,20 @@ class SimpleAgent(Agent):
             messages.append({"role": "system", "content": self._prompt.render()})
         messages.append({"role": "user", "content": user_message})
 
+        if self._output_model is not None:
+            kwargs.setdefault(
+                "response_format",
+                {
+                    "type": "json_object",
+                    "schema": self._output_model.model_json_schema(),
+                },
+            )
+
         result = await self._llm.chat(messages, **kwargs)
+
+        if self._output_model is not None:
+            return self._output_model.model_validate_json(result.content)
+
         return result.content
 
     async def _default_handler(self, message: Message, context: AgentContext) -> None:

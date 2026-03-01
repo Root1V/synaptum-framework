@@ -29,15 +29,13 @@ from synaptum.core.runtime import AgentRuntime
 from synaptum.messaging.in_memory_bus import InMemoryMessageBus
 from synaptum.prompts.file_provider import FilePromptProvider
 
-# ── supervisor state: keyed by msg.id ────────────────────────────────────────
-_sup_state: dict = {}
 
 async def supervisor_handler(agent: SimpleAgent, msg: Message, ctx):
     if msg.type == "start":
         # discover all registered specialists dynamically — no hardcoded list needed
         specialist_names = ctx.agent_names(prefix="specialist-")
         run_key = msg.id
-        _sup_state[run_key] = {
+        agent.state[run_key] = {
             "caller":  msg.reply_to or msg.sender,
             "pending": len(specialist_names),
             "reports": [],
@@ -52,9 +50,9 @@ async def supervisor_handler(agent: SimpleAgent, msg: Message, ctx):
 
     elif msg.type == "report":
         run_key = msg.payload.get("run_key")
-        if run_key not in _sup_state:
+        if run_key not in agent.state:
             return
-        state = _sup_state[run_key]
+        state = agent.state[run_key]
         state["reports"].append({
             "specialist": msg.payload["specialist"],
             "analysis":   msg.payload["analysis"],
@@ -72,7 +70,7 @@ async def supervisor_handler(agent: SimpleAgent, msg: Message, ctx):
                 type="decision",
                 payload={"summary": summary},
             )
-            del _sup_state[run_key]
+            del agent.state[run_key]
 
 
 async def worker_handler(agent: SimpleAgent, msg: Message, ctx):
