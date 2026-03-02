@@ -1,6 +1,6 @@
 [project]
 name = "synaptum"
-version = "0.2.0"
+version = "0.3.0"
 description = "Minimal Agent Development Framework (bus-driven) above an LLM SDK and below an agent platform"
 readme = "README.md"
 requires-python = ">=3.13"
