@@ -5,6 +5,7 @@ from .swarm import SwarmAgent
 from .reflection import ReflectionAgent, Critique
 from .consensus import ConsensusAgent, PanelistVerdict
 from .hitl import HITLAgent, ScreeningResult, HumanReviewRequest, HumanReviewResponse
+from .saga import SagaAgent, SagaStep, StepResult, SagaOutcome, StepAuditEntry
 
 __all__ = [
     "GraphBuilder", "END", "Graph", "ParallelNode", "parallel",
@@ -14,4 +15,5 @@ __all__ = [
     "ReflectionAgent", "Critique",
     "ConsensusAgent", "PanelistVerdict",
     "HITLAgent", "ScreeningResult", "HumanReviewRequest", "HumanReviewResponse",
+    "SagaAgent", "SagaStep", "StepResult", "SagaOutcome", "StepAuditEntry",
 ]
