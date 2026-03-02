@@ -23,13 +23,14 @@ State machine rules:
   underwriting → any          → decision
   decision     → (terminal)
 
-The `controller` agent (passive) drives transitions: it stores the growing
-application context in agent.state, routes stage.input messages, and
-delivers the final letter to the client.
+The `GraphBuilder` assembles the graph: nodes are named ``SimpleAgent``
+instances, edges declare the topology, and ``build()`` returns a
+``GraphAgent`` that drives the run.  A typed ``MortgageState`` dict flows
+through every stage so each node has full context from prior steps.
 """
 
 import asyncio
-from typing import Any
+from typing import Optional, TypedDict
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -40,6 +41,7 @@ from synaptum.agents.simple_agent import SimpleAgent
 from synaptum.core.message import Message
 from synaptum.core.runtime import AgentRuntime
 from synaptum.messaging.in_memory_bus import InMemoryMessageBus
+from synaptum.patterns.graph_builder import END, GraphBuilder
 from synaptum.prompts import FilePromptProvider
 
 
@@ -96,144 +98,26 @@ class LoanDecision(BaseModel):
     reason: str = Field(description="Clear explanation of the decision for the applicant.")
 
 
-# ── Transition table ──────────────────────────────────────────────────────────
+# ── Run state ─────────────────────────────────────────────────────────────────
 
-def _next_stage(stage: str, result: dict[str, Any]) -> str | None:
-    """Pure function: given the completed stage and its result, return the next stage."""
-    if stage == "stage-intake":
-        return "stage-credit-check"   # always proceed; intake is pre-processing only
-
-    if stage == "stage-credit-check":
-        band = result.get("band", "").upper()
-        if band in ("EXCELLENT", "GOOD"):
-            return "stage-decision"
-        if band == "FAIR":
-            return "stage-underwriting"
-        return "stage-decision"          # POOR → decline path
-
-    if stage == "stage-underwriting":
-        return "stage-decision"
-
-    return None                          # stage-decision is terminal
-
-
-# ── Stage handler (shared) ────────────────────────────────────────────────────
-
-async def stage_handler(agent: SimpleAgent, msg: Message, ctx):
-    """Run the stage LLM and report the structured result back to the controller."""
-    if msg.type != "stage.input":
-        return
-
-    context_text = msg.payload.get("context", "")
-    result = await agent.think(
-        f"Application context:\n{context_text}\n\nProcess this stage of the application."
-    )
-
-    await agent._ref.send(
-        to="controller",
-        type="stage.output",
-        payload={"stage": agent.name, "result": result.model_dump()},
-        metadata=msg.metadata,
-    )
-
-
-# ── Controller (passive — no LLM) ─────────────────────────────────────────────
-
-async def controller_handler(agent: SimpleAgent, msg: Message, ctx):
-    """
-    Drives the graph: routes stage.input, collects stage.output,
-    applies the transition table, and delivers the final decision.
-    """
-    if msg.type == "mortgage.submitted":
-        loan_id = msg.payload["loan_id"]
-        application = msg.payload["application"]
-
-        agent.state[loan_id] = {
-            "caller":      msg.sender,
-            "msg_id":      msg.id,
-            "application": application,
-            "history":     [],           # list of {stage, result} dicts
-        }
-
-        app_text = "\n".join(f"  {k}: {v}" for k, v in application.items())
-        print(f"\n── MORTGAGE {loan_id}: entering graph at stage-intake ──")
-        await _dispatch(agent, loan_id, "stage-intake", app_text)
-        return
-
-    if msg.type == "stage.output":
-        loan_id = msg.metadata.get("loan_id")
-        if not loan_id or loan_id not in agent.state:
-            return
-
-        state = agent.state[loan_id]
-        stage = msg.payload["stage"]
-        result = msg.payload["result"]
-
-        # Accumulate context on the blackboard-like state
-        state["history"].append({"stage": stage, "result": result})
-        print(f"  {stage}: {_short(result)}")
-
-        next_stage = _next_stage(stage, result)
-
-        if next_stage is None:
-            # Terminal — deliver decision to caller
-            final = next(
-                (e["result"] for e in reversed(state["history"])
-                 if e["stage"] == "stage-decision"),
-                state["history"][-1]["result"],
-            )
-            caller = state["caller"]
-            caller_msg_id = state["msg_id"]
-            del agent.state[loan_id]
-
-            await agent._ref.send(
-                to=caller,
-                type="mortgage.decision",
-                payload={"loan_id": loan_id, "decision": final},
-                metadata={"in_reply_to": caller_msg_id},
-            )
-            return
-
-        # Build accumulated context for the next stage
-        context_lines = [
-            "Original application:",
-            *[f"  {k}: {v}" for k, v in state["application"].items()],
-        ]
-        for entry in state["history"]:
-            context_lines.append(f"\n[{entry['stage']} output]")
-            context_lines += [f"  {k}: {v}" for k, v in entry["result"].items()]
-
-        print(f"  → routing to {next_stage}")
-        await _dispatch(agent, loan_id, next_stage, "\n".join(context_lines))
-
-
-async def _dispatch(agent: SimpleAgent, loan_id: str, stage: str, context: str):
-    """Route to the next graph stage."""
-    await agent._ref.send(
-        to=stage,
-        type="stage.input",
-        payload={"context": context},
-        reply_to="controller",
-        metadata={"loan_id": loan_id},
-    )
-
-
-def _short(result: dict) -> str:
-    """One-line summary of a stage result for the progress log."""
-    for key in ("band", "recommendation", "outcome", "status"):
-        if key in result:
-            return f"{key}={result[key]}"
-    if "debt_to_income_percent" in result:
-        return f"DTI={result['debt_to_income_percent']}%  LTV={result.get('loan_to_value_percent')}%"
-    return str(list(result.items())[:1])
-
+class MortgageState(TypedDict, total=False):
+    """Typed state dict that flows through every stage of the graph."""
+    # Input payload fields
+    loan_id:     str
+    application: dict
+    # Stage outputs (keyed by normalised agent name: hyphens → underscores)
+    intake:       dict   # IntakeResult
+    credit_check: dict   # CreditResult
+    underwriting: dict   # UnderwritingResult
+    decision:     dict   # LoanDecision
 
 # ── Client ────────────────────────────────────────────────────────────────────
 
 async def client_handler(agent: SimpleAgent, msg: Message, ctx):
     if msg.type == "mortgage.decision":
-        d = msg.payload["decision"]
-        print(f"\n── MORTGAGE DECISION  (loan: {msg.payload['loan_id']}) ──")
+        d = msg.payload["result"]
+        loan_id = msg.payload["input"].get("loan_id", "?")
+        print(f"\n── MORTGAGE DECISION  (loan: {loan_id}) ──")
         print(f"  Outcome:       {d.get('outcome', 'N/A')}")
         if d.get("amount_approved", 0) > 0:
             print(f"  Amount:        ${d['amount_approved']:,.0f}")
@@ -253,47 +137,67 @@ async def main():
     prompt_provider = FilePromptProvider("examples/prompts/graph.yaml")
     runtime = AgentRuntime(bus, prompts=prompt_provider)
 
-    controller = SimpleAgent("controller", handler=controller_handler)
+    # ── Nodes ──────────────────────────────────────────────────────────────────
+    intake = SimpleAgent(
+        "intake",
+        prompt_name="bank.graph.intake.system",
+        output_model=IntakeResult,
+    )
+    credit_check = SimpleAgent(
+        "credit-check",
+        prompt_name="bank.graph.credit_check.system",
+        output_model=CreditResult,
+    )
+    underwriting = SimpleAgent(
+        "underwriting",
+        prompt_name="bank.graph.underwriting.system",
+        output_model=UnderwritingResult,
+    )
+    decision = SimpleAgent(
+        "decision",
+        prompt_name="bank.graph.decision.system",
+        output_model=LoanDecision,
+    )
 
-    stages = [
-        SimpleAgent(
-            "stage-intake",
-            prompt_name="bank.graph.intake.system",
-            output_model=IntakeResult,
-            handler=stage_handler,
-        ),
-        SimpleAgent(
-            "stage-credit-check",
-            prompt_name="bank.graph.credit_check.system",
-            output_model=CreditResult,
-            handler=stage_handler,
-        ),
-        SimpleAgent(
-            "stage-underwriting",
-            prompt_name="bank.graph.underwriting.system",
-            output_model=UnderwritingResult,
-            handler=stage_handler,
-        ),
-        SimpleAgent(
-            "stage-decision",
-            prompt_name="bank.graph.decision.system",
-            output_model=LoanDecision,
-            handler=stage_handler,
-        ),
-    ]
+    # ── Graph ───────────────────────────────────────────────────────────────────
+    processor = (
+        GraphBuilder("mortgage-processor", state=MortgageState)
+        .submit("mortgage.submitted")
+        .result("mortgage.decision")
+        
+        .add_node(intake)
+        .add_node(credit_check)
+        .add_node(underwriting)
+        .add_node(decision)
+        
+        .set_entry(intake)
+        .add_edge(intake, credit_check)
+        .add_conditional_edges(
+            credit_check,
+            lambda state: state["credit_check"]["band"].upper(),
+            {
+                "EXCELLENT": decision,
+                "GOOD":      decision,
+                "FAIR":      underwriting,
+                "POOR":      decision,
+            },
+        )
+        .add_edge(underwriting, decision)
+        .add_edge(decision, END)
+        .verbose()
+        .build()
+    )
 
     client = SimpleAgent("client", handler=client_handler)
 
-    runtime.register(controller)
-    for stage in stages:
-        runtime.register(stage)
+    runtime.register(processor)  # also registers intake, credit_check, underwriting, decision
     runtime.register(client)
 
     await runtime.start(run_id="run-mortgage-graph")
 
     # Borderline applicant: FAIR credit band expected → underwriting path
     await client._ref.send(
-        to="controller",
+        to="mortgage-processor",
         type="mortgage.submitted",
         payload={
             "loan_id": "MTG-2026-00447",

@@ -4,7 +4,7 @@
 
 Synaptum sits between your LLM SDK and your agent platform. It gives you the minimal primitives — agents, a message bus, a runtime, and prompt management — to build reliable, testable agent applications without opinion on your infrastructure.
 
-> **Version:** 0.2.0 · **Python:** ≥ 3.13 · **License:** MIT
+> **Version:** 0.3.0 · **Python:** ≥ 3.13 · **License:** MIT
 
 ---
 
@@ -265,13 +265,17 @@ asyncio.run(main())
 
 Synaptum includes ready-to-use coordination patterns in `synaptum.patterns`:
 
-| Pattern | Class | Use case |
+| Pattern | API | Use case |
 |---|---|---|
 | Request / Reply | `SimpleAgent` | Single agent query/response |
 | Router | `RouterPattern` | LLM decides which specialist handles the task |
 | Supervisor / Worker | `SupervisorPattern` | LLM plans tasks and distributes to workers |
-| Graph | `GraphPattern` | Sequential pipeline with conditional transitions |
+| Graph — sequential | `GraphBuilder` | State machine with typed state and conditional transitions |
+| Graph — parallel | `parallel()` + `GraphBuilder` | Fork/join: independent agents run concurrently via `asyncio.gather()` |
 | Supervisor Queue | `SimpleAgent` + handlers | Worker pool with dynamic task dispatching |
+| Pipeline | `SimpleAgent` chain | Fixed linear processing steps |
+| Pub/Sub | `SimpleAgent` + bus | Broadcast events to multiple subscribers |
+| Blackboard | `SimpleAgent` + shared state | Agents read/write a common knowledge store |
 
 See the [`examples/`](examples/) directory for runnable code for each pattern.
 
@@ -288,6 +292,7 @@ synaptum/
 │   └── context.py        # AgentContext — run_id, metadata, agent_names()
 ├── agents/
 │   ├── simple_agent.py   # SimpleAgent — LLM + prompt + custom handler
+│   ├── graph_agent.py    # GraphAgent — drives a compiled Graph (internal)
 │   └── llm_tool_agent.py # LLMToolAgent — tool-use loop
 ├── prompts/
 │   ├── template.py       # PromptTemplate — content, version, variables
@@ -304,7 +309,7 @@ synaptum/
 ├── patterns/
 │   ├── router.py         # RouterPattern
 │   ├── supervisor.py     # SupervisorPattern
-│   └── graph.py          # GraphPattern
+│   └── graph_builder.py  # GraphBuilder, Graph, ParallelNode, parallel(), END
 ├── tools/                # Tool registry for LLMToolAgent
 └── memory/               # Pluggable memory store
 ```
@@ -343,6 +348,17 @@ class DBPromptProvider(PromptProvider):
 ---
 
 ## Changelog
+
+### [0.3.0] — 2026-03-01
+
+- **`GraphBuilder` declarative API** — replaces the old procedural `GraphPattern`; follows the LangGraph `StateGraph` pattern: nodes are `SimpleAgent` instances, edges declare topology, `build()` returns a `GraphAgent` that drives the entire graph
+- **Typed run state** — `GraphBuilder(name, state=MyTypedDict)` accepts a `TypedDict` that flows through every node; each stage writes its output under a normalised key (hyphens → underscores); conditional router lambdas receive the **full accumulated state dict**
+- **`parallel()` fork/join** — `parallel(name, agent_a, agent_b, agent_c)` creates a `ParallelNode` that executes all children concurrently via `asyncio.gather()` and merges their results back into the shared state; the graph sees it as a single node
+- **Single registration** — `runtime.register(processor)` is enough; the `GraphAgent` automatically cascade-registers all child nodes (including `ParallelNode` children)
+- **`GraphAgent`** — internal execution engine created by `build()`; no message-bus round-trips between internal stages; only two messages exist on the bus per run (submit + result)
+- **`_resolve_name` / `_resolve_target`** — moved from module-level to private `@staticmethod` inside `GraphBuilder`
+- **Example 13** — mortgage state machine fully rewritten with new `GraphBuilder` API and `MortgageState(TypedDict)`
+- **Example 14** — new personal loan assessment demonstrating `parallel()` with three concurrent risk-check agents (`credit-check`, `employment-verify`, `fraud-scan`)
 
 ### [0.2.0] — 2026-02-28
 
