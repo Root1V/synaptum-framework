@@ -1,53 +1,60 @@
 """
 Pattern: Saga / Compensating Transactions — Cross-Border Wire Transfer
 ======================================================================
-Demonstrates the ``SagaAgent`` pattern: a fixed sequence of steps each paired
-with a compensating action.  If any step fails, all previously completed steps
-are reversed in LIFO order — restoring the system to its pre-saga state.
+Demonstrates the ``SagaAgent`` pattern using **true message choreography**.
 
-Saga vs other patterns:
+There is no central orchestrator.  Each step is an autonomous agent that
+reacts to a message, performs its action via LLM, and fires the next
+message.  The SagaAgent only launches the chain — after that it steps
+back completely.
 
-  Plan-and-Execute → planner generates steps dynamically; no rollback
-  Swarm            → agents hand off control; no compensation concept
-  HITL             → single human gate; not a multi-step transaction
+Architecture (choreography, not orchestration)
+-----------------------------------------------
+
+  SagaAgent("wire-saga")
+    registers:
+      wire-saga._fwd.debit-source
+      wire-saga._fwd.fx-conversion
+      wire-saga._fwd.swift-transmission
+      wire-saga._fwd.credit-destination
+      wire-saga._cmp.fx-conversion       ← compensator for step 2
+      wire-saga._cmp.debit-source        ← compensator for step 1
+      wire-saga._outcome                 ← terminal node
+
+  Message flow (all via bus — no Python loops at runtime):
+
+  client ──[wire.saga.started]──▶ wire-saga
+                  │
+                  └──[__saga.fwd__]──▶ _fwd.debit-source         ✓ JE-XXXXX
+                                             │
+                                        [__saga.fwd__]──▶ _fwd.fx-conversion      ✓ FXD-XXXXX
+                                                               │
+                                                          [__saga.fwd__]──▶ _fwd.swift-transmission  ✗ OFFLINE
+                                                                                 │
+                                                                            [__saga.cmp__]──▶ _cmp.fx-conversion    ↩ REV-FXD
+                                                                                                     │
+                                                                                                [__saga.cmp__]──▶ _cmp.debit-source  ↩ REV-JE
+                                                                                                                       │
+                                                                                                                  [__saga.cmp__]──▶ _outcome ──▶ client
+
+Saga state
+----------
+All intermediate results travel immutably inside the message payload
+under the ``__saga__`` key.  No shared mutable state.  No central loop.
+
+Saga vs other patterns
+-----------------------
+  Plan-and-Execute → dynamic steps; no rollback
+  Swarm            → handoff control; no compensation concept
+  HITL             → single human gate
   Reflection       → iterative quality loop; no side-effects to reverse
-  Saga             → FIXED ordered steps; each paired with a compensator;
-                     failure at step K triggers rollback of K-1…0 in reverse
-
-Use-case — Cross-border wire transfer:
-  A Colombian company wants to send EUR funds to a supplier in Spain.
-  The transfer involves 4 sequential steps with external side effects:
-
-    Step 1 → debit-source:        Debit USD from payer account (GL entry)
-    Step 2 → fx-conversion:       Convert USD → EUR at spot rate (FX deal)
-    Step 3 → swift-transmission:  Send SWIFT MT103 to correspondent bank
-    Step 4 → credit-destination:  Credit EUR to beneficiary account
-
-  Demo scenario: the beneficiary's correspondent bank is OFFLINE.
-  SWIFT transmission (step 3) fails → saga rolls back:
-    ↩ step 2: FX reversal  (sell back EUR, recover USD)
-    ↩ step 1: Credit-back  (reverse GL debit, restore balance)
-
-  Steps 1 and 2 are successfully compensated; step 4 never ran.
-
-Execution flow:
-
-  client._ref.send("wire-saga", type="wire.saga.started")
-         │
-         ▼  ✓ Step 1: debit-source       (JE-2026-XXXXXX)
-         ▼  ✓ Step 2: fx-conversion      (FXD-2026-XXXXXX)
-         ▼  ✗ Step 3: swift-transmission (OFFLINE — RJCT)
-         │
-         ├── ROLLBACK triggered
-         ▼  ↩ Step 2 compensated: fx-reversal
-         ▼  ↩ Step 1 compensated: credit-source
-         │
-         ▼  SagaOutcome(status=ROLLED_BACK) → client
+  Saga             → FIXED ordered steps + compensators;
+                     failure at step K triggers LIFO rollback of K-1…0;
+                     **entire flow is driven by messages, not Python loops**
 """
 
 import asyncio
 
-from pathlib import Path as _Path
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -57,14 +64,8 @@ from synaptum.core.context import AgentContext
 from synaptum.core.message import Message
 from synaptum.core.runtime import AgentRuntime
 from synaptum.messaging.in_memory_bus import InMemoryMessageBus
-from synaptum.patterns.saga import (
-    SagaAgent,
-    SagaOutcome,
-    SagaStep,
-    StepResult,
-)
+from synaptum.patterns.saga import SagaAgent, SagaOutcome, SagaStep
 from synaptum.prompts import FilePromptProvider
-
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -80,88 +81,47 @@ async def main() -> None:
         if message.type == "wire.saga.completed":
             results.append(message.payload)
 
-    # ── Step agents (each paired: executor + compensator) ─────────────────
-    debit_source = SimpleAgent(
-        "debit-source",
-        prompt_name  = "bank.saga.debit_source.system",
-        output_model = StepResult,
-    )
-    credit_source = SimpleAgent(          # compensator for debit-source
-        "credit-source",
-        prompt_name  = "bank.saga.credit_source.system",
-        output_model = StepResult,
-    )
-
-    fx_conversion = SimpleAgent(
-        "fx-conversion",
-        prompt_name  = "bank.saga.fx_conversion.system",
-        output_model = StepResult,
-    )
-    fx_reversal = SimpleAgent(            # compensator for fx-conversion
-        "fx-reversal",
-        prompt_name  = "bank.saga.fx_reversal.system",
-        output_model = StepResult,
-    )
-
-    swift_transmission = SimpleAgent(
-        "swift-transmission",
-        prompt_name  = "bank.saga.swift_transmission.system",
-        output_model = StepResult,
-    )
-    swift_cancellation = SimpleAgent(     # compensator for swift-transmission
-        "swift-cancellation",             # (not invoked when MT103 was never sent)
-        prompt_name  = "bank.saga.swift_cancellation.system",
-        output_model = StepResult,
-    )
-
-    credit_destination = SimpleAgent(
-        "credit-destination",
-        prompt_name  = "bank.saga.credit_destination.system",
-        output_model = StepResult,
-    )
-    debit_destination = SimpleAgent(      # compensator for credit-destination
-        "debit-destination",              # (not invoked — step 4 never ran)
-        prompt_name  = "bank.saga.debit_destination.system",
-        output_model = StepResult,
-    )
-
     # ── Saga definition ────────────────────────────────────────────────────
+    # Each SagaStep declares the LLM prompt for the forward action and its
+    # compensating action.  No agent objects to create manually — SagaAgent
+    # builds and registers all internal step/compensator/outcome agents
+    # automatically during runtime.register().
     wire_saga = SagaAgent(
         "wire-saga",
         steps = [
             SagaStep(
-                name        = "debit-source",
-                description = "Debit USD from payer account and record GL journal entry",
-                executor    = debit_source,
-                compensator = credit_source,
+                name              = "debit-source",
+                description       = "Debit USD from payer account and record GL journal entry",
+                forward_prompt    = "bank.saga.debit_source.system",
+                compensate_prompt = "bank.saga.credit_source.system",
             ),
             SagaStep(
-                name        = "fx-conversion",
-                description = "Convert USD to EUR at today's spot rate via FX Trading Desk",
-                executor    = fx_conversion,
-                compensator = fx_reversal,
+                name              = "fx-conversion",
+                description       = "Convert USD to EUR at today's spot rate via FX Trading Desk",
+                forward_prompt    = "bank.saga.fx_conversion.system",
+                compensate_prompt = "bank.saga.fx_reversal.system",
             ),
             SagaStep(
-                name        = "swift-transmission",
-                description = "Transmit SWIFT MT103 to JPMorgan Madrid as correspondent bank",
-                executor    = swift_transmission,
-                compensator = swift_cancellation,
+                name              = "swift-transmission",
+                description       = "Transmit SWIFT MT103 to JPMorgan Madrid as correspondent bank",
+                forward_prompt    = "bank.saga.swift_transmission.system",
+                compensate_prompt = "bank.saga.swift_cancellation.system",
             ),
             SagaStep(
-                name        = "credit-destination",
-                description = "Credit EUR to beneficiary account at Banco Santander Madrid",
-                executor    = credit_destination,
-                compensator = debit_destination,
+                name              = "credit-destination",
+                description       = "Credit EUR to beneficiary account at Banco Santander Madrid",
+                forward_prompt    = "bank.saga.credit_destination.system",
+                compensate_prompt = "bank.saga.debit_destination.system",
             ),
         ],
-        submit_type = "wire.saga.started",
-        result_type = "wire.saga.completed",
-        verbose     = True,
+        trigger_type = "wire.saga.started",
+        result_type  = "wire.saga.completed",
+        verbose      = True,
     )
 
     client = SimpleAgent("client", handler=client_handler)
 
-    runtime.register(wire_saga)
+    runtime.register(wire_saga)   # registers wire-saga + all 9 internal agents
     runtime.register(client)
 
     await runtime.start(run_id="run-wire-saga-2026-031")

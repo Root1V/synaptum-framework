@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import List
 from uuid import uuid4
 from .message import Message
 from .context import AgentContext
@@ -39,3 +40,27 @@ class Agent(ABC):
     @abstractmethod
     async def on_message(self, message: Message, context: AgentContext) -> None:
         raise NotImplementedError
+
+
+class CompositeAgent(Agent):
+    """
+    An Agent that composes a topology of sub-agents.
+
+    ``sub_agents()`` declares the internal agents that form this topology.
+    ``AgentRuntime.register()`` automatically registers all of them when
+    this composite agent is registered — no manual ``runtime.register()``
+    calls needed inside ``_bind_runtime``.
+
+    Use this as the base class whenever an agent's primary job is to wire
+    a group of simpler agents together (e.g. SagaAgent, Pipeline, Swarm).
+    The composite itself is also a full Agent: it can receive messages via
+    ``on_message`` and act as the public entry point for the topology.
+    """
+
+    def sub_agents(self) -> List["Agent"]:
+        """
+        Return the list of agents that make up this topology.
+        Called once by the runtime during registration.
+        Override in subclasses to declare the internal topology.
+        """
+        return []

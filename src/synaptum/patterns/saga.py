@@ -1,531 +1,732 @@
 """
-SagaAgent — Saga / Compensating Transactions pattern.
+SagaAgent — Saga / Compensating Transactions  (choreography model)
+===================================================================
 
-Design
-------
-The Saga pattern manages a sequence of steps that each have *side effects*
-(external systems, ledger entries, SWIFT messages, etc.).  If any step fails
-the saga automatically runs the *compensating action* for every previously
-completed step, in reverse order, restoring the system to its pre-saga state.
+Architecture
+------------
+Classic implementations run sagas as a central loop that calls each step
+in turn.  This implementation is fundamentally different: **there is no
+orchestrator**.  The saga is a chain of autonomous agents connected by
+message passing.  Once started, the ``SagaAgent`` only launches the first
+step and steps back.  The chain evolves entirely through the bus.
 
-  1. **Forward execution** — steps run sequentially.  Each step executor
-     receives: the original transaction payload + a summary of all prior
-     step results so that later steps can reference earlier outputs.
+Execution graph
+---------------
 
-  2. **Failure detection** — an executor signals failure by returning a
-     ``StepResult`` with ``success=False`` and a ``failure_reason``.
-     Any Python exception also triggers the same rollback path.
+  SagaAgent  ─[͟͟saga.fwd͟͟]─▶  _fwd.step-0
+                                    │  success  ─[͟͟saga.fwd͟͟]─▶  _fwd.step-1
+                                    │                           │  success  ─▶  …  ─▶  _outcome (COMMITTED)
+                                    │                           │  failure  ─[͟͟saga.cmp͟͟]─▶  _cmp.step-0  ─▶  _outcome
+                                    │  failure  ─[͟͟saga.cmp͟͟]─▶  _outcome (step-0 failed, nothing to compensate)
 
-  3. **Compensation (rollback)** — steps are compensated in LIFO order.
-     Each compensator receives: the original payload + the step's own
-     forward output (so it knows exactly what to undo).
+Each ``_SagaForwardAgent``:
+  - Receives ``__saga.fwd__`` on the bus
+  - Calls its LLM via ``self.think()`` (inherited from ``SimpleAgent``)
+  - On success → sends ``__saga.fwd__`` to the next step (or ``_outcome``)
+  - On failure → sends ``__saga.cmp__`` to start the compensation chain
 
-  4. **Outcome** — a ``SagaOutcome`` reports whether the saga committed
-     fully or was rolled back, which step failed, which compensations were
-     applied, and the per-step audit log.
+Each ``_SagaCompensatorAgent``:
+  - Receives ``__saga.cmp__`` on the bus
+  - Calls its LLM to undo the forward action
+  - Sends ``__saga.cmp__`` to the previous compensator (LIFO) or to ``_outcome``
 
-Difference from other patterns
--------------------------------
-  Plan-and-Execute → planner decides the steps dynamically; no rollback
-  Swarm            → agents hand off control; no compensation concept
-  HITL             → single pause/gate; not a multi-step transaction
-  Saga             → FIXED, ordered steps each with a paired compensator;
-                     failure at step K triggers rollback of steps K-1…0
-                     in reverse order — the classic distributed-txn pattern
+``_SagaOutcomeAgent``:
+  - Terminal node: receives final ``__saga.fwd__`` (COMMITTED) or
+    ``__saga.cmp__`` (ROLLED_BACK / PARTIAL_ROLLBACK) and delivers
+    ``SagaOutcome`` to the original caller.
 
-Classic use-cases
------------------
-  • Cross-border wire transfer (debit → FX → SWIFT → credit)
-  • E-commerce order (inventory reserve → payment → shipping → loyalty points)
-  • Loan disbursement (approval record → GL debit → core-banking credit → notify)
+Saga state
+----------
+All state is carried **in the message payload** under a reserved
+``__saga__`` key, evolving immutably as messages flow through the chain.
+No shared mutable state outside the bus.
 
-Usage
------
+Public API
+----------
 ::
 
-    from synaptum.patterns.saga import SagaAgent, SagaStep, StepResult
+    from synaptum.patterns.saga import SagaAgent, SagaStep, StepResult, SagaOutcome
 
     saga = SagaAgent(
-        "cross-border-wire",
+        "wire-saga",
         steps = [
-            SagaStep("debit-source",       "Debit USD from payer account",
-                     executor=debit_agent,   compensator=credit_back_agent),
-            SagaStep("fx-conversion",       "Convert USD to EUR at spot rate",
-                     executor=fx_agent,      compensator=fx_reverse_agent),
-            SagaStep("swift-transmission",  "Send SWIFT MT103 to correspondent",
-                     executor=swift_agent,   compensator=swift_cancel_agent),
-            SagaStep("credit-destination",  "Credit EUR to beneficiary account",
-                     executor=credit_agent,  compensator=debit_back_agent),
+            SagaStep(
+                name              = "debit-source",
+                description       = "Debit USD from payer account",
+                forward_prompt    = "bank.saga.debit_source.system",
+                compensate_prompt = "bank.saga.credit_source.system",
+            ),
+            ...
         ],
-        submit_type = "wire.saga.started",
-        result_type = "wire.saga.completed",
-        verbose     = True,
+        trigger_type = "wire.saga.started",
+        result_type  = "wire.saga.completed",
+        verbose      = True,
     )
-    runtime.register(saga)
+    runtime.register(saga)   # registers saga + all internal step/compensator agents
 """
 
 from __future__ import annotations
 
 import json
 import traceback
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from ..core.agent import Agent
+from ..core.agent import Agent, CompositeAgent
 from ..core.context import AgentContext
 from ..core.message import Message
 from ..agents.agent_ref import AgentRef
+from ..agents.simple_agent import SimpleAgent
 
 
-# ── Step result schema ─────────────────────────────────────────────────────────
+# ── Internal message types ─────────────────────────────────────────────────────────────────────────────
+_SAGA_FWD = "__saga.fwd__"
+_SAGA_CMP = "__saga.cmp__"
 
+
+# ── Public result schemas ─────────────────────────────────────────────────────────────────────────────────
 class StepResult(BaseModel):
     """
-    Structured result that every executor AND compensator agent must return.
+    Structured result that every forward executor and compensator must return.
 
     Fields
     ------
-    success : bool
-        True → step completed; the saga may proceed to the next step.
-        False → step failed; the saga should begin compensation.
-    data : dict
-        Output data produced by this step (e.g. debit reference, FX rate used,
-        SWIFT UETR, credited amount).  Forwarded to subsequent steps and stored
-        in the audit log for the compensator's use.
-    failure_reason : str
-        Human-readable explanation of the failure.  Empty string when success=True.
-    reference_id : str
-        External reference / transaction ID assigned by this step
-        (e.g. journal entry ID, SWIFT UETR).  Empty string if not applicable.
+    success        : True → step completed; False → step failed / compensation applied.
+    data           : Output data produced (e.g. debit reference, FX rate, UETR).
+    failure_reason : Human-readable failure description.  Empty when success=True.
+    reference_id   : External reference assigned by this step (e.g. "JE-2026-001").
     """
     success: bool = Field(
-        description="True if the step completed successfully; False if it failed.",
+        description="True if the step completed; False if it failed.",
     )
     data: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Output data produced by this step (forwarded to subsequent steps).",
+        description="Output data produced by this step.",
     )
     failure_reason: str = Field(
         default="",
-        description="Explanation of the failure. Empty string when success=True.",
+        description="Failure description.  Empty when success=True.",
     )
     reference_id: str = Field(
         default="",
-        description="External reference ID assigned by this step (e.g. UETR, journal ID).",
+        description="External reference ID assigned by this step.",
     )
 
-
-# ── Saga outcome schema ────────────────────────────────────────────────────────
 
 class StepAuditEntry(BaseModel):
-    """Audit record for one step in the saga execution log."""
-    step_name: str
-    status: str = Field(
-        description="COMPLETED | FAILED | COMPENSATED | COMPENSATION_FAILED",
+    """Immutable audit record written for every step execution in the saga log."""
+    step_name: str = Field(
+        description="Name of the saga step this entry belongs to (e.g. 'debit-source').",
     )
-    reference_id: str = ""
-    data: Dict[str, Any] = Field(default_factory=dict)
-    failure_reason: str = ""
+    status: str = Field(
+        description=(
+            "Execution result of this step. "
+            "One of: COMPLETED, FAILED, COMPENSATED, COMPENSATION_FAILED."
+        ),
+    )
+    reference_id: str = Field(
+        default="",
+        description="External reference ID produced by this step execution (e.g. 'JE-2026-001').  Empty if none.",
+    )
+    data: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Output data snapshot captured at the time of execution.",
+    )
+    failure_reason: str = Field(
+        default="",
+        description="Failure description when status is FAILED or COMPENSATION_FAILED.  Empty otherwise.",
+    )
 
 
 class SagaOutcome(BaseModel):
     """
-    Final outcome of a saga, delivered to the caller.
+    Final outcome delivered to the saga caller once the chain terminates.
 
-    Fields
+    status
     ------
-    status : str
-        COMMITTED — all steps completed successfully.
-        ROLLED_BACK — a step failed; all prior steps have been compensated.
-        PARTIAL_ROLLBACK — compensation itself failed for one or more steps
-                           (system requires manual intervention).
-    failed_step : str
-        Name of the step that triggered rollback.  Empty if status=COMMITTED.
-    failure_reason : str
-        Reason reported by the failed step.  Empty if status=COMMITTED.
-    steps_completed : int
-        Number of forward steps that ran successfully before failure.
-    compensations_applied : list[str]
-        Names of steps whose compensating actions were executed.
-    audit_log : list[StepAuditEntry]
-        Full per-step execution history in chronological order.
-    summary : str
-        One-paragraph narrative of what happened (human-readable).
+    COMMITTED        — all steps completed successfully; no rollback needed.
+    ROLLED_BACK      — a step failed; all previously completed steps were
+                       successfully compensated.
+    PARTIAL_ROLLBACK — a step failed AND at least one compensator also failed;
+                       manual intervention is required to restore consistency.
     """
     status: str = Field(
-        description="COMMITTED | ROLLED_BACK | PARTIAL_ROLLBACK",
+        description="Terminal status of the saga: COMMITTED | ROLLED_BACK | PARTIAL_ROLLBACK.",
     )
     failed_step: str = Field(
         default="",
-        description="Name of the step that triggered rollback.",
+        description="Name of the step that triggered rollback.  Empty when status=COMMITTED.",
     )
     failure_reason: str = Field(
         default="",
-        description="Failure reason from the failed step.",
+        description="Failure reason reported by the failed step.  Empty when status=COMMITTED.",
     )
     steps_completed: int = Field(
-        description="Number of forward steps that completed before any failure.",
+        description="Number of forward steps that completed successfully before any failure.",
     )
     compensations_applied: List[str] = Field(
         default_factory=list,
-        description="Names of compensated steps.",
+        description="Names of the steps whose compensating actions were executed successfully.",
     )
     audit_log: List[StepAuditEntry] = Field(
         default_factory=list,
-        description="Full execution history in chronological order.",
+        description="Full per-step execution history in chronological order (forward + compensation).",
     )
     summary: str = Field(
-        description="One-paragraph narrative summary of the saga execution.",
+        description="One-paragraph narrative summary of the saga execution, suitable for logging or display.",
     )
 
 
-# ── SagaStep dataclass ─────────────────────────────────────────────────────────
+# ── SagaStep definition ─────────────────────────────────────────────────────────────────────────────────────────
 
-@dataclass
-class SagaStep:
+class SagaStep(BaseModel):
     """
-    Defines one step in a saga: a named forward action + its compensating action.
-
-    Parameters
-    ----------
-    name : str
-        Unique identifier for this step (e.g. "debit-source").
-    description : str
-        Human-readable description of what this step does.
-    executor : Agent
-        LLM agent that performs the forward action.
-        Must return a ``StepResult``-compatible JSON response.
-    compensator : Agent
-        LLM agent that undoes the forward action.
-        Must return a ``StepResult``-compatible JSON response.
+    Declares one step in a saga: a named forward action paired with its
+    compensating action.  Both are expressed as prompt keys resolved at
+    runtime from the configured ``PromptProvider``.
     """
-    name: str
-    description: str
-    executor: Agent
-    compensator: Agent
+    name: str = Field(
+        description="Unique identifier for this step, used as the bus agent name suffix (e.g. 'debit-source').",
+    )
+    description: str = Field(
+        description="Human-readable description of what this step does, injected into the LLM prompt.",
+    )
+    forward_prompt: str = Field(
+        description="Prompt registry key for the executor LLM agent (the forward action).",
+    )
+    compensate_prompt: str = Field(
+        description="Prompt registry key for the compensator LLM agent (the undo action).",
+    )
 
 
-# ── SagaAgent ─────────────────────────────────────────────────────────────────
+# ── Internal agent: forward step ─────────────────────────────────────────────────────────────────────────────────────
 
-class SagaAgent(Agent):
+class _SagaForwardAgent(SimpleAgent):
     """
-    Orchestrates a fixed sequence of steps with automatic rollback.
+    Autonomous forward-execution node in the saga chain.
 
-    If any step's executor returns ``success=False`` (or raises an exception),
-    the saga immediately runs the compensator for each previously completed step
-    in reverse order, then delivers a ``SagaOutcome(status="ROLLED_BACK")``.
+    Inherits LLM infrastructure (``think()``, prompt resolution, ``_ref``)
+    from ``SimpleAgent`` and overrides ``on_message`` to react only to
+    ``__saga.fwd__`` messages.
 
-    If all steps complete successfully it delivers
-    ``SagaOutcome(status="COMMITTED")``.
+    - On success → emits ``__saga.fwd__`` to ``success_target``
+    - On failure → emits ``__saga.cmp__`` to ``failure_target``
 
-    Parameters
-    ----------
-    name : str
-        Bus address for this agent.
-    steps : list[SagaStep]
-        Ordered list of saga steps.  Executed left-to-right; compensated right-to-left.
-    submit_type : str
-        Message type that triggers a saga run.
-    result_type : str
-        Message type for the final ``SagaOutcome``.
-    verbose : bool
-        Print execution progress to stdout.  Default: False.
+    All saga state is immutably propagated through the ``__saga__`` key in
+    the message payload — this agent keeps no local state between runs.
     """
 
     def __init__(
         self,
         name: str,
         *,
-        steps: List[SagaStep],
-        submit_type: str = "saga.started",
-        result_type: str = "saga.completed",
-        verbose: bool = False,
+        step_name:        str,
+        step_description: str,
+        prompt_name:      str,
+        success_target:   str,
+        failure_target:   str,
+        verbose:          bool = False,
+    ) -> None:
+        super().__init__(name, prompt_name=prompt_name, output_model=StepResult)
+        self.step_name        = step_name
+        self.step_description = step_description
+        self.success_target   = success_target
+        self.failure_target   = failure_target
+        self.verbose          = verbose
+        # _bind_runtime, _ref and think() are all inherited from SimpleAgent
+
+    async def on_message(self, message: Message, context: AgentContext) -> None:
+        if message.type == _SAGA_FWD:
+            await self._run(message)
+
+    async def _run(self, message: Message) -> None:
+        payload = message.payload
+        saga    = dict(payload.get("__saga__", {}))
+        prior   = saga.get("steps_state", {})
+
+        if self.verbose:
+            print(f"[saga] ▶  {self.step_name}")
+
+        user_prompt = _forward_prompt(
+            payload, self.step_name, self.step_description, prior
+        )
+        try:
+            result: StepResult = await self.think(user_prompt)
+        except Exception as exc:
+            result = StepResult(
+                success=False,
+                failure_reason=f"{exc}\n{traceback.format_exc(limit=2)}",
+            )
+
+        new_payload = _apply_forward_result(payload, saga, self.step_name, result)
+
+        if result.success:
+            if self.verbose:
+                ref = f"  [ref: {result.reference_id}]" if result.reference_id else ""
+                print(f"[saga]    ✓  {self.step_name}{ref}")
+            await self._ref.send(
+                to       = self.success_target,
+                type     = _SAGA_FWD,
+                payload  = new_payload,
+                reply_to = message.reply_to,
+            )
+        else:
+            if self.verbose:
+                print(f"[saga]    ✗  {self.step_name}: {result.failure_reason[:90]}")
+            await self._ref.send(
+                to       = self.failure_target,
+                type     = _SAGA_CMP,
+                payload  = new_payload,
+                reply_to = message.reply_to,
+            )
+
+
+# ── Internal agent: compensator step ──────────────────────────────────────────────────────────────────────────────────
+
+class _SagaCompensatorAgent(SimpleAgent):
+    """
+    Autonomous compensation node in the saga rollback chain.
+
+    Inherits LLM infrastructure (``think()``, prompt resolution, ``_ref``)
+    from ``SimpleAgent`` and overrides ``on_message`` to react only to
+    ``__saga.cmp__`` messages.
+
+    Receives ``__saga.cmp__``, calls the LLM to undo the forward step, then
+    emits ``__saga.cmp__`` to the previous compensator in LIFO order, or to
+    ``_SagaOutcomeAgent`` when the rollback chain is exhausted.
+
+    The forward step's output is read from
+    ``__saga__["steps_state"][step_name]`` so the compensator knows exactly
+    what to undo.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        step_name:        str,
+        step_description: str,
+        prompt_name:      str,
+        next_target:      str,
+        verbose:          bool = False,
+    ) -> None:
+        super().__init__(name, prompt_name=prompt_name, output_model=StepResult)
+        self.step_name        = step_name
+        self.step_description = step_description
+        self.next_target      = next_target
+        self.verbose          = verbose
+        # _bind_runtime, _ref and think() are all inherited from SimpleAgent
+
+    async def on_message(self, message: Message, context: AgentContext) -> None:
+        if message.type == _SAGA_CMP:
+            await self._run(message)
+
+    async def _run(self, message: Message) -> None:
+        payload      = message.payload
+        saga         = dict(payload.get("__saga__", {}))
+        fwd_raw      = saga.get("steps_state", {}).get(self.step_name, {})
+
+        if self.verbose:
+            print(f"[saga] ↩  compensating {self.step_name}…")
+
+        user_prompt = _compensation_prompt(
+            payload, self.step_name, self.step_description, fwd_raw
+        )
+        try:
+            result: StepResult = await self.think(user_prompt)
+        except Exception as exc:
+            result = StepResult(
+                success=False,
+                failure_reason=f"{exc}\n{traceback.format_exc(limit=2)}",
+            )
+
+        new_payload = _apply_compensation_result(payload, saga, self.step_name, result)
+
+        if self.verbose:
+            if result.success:
+                ref = f"  [ref: {result.reference_id}]" if result.reference_id else ""
+                print(f"[saga]    ✓  {self.step_name} compensated{ref}")
+            else:
+                print(f"[saga]    ⚠  {self.step_name} compensation FAILED: {result.failure_reason[:80]}")
+
+        # Continue LIFO chain → previous compensator or outcome
+        await self._ref.send(
+            to       = self.next_target,
+            type     = _SAGA_CMP,
+            payload  = new_payload,
+            reply_to = message.reply_to,
+        )
+
+
+# ── Internal agent: outcome finalizer ───────────────────────────────────────────────────────────────────────────
+
+class _SagaOutcomeAgent(Agent):
+    """
+    Terminal node of the saga chain.
+
+    Receives:
+    - ``__saga.fwd__`` from the last forward step (COMMITTED)
+    - ``__saga.cmp__`` from the first compensator / or directly from a failing
+      step-0 (ROLLED_BACK / PARTIAL_ROLLBACK)
+
+    Assembles the ``SagaOutcome`` and delivers it to the original caller.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        saga_name:   str,
+        result_type: str,
+        step_names:  List[str],
+        verbose:     bool = False,
     ) -> None:
         super().__init__(name)
-        self.steps       = steps
-        self.submit_type = submit_type
+        self.saga_name   = saga_name
         self.result_type = result_type
+        self.step_names  = step_names
         self.verbose     = verbose
         self._ref: Optional[AgentRef] = None
 
-    # ── Runtime binding ───────────────────────────────────────────────────────
-
     def _bind_runtime(self, runtime) -> None:
         self._ref = AgentRef(self.name, runtime._bus)
-        for step in self.steps:
-            runtime.register(step.executor)
-            runtime.register(step.compensator)
-
-    # ── Message handling ──────────────────────────────────────────────────────
 
     async def on_message(self, message: Message, context: AgentContext) -> None:
-        if message.type == self.submit_type:
-            await self._execute(message)
+        if message.type in (_SAGA_FWD, _SAGA_CMP):
+            await self._finalize(message)
 
-    # ── Core execution ────────────────────────────────────────────────────────
+    async def _finalize(self, message: Message) -> None:
+        payload  = message.payload
+        saga     = payload.get("__saga__", {})
+        caller   = message.reply_to or saga.get("caller", "")
 
-    async def _execute(self, message: Message) -> None:
-        if self._ref is None:
-            raise RuntimeError(
-                f"SagaAgent '{self.name}' has not been bound to a runtime."
+        audit: List[StepAuditEntry] = [
+            StepAuditEntry.model_validate(e) for e in saga.get("audit", [])
+        ]
+        failed_step:   str  = saga.get("failed_step", "")
+        failure_reason: str = saga.get("failure_reason", "")
+        completed:     List = saga.get("completed", [])
+        compensations: List = saga.get("compensations", [])
+        comp_failures: List = saga.get("compensation_failures", [])
+
+        if not failed_step:
+            # ── COMMITTED ──────────────────────────────────────────────────────────────────
+            if self.verbose:
+                print(f"[saga] ✅  All {len(self.step_names)} steps COMMITTED.")
+            outcome = SagaOutcome(
+                status          = "COMMITTED",
+                steps_completed = len(completed),
+                audit_log       = audit,
+                summary         = (
+                    f"Saga \'{self.saga_name}\' committed successfully. "
+                    f"All {len(self.step_names)} steps completed: "
+                    + ", ".join(self.step_names) + "."
+                ),
             )
+        else:
+            # ── ROLLED_BACK / PARTIAL_ROLLBACK ────────────────────────────────────────────────
+            final_status = "PARTIAL_ROLLBACK" if comp_failures else "ROLLED_BACK"
+            if self.verbose:
+                icon = "⚠" if comp_failures else "↩"
+                print(f"[saga] {icon}  {final_status}")
+            outcome = SagaOutcome(
+                status                 = final_status,
+                failed_step            = failed_step,
+                failure_reason         = failure_reason,
+                steps_completed        = len(completed),
+                compensations_applied  = compensations,
+                audit_log              = audit,
+                summary                = (
+                    f"Saga '{self.saga_name}' rolled back after failure at "
+                    f"step '{failed_step}'. Reason: {failure_reason[:120]}. "
+                    f"{len(compensations)} compensation(s) applied: "
+                    + (", ".join(compensations) or "none")
+                    + ("." if not comp_failures else
+                       f". WARNING — {len(comp_failures)} compensation(s) failed "
+                       f"(manual intervention required): {', '.join(comp_failures)}.")
+                ),
+            )
+
+        if self.verbose:
+            print(f"[saga] ■  Delivering '{self.result_type}' → '{caller}'")
+
+        await self._ref.send(
+            to      = caller,
+            type    = self.result_type,
+            payload = outcome.model_dump(),
+        )
+
+
+# ── Public entry point ─────────────────────────────────────────────────────────────────────────────────────────
+# El patrón tiene nombre: Wiring Factory. _bind_runtime es un constructor de topología, no un contenedor. 
+class SagaAgent(CompositeAgent):
+    """
+    Entry point and topology hub for a choreographed saga.
+
+    Inherits from ``CompositeAgent``: the internal topology
+    (``_SagaForwardAgent``, ``_SagaCompensatorAgent``, ``_SagaOutcomeAgent``)
+    is built in ``__init__`` and declared via ``sub_agents()``. The runtime
+    registers all sub-agents automatically when ``runtime.register(saga)``
+    is called — no manual ``runtime.register()`` inside ``_bind_runtime``.
+
+    At runtime, ``SagaAgent`` acts as the public entry point: it receives
+    the trigger message, initialises the ``__saga__`` state envelope, and
+    fires the first ``__saga.fwd__`` message. After that **it does nothing**
+    — the chain is self-driving.
+
+    Parameters
+    ----------
+    name         : Bus address for this agent (e.g. ``"wire-saga"``).
+    steps        : Ordered ``SagaStep`` list.  Forward order left-to-right;
+                   compensation order right-to-left on failure.
+    trigger_type : Message type that starts a saga run.
+    result_type  : Message type for the delivered ``SagaOutcome``.
+    verbose      : Print execution progress to stdout.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        steps:        List[SagaStep],
+        trigger_type: str = "saga.started",
+        result_type:  str = "saga.completed",
+        verbose:      bool = False,
+    ) -> None:
+        super().__init__(name)
+        self.steps        = steps
+        self.trigger_type = trigger_type
+        self.result_type  = result_type
+        self.verbose      = verbose
+        self._ref: Optional[AgentRef] = None
+
+        # Pre-compute internal agent names
+        self._outcome_name = f"{name}._outcome"
+        self._fwd_names    = [f"{name}._fwd.{s.name}" for s in steps]
+        self._cmp_names    = [f"{name}._cmp.{s.name}" for s in steps]
+
+        # Build topology at construction time — runtime registers them via sub_agents()
+        self._topology: List[Agent] = self._build_topology()
+
+    # ── Topology declaration ───────────────────────────────────────────────────────────────────────────
+
+    def sub_agents(self) -> List[Agent]:
+        """Declares the internal agents that form this saga's topology."""
+        return self._topology
+
+    def _build_topology(self) -> List[Agent]:
+        """Constructs all internal agents. Called once during ``__init__``."""
+        steps = self.steps
+        n     = len(steps)
+        agents: List[Agent] = []
+
+        # Outcome agent (terminal node)
+        agents.append(_SagaOutcomeAgent(
+            self._outcome_name,
+            saga_name   = self.name,
+            result_type = self.result_type,
+            step_names  = [s.name for s in steps],
+            verbose     = self.verbose,
+        ))
+
+        # Compensator agents — cmp[i] sends to cmp[i-1] or outcome (LIFO)
+        for i, step in enumerate(steps):
+            next_cmp = self._cmp_names[i - 1] if i > 0 else self._outcome_name
+            agents.append(_SagaCompensatorAgent(
+                self._cmp_names[i],
+                step_name        = step.name,
+                step_description = step.description,
+                prompt_name      = step.compensate_prompt,
+                next_target      = next_cmp,
+                verbose          = self.verbose,
+            ))
+
+        # Forward agents
+        # success_target[i] = fwd[i+1]  (outcome for last step)
+        # failure_target[i] = cmp[i-1]  (outcome for step 0 — nothing to compensate)
+        for i, step in enumerate(steps):
+            success_target = self._fwd_names[i + 1] if i < n - 1 else self._outcome_name
+            failure_target = self._cmp_names[i - 1] if i > 0 else self._outcome_name
+            agents.append(_SagaForwardAgent(
+                self._fwd_names[i],
+                step_name        = step.name,
+                step_description = step.description,
+                prompt_name      = step.forward_prompt,
+                success_target   = success_target,
+                failure_target   = failure_target,
+                verbose          = self.verbose,
+            ))
+
+        return agents
+
+    # ── Runtime binding ────────────────────────────────────────────────────────────────────────────────
+
+    def _bind_runtime(self, runtime) -> None:
+        """Sets up the bus reference. Sub-agents are registered by the runtime via sub_agents()."""
+        self._ref = AgentRef(self.name, runtime._bus)
+
+    # ── Message handling ─────────────────────────────────────────────────────────────────────────────────
+
+    async def on_message(self, message: Message, context: AgentContext) -> None:
+        if message.type != self.trigger_type:
+            return
+
+        caller = message.reply_to or message.sender
+
+        if self.verbose:
+            sep = "━" * 56
+            print(f"\n{sep}\n  SAGA START — {self.name}  ({len(self.steps)} steps)\n{sep}")
 
         payload = (
             message.payload
             if isinstance(message.payload, dict)
             else {"data": message.payload}
         )
-        caller = message.reply_to or message.sender
 
-        _say = self._say
-        _say(
-            f"\n{'━' * 56}\n"
-            f"  SAGA START — {self.name}  ({len(self.steps)} steps)\n"
-            f"{'━' * 56}"
+        # Initialise immutable saga-state envelope
+        saga_state: Dict[str, Any] = {
+            "id":                    self.name,
+            "caller":                caller,
+            "result_type":           self.result_type,
+            "steps_state":           {},
+            "completed":             [],
+            "compensations":         [],
+            "compensation_failures": [],
+            "audit":                 [],
+            "failed_step":           "",
+            "failure_reason":        "",
+        }
+
+        # Fire the chain — we step back; the bus does the rest
+        await self._ref.send(
+            to       = self._fwd_names[0],
+            type     = _SAGA_FWD,
+            payload  = {**payload, "__saga__": saga_state},
+            reply_to = caller,
         )
 
-        # Completed steps stack: (SagaStep, StepResult)
-        completed: List[tuple[SagaStep, StepResult]] = []
-        audit_log: List[StepAuditEntry] = []
-        prior_results: Dict[str, Any] = {}  # step_name → data dict
 
-        outcome: SagaOutcome
+# ── Prompt builders ─────────────────────────────────────────────────────────────────────────────────────────
 
-        # ── 1. Forward execution ──────────────────────────────────────────────
-        for step in self.steps:
-            _say(f"  ▶  [{step.name}]  {step.description}")
-            prompt = self._forward_prompt(payload, step, prior_results)
-
-            try:
-                raw = await step.executor.think(prompt)
-                result = self._coerce_step_result(raw, step.name, is_compensator=False)
-            except Exception as exc:
-                result = StepResult(
-                    success=False,
-                    failure_reason=f"Executor raised exception: {exc}\n{traceback.format_exc(limit=3)}",
-                )
-
-            if result.success:
-                _say(
-                    f"     ✓  {step.name} — OK"
-                    + (f"  [ref: {result.reference_id}]" if result.reference_id else "")
-                )
-                audit_log.append(StepAuditEntry(
-                    step_name=step.name,
-                    status="COMPLETED",
-                    reference_id=result.reference_id,
-                    data=result.data,
-                ))
-                completed.append((step, result))
-                prior_results[step.name] = result.data
-            else:
-                _say(f"     ✗  {step.name} — FAILED: {result.failure_reason[:100]}")
-                audit_log.append(StepAuditEntry(
-                    step_name=step.name,
-                    status="FAILED",
-                    failure_reason=result.failure_reason,
-                ))
-
-                # ── 2. Compensation (rollback) ─────────────────────────────
-                outcome = await self._compensate(
-                    payload, completed, audit_log,
-                    failed_step=step.name,
-                    failure_reason=result.failure_reason,
-                )
-                await self._deliver(caller, message, outcome)
-                return
-
-        # ── All steps committed ───────────────────────────────────────────────
-        _say(f"\n  ✅  All {len(self.steps)} steps COMMITTED successfully.")
-        outcome = SagaOutcome(
-            status="COMMITTED",
-            steps_completed=len(self.steps),
-            audit_log=audit_log,
-            summary=(
-                f"Saga '{self.name}' committed successfully. "
-                f"All {len(self.steps)} steps completed: "
-                + ", ".join(s.name for s in self.steps) + "."
-            ),
-        )
-        await self._deliver(caller, message, outcome)
-
-    # ── Compensation orchestrator ─────────────────────────────────────────────
-
-    async def _compensate(
-        self,
-        payload: Dict[str, Any],
-        completed: List[tuple[SagaStep, StepResult]],
-        audit_log: List[StepAuditEntry],
-        failed_step: str,
-        failure_reason: str,
-    ) -> SagaOutcome:
-        _say = self._say
-        _say(
-            f"\n  ↩  ROLLING BACK — compensating {len(completed)} completed step(s) "
-            f"in reverse order…"
-        )
-
-        compensation_failures: List[str] = []
-        compensations_applied: List[str] = []
-
-        # LIFO reverse
-        for step, forward_result in reversed(completed):
-            _say(f"  ↩  compensating [{step.name}]…")
-            prompt = self._compensation_prompt(payload, step, forward_result)
-
-            try:
-                raw = await step.compensator.think(prompt)
-                comp_result = self._coerce_step_result(raw, step.name, is_compensator=True)
-            except Exception as exc:
-                comp_result = StepResult(
-                    success=False,
-                    failure_reason=f"Compensator raised exception: {exc}",
-                )
-
-            if comp_result.success:
-                _say(f"     ✓  {step.name} compensated")
-                audit_log.append(StepAuditEntry(
-                    step_name=step.name,
-                    status="COMPENSATED",
-                    reference_id=comp_result.reference_id,
-                    data=comp_result.data,
-                ))
-                compensations_applied.append(step.name)
-            else:
-                reason = comp_result.failure_reason[:120]
-                _say(f"     ⚠  {step.name} COMPENSATION FAILED: {reason}")
-                audit_log.append(StepAuditEntry(
-                    step_name=step.name,
-                    status="COMPENSATION_FAILED",
-                    failure_reason=comp_result.failure_reason,
-                ))
-                compensation_failures.append(step.name)
-
-        final_status = "PARTIAL_ROLLBACK" if compensation_failures else "ROLLED_BACK"
-        _say(f"\n  {'⚠' if compensation_failures else '↩'}  {final_status}")
-
-        return SagaOutcome(
-            status=final_status,
-            failed_step=failed_step,
-            failure_reason=failure_reason,
-            steps_completed=len(completed),
-            compensations_applied=compensations_applied,
-            audit_log=audit_log,
-            summary=(
-                f"Saga '{self.name}' rolled back after failure at step '{failed_step}'. "
-                f"Reason: {failure_reason[:120]}. "
-                f"{len(compensations_applied)} compensation(s) applied: "
-                + (", ".join(compensations_applied) or "none")
-                + ("." if not compensation_failures else
-                   f".  WARNING — {len(compensation_failures)} compensation(s) failed "
-                   f"and require manual intervention: {', '.join(compensation_failures)}.")
-            ),
-        )
-
-    # ── Prompt builders ───────────────────────────────────────────────────────
-
-    @staticmethod
-    def _forward_prompt(
-        payload: Dict[str, Any],
-        step: SagaStep,
-        prior_results: Dict[str, Any],
-    ) -> str:
-        parts = [
-            f"SAGA STEP: {step.name}",
-            f"YOUR TASK: {step.description}",
-            "",
-            "TRANSACTION PAYLOAD:",
-            json.dumps(payload, indent=2, default=str),
-        ]
-        if prior_results:
-            parts += [
-                "",
-                "PRIOR STEP OUTPUTS (use these to inform your action):",
-                json.dumps(prior_results, indent=2, default=str),
-            ]
+def _forward_prompt(
+    payload:          Dict[str, Any],
+    step_name:        str,
+    step_description: str,
+    prior_results:    Dict[str, Any],
+) -> str:
+    clean = {k: v for k, v in payload.items() if k != "__saga__"}
+    parts = [
+        f"SAGA STEP: {step_name}",
+        f"YOUR TASK: {step_description}",
+        "",
+        "TRANSACTION PAYLOAD:",
+        json.dumps(clean, indent=2, default=str),
+    ]
+    if prior_results:
         parts += [
             "",
-            "Execute this step now.  Respond ONLY with a valid JSON object with these keys:",
-            '  "success"        : true if the step completed, false if it failed',
-            '  "data"           : dict of outputs produced (references, amounts, rates, etc.)',
-            '  "failure_reason" : explanation if success=false, else empty string ""',
-            '  "reference_id"   : external reference / transaction ID, or empty string ""',
-            "",
-            "Be specific and realistic.  Generate plausible reference IDs (e.g. JE-2026-XXXXX, "
-            "UETR: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX).",
+            "PRIOR STEP OUTPUTS (use these references in your response):",
+            json.dumps(prior_results, indent=2, default=str),
         ]
-        return "\n".join(parts)
+    parts += [
+        "",
+        "Execute this step.  Respond ONLY with a valid JSON object:",
+        '  "success"        : true if the step completed, false if it failed',
+        '  "data"           : dict of outputs (references, amounts, rates, etc.)',
+        '  "failure_reason" : explanation if success=false, else ""',
+        '  "reference_id"   : external reference ID or ""',
+        "",
+        "Generate realistic reference IDs (e.g. JE-2026-XXXXX, FXD-2026-XXXXX).",
+    ]
+    return "\n".join(parts)
 
-    @staticmethod
-    def _compensation_prompt(
-        payload: Dict[str, Any],
-        step: SagaStep,
-        forward_result: StepResult,
-    ) -> str:
-        parts = [
-            f"SAGA COMPENSATION: {step.name}",
-            f"YOUR TASK: You are undoing / reversing the step '{step.name}'.",
-            f"ORIGINAL STEP DESCRIPTION: {step.description}",
-            "",
-            "ORIGINAL TRANSACTION PAYLOAD:",
-            json.dumps(payload, indent=2, default=str),
-            "",
-            "OUTPUTS FROM THE ORIGINAL STEP (what you need to reverse):",
-            json.dumps({
-                "reference_id": forward_result.reference_id,
-                "data":         forward_result.data,
-            }, indent=2, default=str),
-            "",
-            "Reverse/undo exactly what the original step did.  "
-            "Respond ONLY with a valid JSON object with these keys:",
-            '  "success"        : true if the compensation completed, false if it also failed',
-            '  "data"           : dict of compensation outputs (reversal refs, amounts, etc.)',
-            '  "failure_reason" : explanation if success=false, else empty string ""',
-            '  "reference_id"   : reversal reference ID, or empty string ""',
-        ]
-        return "\n".join(parts)
 
-    # ── Delivery ──────────────────────────────────────────────────────────────
+def _compensation_prompt(
+    payload:          Dict[str, Any],
+    step_name:        str,
+    step_description: str,
+    forward_result:   Dict[str, Any],
+) -> str:
+    clean = {k: v for k, v in payload.items() if k != "__saga__"}
+    parts = [
+        f"SAGA COMPENSATION: {step_name}",
+        f"YOUR TASK: Reverse / undo step '{step_name}'.",
+        f"ORIGINAL STEP: {step_description}",
+        "",
+        "ORIGINAL TRANSACTION PAYLOAD:",
+        json.dumps(clean, indent=2, default=str),
+        "",
+        "WHAT THE ORIGINAL STEP PRODUCED (undo exactly this):",
+        json.dumps(forward_result, indent=2, default=str),
+        "",
+        "Reverse/undo exactly what the original step did.",
+        "Respond ONLY with a valid JSON object:",
+        '  "success"        : true if compensation completed, false if it also failed',
+        '  "data"           : compensation outputs (reversal refs, amounts, etc.)',
+        '  "failure_reason" : explanation if success=false, else ""',
+        '  "reference_id"   : reversal reference ID or ""',
+    ]
+    return "\n".join(parts)
 
-    async def _deliver(
-        self,
-        caller: str,
-        message: Message,
-        outcome: SagaOutcome,
-    ) -> None:
-        self._say(f"  ■  Sending '{self.result_type}' → '{caller}'")
-        await self._ref.send(
-            to       = caller,
-            type     = self.result_type,
-            payload  = outcome.model_dump(),
-            metadata = {"in_reply_to": message.id},
-        )
 
-    # ── Helpers ───────────────────────────────────────────────────────────────
+# ── Payload state helpers (pure / immutable) ────────────────────────────────────────────────────────────────
 
-    def _say(self, msg: str) -> None:
-        if self.verbose:
-            print(f"[{self.name}] {msg}")
+def _apply_forward_result(
+    payload:   Dict[str, Any],
+    saga:      Dict[str, Any],
+    step_name: str,
+    result:    StepResult,
+) -> Dict[str, Any]:
+    new_steps = {**saga.get("steps_state", {}), step_name: result.model_dump()}
+    new_audit = list(saga.get("audit", [])) + [
+        StepAuditEntry(
+            step_name      = step_name,
+            status         = "COMPLETED" if result.success else "FAILED",
+            reference_id   = result.reference_id,
+            data           = result.data,
+            failure_reason = result.failure_reason,
+        ).model_dump()
+    ]
+    new_completed = list(saga.get("completed", [])) + ([step_name] if result.success else [])
+    patch: Dict[str, Any] = {
+        **saga,
+        "steps_state": new_steps,
+        "audit":       new_audit,
+        "completed":   new_completed,
+    }
+    if not result.success:
+        patch["failed_step"]    = step_name
+        patch["failure_reason"] = result.failure_reason
+    return {**payload, "__saga__": patch}
 
-    def _coerce_step_result(
-        self,
-        raw: Any,
-        step_name: str,
-        is_compensator: bool,
-    ) -> StepResult:
-        label = "compensator" if is_compensator else "executor"
-        if isinstance(raw, StepResult):
-            return raw
-        if isinstance(raw, dict):
-            return StepResult.model_validate(raw)
-        try:
-            import json as _json
-            parsed = _json.loads(raw) if isinstance(raw, str) else raw
-            return StepResult.model_validate(parsed)
-        except Exception as exc:
-            raise ValueError(
-                f"[{self.name}] {label} for step '{step_name}' returned output "
-                f"that cannot be coerced to StepResult: {raw!r}"
-            ) from exc
+
+def _apply_compensation_result(
+    payload:   Dict[str, Any],
+    saga:      Dict[str, Any],
+    step_name: str,
+    result:    StepResult,
+) -> Dict[str, Any]:
+    status    = "COMPENSATED" if result.success else "COMPENSATION_FAILED"
+    new_audit = list(saga.get("audit", [])) + [
+        StepAuditEntry(
+            step_name      = step_name,
+            status         = status,
+            reference_id   = result.reference_id,
+            data           = result.data,
+            failure_reason = result.failure_reason,
+        ).model_dump()
+    ]
+    new_comps    = list(saga.get("compensations", []))
+    new_failures = list(saga.get("compensation_failures", []))
+    if result.success:
+        new_comps.append(step_name)
+    else:
+        new_failures.append(step_name)
+    patch: Dict[str, Any] = {
+        **saga,
+        "audit":                 new_audit,
+        "compensations":         new_comps,
+        "compensation_failures": new_failures,
+    }
+    return {**payload, "__saga__": patch}

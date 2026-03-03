@@ -2,7 +2,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Dict, Optional
 
-from .agent import Agent
+from .agent import Agent, CompositeAgent
 from .context import AgentContext
 from .message import Message
 from ..messaging.bus import MessageBus
@@ -57,6 +57,11 @@ class AgentRuntime:
         # Inyecta el PromptProvider del runtime si el agente lo necesita
         if self._prompts is not None and hasattr(agent, "_inject_prompt_registry"):
             agent._inject_prompt_registry(self._prompts)
+
+        # Si es un agente compuesto, registra su topología interna automáticamente
+        if isinstance(agent, CompositeAgent):
+            for sub in agent.sub_agents():
+                self.register(sub)
 
         async def handler(msg: Message) -> None:
             await agent.on_message(msg, self._context)
