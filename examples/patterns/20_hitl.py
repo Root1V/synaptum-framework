@@ -39,19 +39,15 @@ Transfer under review:
 
 Execution flow:
 
-  client._ref.send("wire-edd-review", type="wire.edd.submitted")
-         │
-         ▼
-  aml-screener.think()          ← automated AML risk screening
-         │
-         ▼
-  ⏸ review_handler(request)    ← PAUSE: compliance officer decides
-         │
-         ▼
-  wire-operations.think()       ← generate MT103 or rejection notice
-         │
-         ▼
-  _ref.send("client", type="wire.edd.processed") → result handler
+  client ──[wire.edd.submitted]──▶ wire-edd-review (HITLAgent)
+                  │
+           [__hitl.screen__]──▶ wire-edd-review._screener  ← AML screening LLM
+                                        │
+                                 [__hitl.review__]──▶ wire-edd-review._gate  ← PAUSE: human decides
+                                                              │
+                                                      [__hitl.execute__]──▶ wire-edd-review._executor  ← MT103 / denial LLM
+                                                                                    │
+                                                                         [wire.edd.processed]──▶ client
 """
 
 import asyncio
@@ -71,7 +67,6 @@ from synaptum.patterns.hitl import (
     HITLAgent,
     HumanReviewRequest,
     HumanReviewResponse,
-    ScreeningResult,
 )
 from synaptum.prompts import FilePromptProvider
 
@@ -194,26 +189,20 @@ async def main() -> None:
         if message.type == "wire.edd.processed":
             results.append(message.payload)
 
-    aml_screener = SimpleAgent(
-        "aml-screener",
-        prompt_name  = "bank.hitl.aml_screener.system",
-        output_model = ScreeningResult,
-    )
-
-    wire_ops = SimpleAgent(
-        "wire-operations",
-        prompt_name  = "bank.hitl.wire_operations.system",
-        output_model = WireReleaseInstruction,
-    )
-
+    # ── HITL definition ────────────────────────────────────────────────
+    # HITLAgent builds and registers all 3 internal agents automatically:
+    #   wire-edd-review._screener  — AML screening LLM
+    #   wire-edd-review._gate      — human pause (no LLM)
+    #   wire-edd-review._executor  — final output LLM
     hitl = HITLAgent(
         "wire-edd-review",
-        analyzer       = aml_screener,
-        executor       = wire_ops,
-        review_handler = mock_compliance_review,
-        submit_type    = "wire.edd.submitted",
-        result_type    = "wire.edd.processed",
-        verbose        = True,
+        screener_prompt = "bank.hitl.aml_screener.system",
+        executor_prompt = "bank.hitl.wire_operations.system",
+        executor_model  = WireReleaseInstruction,
+        review_handler  = mock_compliance_review,
+        trigger_type    = "wire.edd.submitted",
+        result_type     = "wire.edd.processed",
+        verbose         = True,
     )
 
     client = SimpleAgent("client", handler=client_handler)
