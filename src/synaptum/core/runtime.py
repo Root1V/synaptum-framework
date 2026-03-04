@@ -2,7 +2,8 @@ import asyncio
 from dataclasses import dataclass
 from typing import Dict, Optional
 
-from .agent import Agent, CompositeAgent
+from .agent import Agent
+from ..agents.composite_agent import CompositeAgent
 from .context import AgentContext
 from .message import Message
 from ..messaging.bus import MessageBus

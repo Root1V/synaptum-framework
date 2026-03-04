@@ -78,10 +78,10 @@ from typing import Any, Dict, List, Optional, Type
 
 from pydantic import BaseModel, Field
 
-from ..core.agent import Agent, CompositeAgent
+from ..core.agent import Agent
 from ..core.context import AgentContext
 from ..core.message import Message
-from ..agents.agent_ref import AgentRef
+from ..agents.composite_agent import CompositeAgent
 from ..agents.llm_agent import LLMAgent
 from ..agents.message_agent import MessageAgent
 
@@ -386,7 +386,7 @@ class ConsensusAgent(CompositeAgent):
         self.submit_type  = submit_type
         self.result_type  = result_type
         self.verbose      = verbose
-        self._ref: Optional[AgentRef] = None
+        # _ref inherited from CompositeAgent -> MessageAgent
 
         self._aggregator_name = f"{name}._aggregator"
         self._judge_name      = f"{name}._judge"
@@ -434,12 +434,6 @@ class ConsensusAgent(CompositeAgent):
         )
 
         return agents
-
-    # -- Runtime binding -------------------------------------------------------
-
-    def _bind_runtime(self, runtime) -> None:
-        """Sets up the bus reference. Sub-agents are registered by the runtime."""
-        self._ref = AgentRef(self.name, runtime._bus)
 
     # -- Message handling ------------------------------------------------------
 

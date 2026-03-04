@@ -73,12 +73,11 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from ..core.agent import Agent, CompositeAgent
+from ..core.agent import Agent
 from ..core.context import AgentContext
 from ..core.message import Message
-from ..agents.agent_ref import AgentRef
+from ..agents.composite_agent import CompositeAgent
 from ..agents.llm_agent import LLMAgent
-from ..agents.message_agent import MessageAgent
 from ..agents.message_agent import MessageAgent
 
 
@@ -498,7 +497,7 @@ class SagaAgent(CompositeAgent):
         self.trigger_type = trigger_type
         self.result_type  = result_type
         self.verbose      = verbose
-        self._ref: Optional[AgentRef] = None
+        # _ref inherited from CompositeAgent -> MessageAgent
 
         # Pre-compute internal agent names
         self._outcome_name = f"{name}._outcome"
@@ -558,12 +557,6 @@ class SagaAgent(CompositeAgent):
             ))
 
         return agents
-
-    # ── Runtime binding ────────────────────────────────────────────────────────────────────────────────
-
-    def _bind_runtime(self, runtime) -> None:
-        """Sets up the bus reference. Sub-agents are registered by the runtime via sub_agents()."""
-        self._ref = AgentRef(self.name, runtime._bus)
 
     # ── Message handling ─────────────────────────────────────────────────────────────────────────────────
 
