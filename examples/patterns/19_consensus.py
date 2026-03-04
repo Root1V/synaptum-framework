@@ -30,20 +30,21 @@ Use-case — multi-member credit committee:
 
 Execution flow:
 
-  submit("loan.committee.submitted")
-         │
-         ├──────────────────────────────────────────┐
-         │  (concurrent, independent)               │
-         ▼                       ▼                   ▼
-  credit-analyst.think()  risk-officer.think()  sector-expert.think()
-         │                       │                   │
-         └──────────── asyncio.gather() ─────────────┘
-                                 │
-                                 ▼
-                    committee-chair.think(all 3 verdicts)
-                                 │
-                                 ▼
-                    send("loan.committee.decision") → client
+  client ──[loan.committee.submitted]──▶ loan-committee (ConsensusAgent)
+                  │
+           ┌──────┼──────┐  (fan-out, concurrent)
+           ▼      ▼      ▼
+  [__consensus.panel__]──▶ loan-committee._panelist.credit-analyst
+  [__consensus.panel__]──▶ loan-committee._panelist.risk-officer
+  [__consensus.panel__]──▶ loan-committee._panelist.sector-expert
+           │      │      │
+           └──────┴──────┘  (each fires independently)
+                  │
+           [__consensus.verdict__] × 3 ──▶ loan-committee._aggregator
+                                                      │  (waits for all 3)
+                                           [__consensus.judge__]──▶ loan-committee._judge
+                                                                           │
+                                                             [loan.committee.decision]──▶ client
 """
 
 import asyncio
@@ -57,7 +58,7 @@ from synaptum.agents.simple_agent import SimpleAgent
 from synaptum.core.message import Message
 from synaptum.core.runtime import AgentRuntime
 from synaptum.messaging.in_memory_bus import InMemoryMessageBus
-from synaptum.patterns.consensus import ConsensusAgent, PanelistVerdict
+from synaptum.patterns.consensus import ConsensusAgent
 from synaptum.prompts import FilePromptProvider
 
 
@@ -173,42 +174,21 @@ async def main():
     prompt_provider = FilePromptProvider("examples/prompts/consensus.yaml")
     runtime         = AgentRuntime(bus, prompts=prompt_provider)
 
-    # ── Panel agents (run concurrently, independently) ────────────────────────
-    credit_analyst = SimpleAgent(
-        "credit-analyst",
-        prompt_name  = "bank.consensus.credit_analyst.system",
-        output_model = PanelistVerdict,
-    )
-    risk_officer = SimpleAgent(
-        "risk-officer",
-        prompt_name  = "bank.consensus.risk_officer.system",
-        output_model = PanelistVerdict,
-    )
-    sector_expert = SimpleAgent(
-        "sector-expert",
-        prompt_name  = "bank.consensus.sector_expert.system",
-        output_model = PanelistVerdict,
-    )
-
-    # ── Judge ─────────────────────────────────────────────────────────────────
-    committee_chair = SimpleAgent(
-        "committee-chair",
-        prompt_name  = "bank.consensus.committee_chair.system",
-        output_model = CommitteeDecision,
-    )
-
     # ── ConsensusAgent ────────────────────────────────────────────────────────
+    # Panelists and judge are declared by config — ConsensusAgent builds and
+    # registers all internal agents automatically via sub_agents().
     loan_committee = ConsensusAgent(
         "loan-committee",
         panelists = {
-            "credit-analyst": credit_analyst,
-            "risk-officer":   risk_officer,
-            "sector-expert":  sector_expert,
+            "credit-analyst": "bank.consensus.credit_analyst.system",
+            "risk-officer":   "bank.consensus.risk_officer.system",
+            "sector-expert":  "bank.consensus.sector_expert.system",
         },
-        judge       = committee_chair,
-        submit_type = "loan.committee.submitted",
-        result_type = "loan.committee.decision",
-        verbose     = True,
+        judge_prompt = "bank.consensus.committee_chair.system",
+        judge_model  = CommitteeDecision,
+        submit_type  = "loan.committee.submitted",
+        result_type  = "loan.committee.decision",
+        verbose      = True,
     )
 
     client = SimpleAgent("client", handler=client_handler)

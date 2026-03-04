@@ -1,329 +1,482 @@
 """
-ConsensusAgent — independent multi-panel voting and synthesis pattern.
+ConsensusAgent - independent multi-panel voting and synthesis pattern  (choreography model)
+===========================================================================================
 
-Design
-------
-The Consensus pattern solicits *independent* opinions from N specialist agents
-and then routes all responses to a judge that synthesises them into a final
-authoritative decision.
+Architecture
+------------
+Classic implementations call ``panelist.think()`` inside an ``asyncio.gather``
+loop, then ``judge.think()`` - imperative orchestration inside a single agent.
 
-  1. **Panel**    — all panelist agents receive the SAME input concurrently
-                    (via ``asyncio.gather``).  They produce independent verdicts
-                    with no knowledge of each other's views.
+This implementation uses **pure message choreography**: each stage is an
+autonomous agent that reacts to its own message type, performs its action,
+and fires the next message.  ``ConsensusAgent`` only fans out the panel
+messages then steps back completely, just like ``HITLAgent`` and ``SagaAgent``.
 
-  2. **Aggregate** — the judge receives every panelist response plus the
-                     original input and produces a synthesized final decision.
-                     The judge can weigh perspectives, identify consensus vs.
-                     dissent, and override minority views with justification.
+Execution graph
+---------------
 
-  3. **Deliver**  — the result includes the final decision, each panelist's
-                    individual verdict, and a consensus summary.
+  ConsensusAgent --[__consensus.panel__]--> _PanelistAgent[role-A]
+                 --[__consensus.panel__]--> _PanelistAgent[role-B]   (concurrent)
+                 --[__consensus.panel__]--> _PanelistAgent[role-C]
+                                                    |  (each fires independently)
+                                          [__consensus.verdict__]--> _AggregatorAgent
+                                          (accumulated until count == expected)
+                                                    |
+                                          [__consensus.judge__]--> _JudgeAgent
+                                                                        |
+                                                               result_type --> caller
 
-Difference from other patterns
--------------------------------
-  parallel()       → N different agents process the SAME graph state
-                      as part of a larger workflow; there is no judge
-  MapReduceAgent   → the SAME agent processes N different data chunks;
-                      reducer merges results (not opinions)
-  Swarm            → agents hand off control sequentially based on findings
-  Reflection       → one agent iteratively refines a single output
-  Consensus        → N DIFFERENT agents produce INDEPENDENT verdicts on the
-                      SAME input; a judge synthesises them — majority or
-                      weighted vote, or expert synthesis
+``_PanelistAgent`` (LLMAgent x N):
+  - Reacts to ``__consensus.panel__``
+  - Calls LLM to produce ``PanelistVerdict``
+  - Fires ``__consensus.verdict__`` to the aggregator
 
-Usage
------
+``_AggregatorAgent`` (MessageAgent, no LLM):
+  - Reacts to ``__consensus.verdict__``
+  - Accumulates verdicts per ``correlation_id`` until all N arrive
+  - Fires ``__consensus.judge__`` once complete
+
+``_JudgeAgent`` (LLMAgent):
+  - Reacts to ``__consensus.judge__``
+  - Receives original input + all verdicts as serialised JSON
+  - Produces final synthesised decision
+  - Delivers result to original caller via the bus
+
+Consensus state
+---------------
+All intermediate results travel immutably under the ``__consensus__`` key in
+the message payload.  No shared mutable state outside the bus  (except the
+aggregator's in-flight correlation map, which is ephemeral per-run).
+
+Public API
+----------
 ::
 
-    from synaptum.patterns.consensus import ConsensusAgent
+    from synaptum.patterns.consensus import ConsensusAgent, PanelistVerdict
 
-    credit_analyst = SimpleAgent("credit-analyst", ...)
-    risk_officer   = SimpleAgent("risk-officer",   ...)
-    sector_expert  = SimpleAgent("sector-expert",  ...)
-    judge          = SimpleAgent("credit-committee-chair", ...)
-
-    panel = ConsensusAgent(
+    consensus = ConsensusAgent(
         "loan-committee",
-        panelists   = {
-            "credit-analyst": credit_analyst,
-            "risk-officer":   risk_officer,
-            "sector-expert":  sector_expert,
+        panelists    = {
+            "credit-analyst": "bank.consensus.credit_analyst.system",
+            "risk-officer":   "bank.consensus.risk_officer.system",
+            "sector-expert":  "bank.consensus.sector_expert.system",
         },
-        judge       = judge,
-        submit_type = "loan.committee.submitted",
-        result_type = "loan.committee.decision",
-        verbose     = True,
+        judge_prompt = "bank.consensus.committee_chair.system",
+        judge_model  = CommitteeDecision,
+        submit_type  = "loan.committee.submitted",
+        result_type  = "loan.committee.decision",
+        verbose      = True,
     )
-
-    runtime.register(panel)
+    runtime.register(consensus)   # registers consensus + all internal agents automatically
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
-from typing import Any, Dict, List, Optional
+import uuid
+from typing import Any, Dict, List, Optional, Type
 
 from pydantic import BaseModel, Field
 
-from ..core.agent import Agent
+from ..core.agent import Agent, CompositeAgent
 from ..core.context import AgentContext
 from ..core.message import Message
 from ..agents.agent_ref import AgentRef
+from ..agents.llm_agent import LLMAgent
+from ..agents.message_agent import MessageAgent
 
 
-# ── Panelist verdict ──────────────────────────────────────────────────────────
+# -- Internal message types ----------------------------------------------------
+_CONSENSUS_PANEL   = "__consensus.panel__"
+_CONSENSUS_VERDICT = "__consensus.verdict__"
+_CONSENSUS_JUDGE   = "__consensus.judge__"
+
+
+# -- Public data model ---------------------------------------------------------
 
 class PanelistVerdict(BaseModel):
     """
-    The structured response each panelist must return.
+    Structured output that each panelist LLM must return.
 
     Fields
     ------
     recommendation : str
-        This panelist's recommended decision, e.g. APPROVE / DECLINE / etc.
+        Recommended decision, e.g. APPROVE / DECLINE / etc.
     confidence : str
         Confidence level: LOW | MEDIUM | HIGH.
     rationale : str
-        Detailed justification for the recommendation (3-5 sentences).
+        Detailed justification (3-5 sentences).
     key_concerns : list[str]
-        Top 2-4 concerns or risks (empty list if none).
+        Top 2-4 concerns or risks (empty if none).
     key_positives : list[str]
-        Top 2-4 strengths or positives (empty list if none).
+        Top 2-4 strengths (empty if none).
     conditions : list[str]
-        Any conditions the panelist would attach to a positive decision.
-        Empty list if unconditional or declining.
+        Conditions attached to a positive recommendation.
+        Empty if unconditional or declining.
     """
     recommendation: str = Field(
-        description="This panelist's recommended decision."
+        description="This panelist's recommended decision.",
     )
     confidence: str = Field(
-        description="Confidence level: LOW | MEDIUM | HIGH."
+        description="Confidence level: LOW | MEDIUM | HIGH.",
     )
     rationale: str = Field(
-        description="Detailed justification for the recommendation (3-5 sentences)."
+        description="Detailed justification for the recommendation (3-5 sentences).",
     )
     key_concerns: List[str] = Field(
-        description="Top 2-4 specific concerns or risks."
+        description="Top 2-4 specific concerns or risks.",
     )
     key_positives: List[str] = Field(
-        description="Top 2-4 strengths or positives."
+        description="Top 2-4 strengths or positives.",
     )
     conditions: List[str] = Field(
         description=(
             "Conditions attached to a positive recommendation. "
             "Empty if unconditional or declining."
-        )
+        ),
     )
 
 
-# ── ConsensusAgent ────────────────────────────────────────────────────────────
+# -- Internal agent: panelist --------------------------------------------------
 
-class ConsensusAgent(Agent):
+class _PanelistAgent(LLMAgent):
     """
-    Runs N panelist agents concurrently on the same input, then routes all
-    verdicts to a judge agent for synthesis into a final decision.
+    Autonomous panelist node.
 
-    Parameters
-    ----------
-    name : str
-        Bus address for this agent.
-    panelists : dict[str, Agent]
-        Specialist agents keyed by role name.  All run concurrently.
-    judge : Agent
-        Synthesises panelist verdicts into the final decision.
-    submit_type : str
-        Message type that triggers a run.
-    result_type : str
-        Message type for the final result.
-    verbose : bool
-        Print panel trace to stdout.
+    Inherits LLM infrastructure from ``LLMAgent``.  Reacts to
+    ``__consensus.panel__``, calls the LLM to produce a ``PanelistVerdict``,
+    and fires ``__consensus.verdict__`` to the aggregator agent.
     """
 
     def __init__(
         self,
         name: str,
         *,
-        panelists: Dict[str, Agent],
-        judge: Agent,
-        submit_type: str = "consensus.submitted",
-        result_type: str = "consensus.result",
-        verbose: bool = False,
+        role:        str,
+        prompt_name: str,
+        verbose:     bool = False,
     ) -> None:
-        super().__init__(name)
-        self.panelists   = panelists
-        self.judge       = judge
-        self.submit_type = submit_type
-        self.result_type = result_type
-        self.verbose     = verbose
-        self._ref: Optional[AgentRef] = None
-
-    # ── Runtime binding ───────────────────────────────────────────────────────
-
-    def _bind_runtime(self, runtime) -> None:
-        self._ref = AgentRef(self.name, runtime._bus)
-        for agent in self.panelists.values():
-            runtime.register(agent)
-        runtime.register(self.judge)
-
-    # ── Message handling ──────────────────────────────────────────────────────
+        super().__init__(name, prompt_name=prompt_name, output_model=PanelistVerdict)
+        self.role    = role
+        self.verbose = verbose
 
     async def on_message(self, message: Message, context: AgentContext) -> None:
-        if message.type == self.submit_type:
-            await self._execute(message)
+        if message.type == _CONSENSUS_PANEL:
+            await self._run(message)
 
-    # ── Execution ─────────────────────────────────────────────────────────────
+    async def _run(self, message: Message) -> None:
+        payload    = message.payload
+        state      = dict(payload.get("__consensus__", {}))
+        clean      = {k: v for k, v in payload.items() if k != "__consensus__"}
+        agent_name = self.name.split(".")[0]
 
-    async def _execute(self, message: Message) -> None:
-        if self._ref is None:
-            raise RuntimeError(
-                f"ConsensusAgent '{self.name}' has not been bound to a runtime."
+        if self.verbose:
+            print(f"[{agent_name}] > [{self.role}] evaluating case...")
+
+        verdict: PanelistVerdict = await self.think(
+            json.dumps(clean, indent=2, default=str)
+        )
+
+        if self.verbose:
+            print(
+                f"[{agent_name}]    ok [{self.role}]"
+                f"  {verdict.recommendation} | {verdict.confidence}"
             )
+
+        await self._ref.send(
+            to      = state["aggregator_target"],
+            type    = _CONSENSUS_VERDICT,
+            payload = {
+                "__consensus__": state,
+                "role":          self.role,
+                "verdict":       verdict.model_dump(),
+            },
+            reply_to = message.reply_to,
+        )
+
+
+# -- Internal agent: aggregator ------------------------------------------------
+
+class _AggregatorAgent(MessageAgent):
+    """
+    Verdict collector - the fan-in point.
+
+    No LLM.  Inherits ``self._ref`` from ``MessageAgent`` - no ``_bind_runtime``
+    boilerplate needed.  Reacts to ``__consensus.verdict__``, accumulates verdicts
+    by ``correlation_id`` until all N panelists have responded, then fires
+    ``__consensus.judge__`` to the judge agent.
+
+    Internal state (ephemeral per-run)
+    -----------------------------------
+    ``_pending`` maps ``correlation_id`` to a dict containing the accumulated
+    verdicts and the consensus state envelope.  Entries are removed once the
+    judge message is fired.
+    """
+
+    def __init__(self, name: str, *, verbose: bool = False) -> None:
+        super().__init__(name)
+        self.verbose  = verbose
+        self._pending: Dict[str, Dict[str, Any]] = {}
+        # self._ref inherited from MessageAgent
+
+    async def on_message(self, message: Message, context: AgentContext) -> None:
+        if message.type == _CONSENSUS_VERDICT:
+            await self._run(message)
+
+    async def _run(self, message: Message) -> None:
+        payload        = message.payload
+        state          = dict(payload.get("__consensus__", {}))
+        role           = payload["role"]
+        verdict        = payload["verdict"]
+        correlation_id = state["correlation_id"]
+        expected       = state["expected"]
+        agent_name     = self.name.split(".")[0]
+
+        if correlation_id not in self._pending:
+            self._pending[correlation_id] = {"verdicts": {}, "state": state}
+
+        self._pending[correlation_id]["verdicts"][role] = verdict
+        collected = len(self._pending[correlation_id]["verdicts"])
+
+        if self.verbose:
+            print(
+                f"[{agent_name}]    verdict received: {role}"
+                f"  ({collected}/{expected})"
+            )
+
+        if collected < expected:
+            return
+
+        bucket   = self._pending.pop(correlation_id)
+        verdicts = bucket["verdicts"]
+
+        if self.verbose:
+            recs   = [v["recommendation"] for v in verdicts.values()]
+            unique = set(recs)
+            if len(unique) == 1:
+                print(f"[{agent_name}] -> UNANIMOUS: {recs[0]}")
+            else:
+                counts  = {r: recs.count(r) for r in unique}
+                summary = "  ".join(f"{r}x{c}" for r, c in counts.items())
+                print(f"[{agent_name}] -> SPLIT panel: {summary}")
+            print(f"[{agent_name}] > forwarding to judge...")
+
+        await self._ref.send(
+            to      = state["judge_target"],
+            type    = _CONSENSUS_JUDGE,
+            payload = {
+                "__consensus__":  state,
+                "verdicts":       verdicts,
+                "original_input": state["original_input"],
+            },
+            reply_to = message.reply_to,
+        )
+
+
+# -- Internal agent: judge -----------------------------------------------------
+
+class _JudgeAgent(LLMAgent):
+    """
+    Final synthesis node.
+
+    Inherits LLM infrastructure from ``LLMAgent``.  Reacts to
+    ``__consensus.judge__``, receives the original input and all panelist
+    verdicts as serialised JSON, calls the LLM, and delivers the result
+    to the original caller.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        prompt_name:  str,
+        output_model: Optional[Type[BaseModel]],
+        verbose:      bool = False,
+    ) -> None:
+        super().__init__(name, prompt_name=prompt_name, output_model=output_model)
+        self.verbose = verbose
+
+    async def on_message(self, message: Message, context: AgentContext) -> None:
+        if message.type == _CONSENSUS_JUDGE:
+            await self._run(message)
+
+    async def _run(self, message: Message) -> None:
+        payload        = message.payload
+        state          = payload.get("__consensus__", {})
+        verdicts       = payload["verdicts"]
+        original_input = payload["original_input"]
+        caller         = message.reply_to or state.get("caller", "")
+        result_type    = state.get("result_type", "consensus.result")
+        agent_name     = self.name.split(".")[0]
+
+        if self.verbose:
+            print(f"[{agent_name}] > Judge synthesising {len(verdicts)} verdicts...")
+
+        raw_result = await self.think(
+            json.dumps({
+                "original_input": original_input,
+                "verdicts":       verdicts,
+            }, indent=2, default=str)
+        )
+
+        final_result = (
+            raw_result.model_dump()
+            if hasattr(raw_result, "model_dump")
+            else (raw_result if isinstance(raw_result, dict) else {"text": raw_result})
+        )
+
+        if self.verbose:
+            decision = final_result.get("decision", final_result.get("recommendation", "?"))
+            print(f"[{agent_name}] [] Decision: {decision}  -> delivering '{result_type}' to '{caller}'")
+
+        await self._ref.send(
+            to      = caller,
+            type    = result_type,
+            payload = {
+                "result":    final_result,
+                "verdicts":  verdicts,
+                "panelists": list(verdicts.keys()),
+                "input":     original_input,
+            },
+        )
+
+
+# -- Public entry point --------------------------------------------------------
+
+class ConsensusAgent(CompositeAgent):
+    """
+    Entry point and topology hub for a choreographed consensus pipeline.
+
+    Inherits from ``CompositeAgent``: the internal topology
+    (``_PanelistAgent`` x N, ``_AggregatorAgent``, ``_JudgeAgent``)
+    is built in ``__init__`` and registered automatically by the runtime
+    via ``sub_agents()`` - no manual ``runtime.register()`` calls needed.
+
+    At runtime, ``ConsensusAgent`` acts as the public entry point: it receives
+    the trigger message, initialises the ``__consensus__`` state envelope, and
+    fans out one ``__consensus.panel__`` message per panelist concurrently.
+    After that it steps back - the chain is self-driving.
+
+    Parameters
+    ----------
+    name         : Bus address (e.g. ``"loan-committee"``).
+    panelists    : Mapping of role name -> prompt key.
+    judge_prompt : Prompt key for the judge/synthesiser LLM.
+    judge_model  : Pydantic model for the judge's structured output.
+    submit_type  : Message type that starts the pipeline.
+    result_type  : Message type for the delivered result.
+    verbose      : Print step-by-step progress to stdout.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        panelists:    Dict[str, str],
+        judge_prompt: str,
+        judge_model:  Optional[Type[BaseModel]] = None,
+        submit_type:  str = "consensus.submitted",
+        result_type:  str = "consensus.result",
+        verbose:      bool = False,
+    ) -> None:
+        super().__init__(name)
+        self.panelists    = panelists
+        self.judge_prompt = judge_prompt
+        self.judge_model  = judge_model
+        self.submit_type  = submit_type
+        self.result_type  = result_type
+        self.verbose      = verbose
+        self._ref: Optional[AgentRef] = None
+
+        self._aggregator_name = f"{name}._aggregator"
+        self._judge_name      = f"{name}._judge"
+        self._panelist_names  = {
+            role: f"{name}._panelist.{role}"
+            for role in panelists
+        }
+
+        self._topology: List[Agent] = self._build_topology()
+
+    # -- Topology declaration --------------------------------------------------
+
+    def sub_agents(self) -> List[Agent]:
+        """Declares the internal agents that form this consensus pipeline."""
+        return self._topology
+
+    def _build_topology(self) -> List[Agent]:
+        """Constructs all internal agents. Called once in ``__init__``."""
+        agents: List[Agent] = []
+
+        for role, prompt_name in self.panelists.items():
+            agents.append(
+                _PanelistAgent(
+                    self._panelist_names[role],
+                    role        = role,
+                    prompt_name = prompt_name,
+                    verbose     = self.verbose,
+                )
+            )
+
+        agents.append(
+            _AggregatorAgent(
+                self._aggregator_name,
+                verbose = self.verbose,
+            )
+        )
+
+        agents.append(
+            _JudgeAgent(
+                self._judge_name,
+                prompt_name  = self.judge_prompt,
+                output_model = self.judge_model,
+                verbose      = self.verbose,
+            )
+        )
+
+        return agents
+
+    # -- Runtime binding -------------------------------------------------------
+
+    def _bind_runtime(self, runtime) -> None:
+        """Sets up the bus reference. Sub-agents are registered by the runtime."""
+        self._ref = AgentRef(self.name, runtime._bus)
+
+    # -- Message handling ------------------------------------------------------
+
+    async def on_message(self, message: Message, context: AgentContext) -> None:
+        if message.type != self.submit_type:
+            return
+
+        caller = message.reply_to or message.sender
+
+        if self.verbose:
+            sep   = "=" * 56
+            roles = list(self.panelists.keys())
+            print(f"\n{sep}\n  CONSENSUS START - {self.name}  ({len(roles)} panelists)\n{sep}")
+            print(f"  Panel: {', '.join(roles)}")
 
         payload = (
             message.payload
             if isinstance(message.payload, dict)
             else {"data": message.payload}
         )
-        caller = message.reply_to or message.sender
 
-        if self.verbose:
-            names = list(self.panelists.keys())
-            print(f"\n── [{self.name}]  CONSENSUS PANEL  ({len(names)} panelists) ──")
-            print(f"   Panelists: {', '.join(names)}")
+        correlation_id = str(uuid.uuid4())
 
-        # ── 1. Concurrent panel ───────────────────────────────────────────────
-        panel_prompt = self._panel_prompt(payload)
+        consensus_state: Dict[str, Any] = {
+            "correlation_id":    correlation_id,
+            "expected":          len(self.panelists),
+            "caller":            caller,
+            "result_type":       self.result_type,
+            "aggregator_target": self._aggregator_name,
+            "judge_target":      self._judge_name,
+            "original_input":    payload,
+        }
 
-        raw_verdicts = await asyncio.gather(
-            *[agent.think(panel_prompt) for agent in self.panelists.values()]
-        )
-
-        verdicts: Dict[str, PanelistVerdict] = {}
-        for role, raw in zip(self.panelists.keys(), raw_verdicts):
-            verdict = self._coerce_verdict(raw)
-            verdicts[role] = verdict
-            if self.verbose:
-                print(
-                    f"   ✦ {role:28s}  [{verdict.recommendation}|{verdict.confidence}]  "
-                    f"{verdict.rationale[:60].replace(chr(10),' ')}…"
-                )
-
-        # Quick consensus/dissent summary for verbose output
-        if self.verbose:
-            recs = [v.recommendation for v in verdicts.values()]
-            unique = set(recs)
-            if len(unique) == 1:
-                print(f"\n   → UNANIMOUS: all panelists recommend {recs[0]}")
-            else:
-                counts = {r: recs.count(r) for r in unique}
-                summary = ", ".join(f"{r}×{c}" for r, c in counts.items())
-                print(f"\n   → SPLIT panel: {summary}")
-
-        # ── 2. Judge synthesises ──────────────────────────────────────────────
-        if self.verbose:
-            print(f"\n   ▶ Judge synthesising…")
-
-        judge_prompt = self._judge_prompt(payload, verdicts)
-        raw_final    = await self.judge.think(judge_prompt)
-        final_result = (
-            raw_final.model_dump()
-            if hasattr(raw_final, "model_dump")
-            else (raw_final if isinstance(raw_final, dict) else {"text": raw_final})
-        )
-
-        if self.verbose:
-            decision = final_result.get("decision", final_result.get("recommendation", "?"))
-            print(f"   ■  Judge decision: {decision}")
-            print(f"   ■  Sending '{self.result_type}' to '{caller}'")
-
-        # ── 3. Deliver ────────────────────────────────────────────────────────
-        verdicts_dict = {role: v.model_dump() for role, v in verdicts.items()}
-
-        await self._ref.send(
-            to      = caller,
-            type    = self.result_type,
-            payload = {
-                "result":    final_result,
-                "verdicts":  verdicts_dict,
-                "panelists": list(self.panelists.keys()),
-                "input":     payload,
-            },
-            metadata = {"in_reply_to": message.id},
-        )
-
-    # ── Prompt builders ───────────────────────────────────────────────────────
-
-    @staticmethod
-    def _panel_prompt(payload: Dict[str, Any]) -> str:
-        lines: List[str] = [
-            "── CASE FOR REVIEW ─────────────────────────────────────",
-        ]
-        for k, v in payload.items():
-            if isinstance(v, (dict, list)):
-                lines.append(f"{k}: {json.dumps(v, ensure_ascii=False)[:500]}")
-            else:
-                lines.append(f"{k}: {v}")
-
-        lines += [
-            "",
-            "Review the case above using your specialist expertise.",
-            "Your opinion is INDEPENDENT — you have not seen any other panelist's view.",
-            "Be specific and rigorous. Your verdict will be presented to a judge.",
-            "",
-            "Respond ONLY with a valid JSON object matching the PanelistVerdict schema.",
-        ]
-        return "\n".join(lines)
-
-    @staticmethod
-    def _judge_prompt(
-        payload: Dict[str, Any],
-        verdicts: Dict[str, PanelistVerdict],
-    ) -> str:
-        lines: List[str] = [
-            "── ORIGINAL CASE ───────────────────────────────────────",
-        ]
-        for k, v in payload.items():
-            if isinstance(v, (dict, list)):
-                lines.append(f"{k}: {json.dumps(v, ensure_ascii=False)[:400]}")
-            else:
-                lines.append(f"{k}: {v}")
-
-        lines += ["", "── PANELIST VERDICTS ───────────────────────────────────"]
-        for role, verdict in verdicts.items():
-            lines.append(f"\n{role}  [{verdict.recommendation} | {verdict.confidence}]")
-            lines.append(f"  Rationale: {verdict.rationale}")
-            if verdict.key_concerns:
-                lines.append(f"  Concerns:  {'; '.join(verdict.key_concerns)}")
-            if verdict.key_positives:
-                lines.append(f"  Positives: {'; '.join(verdict.key_positives)}")
-            if verdict.conditions:
-                lines.append(f"  Conditions: {'; '.join(verdict.conditions)}")
-
-        lines += [
-            "",
-            "── YOUR ROLE: JUDGE / SYNTHESISER ─────────────────────",
-            "You have received independent verdicts from all panelists above.",
-            "Your job:",
-            "  1. Identify where panelists agree (consensus) and disagree (dissent).",
-            "  2. Weigh the arguments — not just count votes.",
-            "  3. Produce a final authoritative decision with full justification.",
-            "  4. If overriding a minority view, explain why explicitly.",
-            "  5. Merge all conditions from positive panelists into a final",
-            "     conditions list, removing duplicates.",
-            "",
-            "Respond ONLY with a valid JSON object matching the required schema.",
-        ]
-        return "\n".join(lines)
-
-    # ── Coercion ──────────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _coerce_verdict(raw: Any) -> PanelistVerdict:
-        if isinstance(raw, PanelistVerdict):
-            return raw
-        if isinstance(raw, dict):
-            return PanelistVerdict.model_validate(raw)
-        if isinstance(raw, str):
-            return PanelistVerdict.model_validate_json(raw)
-        raise TypeError(f"Cannot coerce {type(raw)} to PanelistVerdict")
+        for role, panelist_name in self._panelist_names.items():
+            await self._ref.send(
+                to       = panelist_name,
+                type     = _CONSENSUS_PANEL,
+                payload  = {**payload, "__consensus__": consensus_state},
+                reply_to = caller,
+            )
