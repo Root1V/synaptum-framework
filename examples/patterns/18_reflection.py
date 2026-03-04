@@ -175,6 +175,8 @@ async def main():
 
     client = SimpleAgent("client", handler=client_handler)
 
+    runtime.register(credit_analyst)
+    runtime.register(credit_reviewer)
     runtime.register(reflection_loop)
     runtime.register(client)
 
