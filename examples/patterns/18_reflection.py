@@ -52,6 +52,7 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
+from synaptum.agents import LLMAgent
 from synaptum.agents.simple_agent import SimpleAgent
 from synaptum.core.message import Message
 from synaptum.core.runtime import AgentRuntime
@@ -149,12 +150,12 @@ async def main():
     runtime         = AgentRuntime(bus, prompts=prompt_provider)
 
     # ── Agents ────────────────────────────────────────────────────────────────
-    credit_analyst = SimpleAgent(
+    credit_analyst = LLMAgent(
         "credit-analyst",
         prompt_name  = "bank.reflection.credit_analyst.system",
         output_model = CreditReport,
     )
-    credit_reviewer = SimpleAgent(
+    credit_reviewer = LLMAgent(
         "credit-reviewer",
         prompt_name  = "bank.reflection.credit_reviewer.system",
         output_model = Critique,

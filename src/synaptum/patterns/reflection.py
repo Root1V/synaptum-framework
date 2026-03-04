@@ -33,8 +33,8 @@ Usage
 
     from synaptum.patterns.reflection import ReflectionAgent
 
-    writer  = SimpleAgent("report-writer",   output_model=CreditReport, ...)
-    critic  = SimpleAgent("report-reviewer", output_model=Critique,     ...)
+    writer  = LLMAgent("report-writer",   output_model=CreditReport, ...)
+    critic  = LLMAgent("report-reviewer", output_model=Critique,     ...)
 
     loop = ReflectionAgent(
         "credit-report-loop",
@@ -52,14 +52,14 @@ Usage
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from ..core.agent import Agent
 from ..core.context import AgentContext
 from ..core.message import Message
-from ..agents.agent_ref import AgentRef
+from ..agents.composite_agent import CompositeAgent
+from ..agents.llm_agent import LLMAgent
 
 
 # ── Critique data structure ───────────────────────────────────────────────────
@@ -110,7 +110,7 @@ class Critique(BaseModel):
 
 # ── ReflectionAgent ───────────────────────────────────────────────────────────
 
-class ReflectionAgent(Agent):
+class ReflectionAgent(CompositeAgent):
     """
     Runs a generate → critique → revise loop until the output passes quality
     criteria or the iteration budget is exhausted.
@@ -119,10 +119,10 @@ class ReflectionAgent(Agent):
     ----------
     name : str
         Bus address for this agent.
-    generator : Agent
+    generator : LLMAgent
         Produces the initial output and all revisions.
         Should be configured with the appropriate ``output_model``.
-    critic : Agent
+    critic : LLMAgent
         Evaluates the generator's output.
         Should be configured with ``output_model=Critique``.
     pass_threshold : float
@@ -142,8 +142,8 @@ class ReflectionAgent(Agent):
         self,
         name: str,
         *,
-        generator: Agent,
-        critic: Agent,
+        generator: LLMAgent,
+        critic: LLMAgent,
         pass_threshold: float = 7.5,
         max_iterations: int = 3,
         submit_type: str = "reflection.submitted",
@@ -158,14 +158,12 @@ class ReflectionAgent(Agent):
         self.submit_type    = submit_type
         self.result_type    = result_type
         self.verbose        = verbose
-        self._ref: Optional[AgentRef] = None
+        # _ref inherited from CompositeAgent -> MessageAgent
 
-    # ── Runtime binding ───────────────────────────────────────────────────────
+    # ── Sub-agents ────────────────────────────────────────────────────────────
 
-    def _bind_runtime(self, runtime) -> None:
-        self._ref = AgentRef(self.name, runtime._bus)
-        runtime.register(self.generator)
-        runtime.register(self.critic)
+    def sub_agents(self) -> List[LLMAgent]:
+        return [self.generator, self.critic]
 
     # ── Message handling ──────────────────────────────────────────────────────
 
@@ -176,11 +174,6 @@ class ReflectionAgent(Agent):
     # ── Execution ─────────────────────────────────────────────────────────────
 
     async def _execute(self, message: Message) -> None:
-        if self._ref is None:
-            raise RuntimeError(
-                f"ReflectionAgent '{self.name}' has not been bound to a runtime."
-            )
-
         payload = (
             message.payload
             if isinstance(message.payload, dict)
