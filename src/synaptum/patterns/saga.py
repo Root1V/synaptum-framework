@@ -21,7 +21,7 @@ Execution graph
 
 Each ``_SagaForwardAgent``:
   - Receives ``__saga.fwd__`` on the bus
-  - Calls its LLM via ``self.think()`` (inherited from ``SimpleAgent``)
+  - Calls its LLM via ``self.think()`` (inherited from ``LLMAgent``)
   - On success → sends ``__saga.fwd__`` to the next step (or ``_outcome``)
   - On failure → sends ``__saga.cmp__`` to start the compensation chain
 
@@ -77,7 +77,9 @@ from ..core.agent import Agent, CompositeAgent
 from ..core.context import AgentContext
 from ..core.message import Message
 from ..agents.agent_ref import AgentRef
-from ..agents.simple_agent import SimpleAgent
+from ..agents.llm_agent import LLMAgent
+from ..agents.message_agent import MessageAgent
+from ..agents.message_agent import MessageAgent
 
 
 # ── Internal message types ─────────────────────────────────────────────────────────────────────────────
@@ -202,12 +204,12 @@ class SagaStep(BaseModel):
 
 # ── Internal agent: forward step ─────────────────────────────────────────────────────────────────────────────────────
 
-class _SagaForwardAgent(SimpleAgent):
+class _SagaForwardAgent(LLMAgent):
     """
     Autonomous forward-execution node in the saga chain.
 
     Inherits LLM infrastructure (``think()``, prompt resolution, ``_ref``)
-    from ``SimpleAgent`` and overrides ``on_message`` to react only to
+    from ``LLMAgent`` and overrides ``on_message`` to react only to
     ``__saga.fwd__`` messages.
 
     - On success → emits ``__saga.fwd__`` to ``success_target``
@@ -234,7 +236,7 @@ class _SagaForwardAgent(SimpleAgent):
         self.success_target   = success_target
         self.failure_target   = failure_target
         self.verbose          = verbose
-        # _bind_runtime, _ref and think() are all inherited from SimpleAgent
+        # _bind_runtime, _ref and think() are all inherited from LLMAgent
 
     async def on_message(self, message: Message, context: AgentContext) -> None:
         if message.type == _SAGA_FWD:
@@ -284,12 +286,12 @@ class _SagaForwardAgent(SimpleAgent):
 
 # ── Internal agent: compensator step ──────────────────────────────────────────────────────────────────────────────────
 
-class _SagaCompensatorAgent(SimpleAgent):
+class _SagaCompensatorAgent(LLMAgent):
     """
     Autonomous compensation node in the saga rollback chain.
 
     Inherits LLM infrastructure (``think()``, prompt resolution, ``_ref``)
-    from ``SimpleAgent`` and overrides ``on_message`` to react only to
+    from ``LLMAgent`` and overrides ``on_message`` to react only to
     ``__saga.cmp__`` messages.
 
     Receives ``__saga.cmp__``, calls the LLM to undo the forward step, then
@@ -316,7 +318,7 @@ class _SagaCompensatorAgent(SimpleAgent):
         self.step_description = step_description
         self.next_target      = next_target
         self.verbose          = verbose
-        # _bind_runtime, _ref and think() are all inherited from SimpleAgent
+        # _bind_runtime, _ref and think() are all inherited from LLMAgent
 
     async def on_message(self, message: Message, context: AgentContext) -> None:
         if message.type == _SAGA_CMP:
@@ -361,7 +363,7 @@ class _SagaCompensatorAgent(SimpleAgent):
 
 # ── Internal agent: outcome finalizer ───────────────────────────────────────────────────────────────────────────
 
-class _SagaOutcomeAgent(Agent):
+class _SagaOutcomeAgent(MessageAgent):
     """
     Terminal node of the saga chain.
 
@@ -387,10 +389,7 @@ class _SagaOutcomeAgent(Agent):
         self.result_type = result_type
         self.step_names  = step_names
         self.verbose     = verbose
-        self._ref: Optional[AgentRef] = None
-
-    def _bind_runtime(self, runtime) -> None:
-        self._ref = AgentRef(self.name, runtime._bus)
+        # self._ref inherited from MessageAgent
 
     async def on_message(self, message: Message, context: AgentContext) -> None:
         if message.type in (_SAGA_FWD, _SAGA_CMP):

@@ -23,7 +23,7 @@ Execution graph
                                                                           │
                                                                    result_type ─▶ caller
 
-``_HITLScreenerAgent`` (SimpleAgent):
+``_HITLScreenerAgent`` (LLMAgent):
   - Reacts to ``__hitl.screen__``
   - Calls LLM to produce ``ScreeningResult``
   - Builds ``HumanReviewRequest``
@@ -34,7 +34,7 @@ Execution graph
   - Calls ``review_handler(request)`` — the human pause point
   - Emits ``__hitl.execute__`` to ``_executor`` with the human decision embedded
 
-``_HITLExecutorAgent`` (SimpleAgent):
+``_HITLExecutorAgent`` (LLMAgent):
   - Reacts to ``__hitl.execute__``
   - Calls LLM to produce the final structured output
   - Delivers result to original caller via the bus
@@ -83,7 +83,8 @@ from ..core.agent import Agent, CompositeAgent
 from ..core.context import AgentContext
 from ..core.message import Message
 from ..agents.agent_ref import AgentRef
-from ..agents.simple_agent import SimpleAgent
+from ..agents.llm_agent import LLMAgent
+from ..agents.message_agent import MessageAgent
 
 
 # ── Internal message types ────────────────────────────────────────────────────
@@ -182,11 +183,11 @@ _APPROVAL_DECISIONS = {
 
 # ── Internal agent: screener ──────────────────────────────────────────────────
 
-class _HITLScreenerAgent(SimpleAgent):
+class _HITLScreenerAgent(LLMAgent):
     """
     Autonomous screening node.
 
-    Inherits LLM infrastructure from ``SimpleAgent``.  Reacts to
+    Inherits LLM infrastructure from ``LLMAgent``.  Reacts to
     ``__hitl.screen__``, calls the LLM to produce a ``ScreeningResult``,
     builds the ``HumanReviewRequest``, and fires ``__hitl.review__`` to
     the gate agent.
@@ -212,13 +213,13 @@ class _HITLScreenerAgent(SimpleAgent):
         payload = message.payload
         hitl    = dict(payload.get("__hitl__", {}))
         clean   = {k: v for k, v in payload.items() if k != "__hitl__"}
-        saga_name = self.name.split(".")[0]
+        agent_name = self.name.split(".")[0]
 
         if self.verbose:
-            print(f"[{saga_name}] ▶  Running automated screening…")
+            print(f"[{agent_name}] ▶  Running automated screening…")
 
         try:
-            screening: ScreeningResult = await self.think(_analysis_prompt(clean))
+            screening: ScreeningResult = await self.think(json.dumps(clean, indent=2, default=str))
         except Exception as exc:
             screening = ScreeningResult(
                 summary="Screening failed due to an internal error.",
@@ -229,7 +230,7 @@ class _HITLScreenerAgent(SimpleAgent):
             )
 
         if self.verbose:
-            print(f"[{saga_name}]    ✓  Screening complete — risk: {screening.risk_level}")
+            print(f"[{agent_name}]    ✓  Screening complete — risk: {screening.risk_level}")
 
         review_request = _build_review_request(clean, screening)
         new_hitl = {
@@ -248,14 +249,16 @@ class _HITLScreenerAgent(SimpleAgent):
 
 # ── Internal agent: gate (human pause) ───────────────────────────────────────
 
-class _HITLGateAgent(Agent):
+class _HITLGateAgent(MessageAgent):
     """
     Human decision gate — the pause point.
 
-    No LLM.  Reacts to ``__hitl.review__``, calls the application-supplied
-    ``review_handler`` coroutine (which may open a web form, send a Slack
-    message, block on stdin, etc.), then fires ``__hitl.execute__`` with the
-    human decision embedded in the ``__hitl__`` state.
+    No LLM.  Inherits ``self._ref`` from ``MessageAgent`` — no ``_bind_runtime``
+    boilerplate needed.  Reacts to ``__hitl.review__``, calls the
+    application-supplied ``review_handler`` coroutine (which may open a web
+    form, send a Slack message, block on stdin, etc.), then fires
+    ``__hitl.execute__`` with the human decision embedded in the
+    ``__hitl__`` state.
     """
 
     def __init__(
@@ -270,10 +273,7 @@ class _HITLGateAgent(Agent):
         self.review_handler = review_handler
         self.execute_target = execute_target
         self.verbose        = verbose
-        self._ref: Optional[AgentRef] = None
-
-    def _bind_runtime(self, runtime) -> None:
-        self._ref = AgentRef(self.name, runtime._bus)
+        # self._ref inherited from MessageAgent
 
     async def on_message(self, message: Message, context: AgentContext) -> None:
         if message.type == _HITL_REVIEW:
@@ -283,13 +283,13 @@ class _HITLGateAgent(Agent):
         payload        = message.payload
         hitl           = dict(payload.get("__hitl__", {}))
         review_request = HumanReviewRequest.model_validate(hitl["review_request"])
-        saga_name      = self.name.split(".")[0]
+        agent_name     = self.name.split(".")[0]
 
         if self.verbose:
             print(
-                f"[{saga_name}] ⏸  PAUSING for human review"
+                f"[{agent_name}] ⏸  PAUSING for human review"
                 f"  [task: {review_request.task_id}]"
-                f"\n[{saga_name}]    Risk: {review_request.risk_level}"
+                f"\n[{agent_name}]    Risk: {review_request.risk_level}"
                 f"  |  Options: {', '.join(review_request.options)}"
             )
 
@@ -299,9 +299,9 @@ class _HITLGateAgent(Agent):
 
         if self.verbose:
             path = "APPROVED path" if approved else "REJECTED path"
-            print(f"[{saga_name}] ▶  Human decided: {human_response.decision}  ({path})")
+            print(f"[{agent_name}] ▶  Human decided: {human_response.decision}  ({path})")
             if human_response.conditions:
-                print(f"[{saga_name}]    Conditions: {len(human_response.conditions)} item(s)")
+                print(f"[{agent_name}]    Conditions: {len(human_response.conditions)} item(s)")
 
         new_hitl = {
             **hitl,
@@ -319,11 +319,11 @@ class _HITLGateAgent(Agent):
 
 # ── Internal agent: executor ──────────────────────────────────────────────────
 
-class _HITLExecutorAgent(SimpleAgent):
+class _HITLExecutorAgent(LLMAgent):
     """
     Final output node.
 
-    Inherits LLM infrastructure from ``SimpleAgent``.  Reacts to
+    Inherits LLM infrastructure from ``LLMAgent``.  Reacts to
     ``__hitl.execute__``, builds the execution prompt from the full
     ``__hitl__`` state (original payload + screening + human decision),
     calls the LLM, and delivers the result to the original caller.
@@ -354,13 +354,22 @@ class _HITLExecutorAgent(SimpleAgent):
         screening      = ScreeningResult.model_validate(hitl["screening"])
         human_response = HumanReviewResponse.model_validate(hitl["human_response"])
         approved       = hitl.get("approved", False)
-        saga_name      = self.name.split(".")[0]
+        agent_name     = self.name.split(".")[0]
 
         if self.verbose:
-            print(f"[{saga_name}] ▶  Generating final output…")
+            print(f"[{agent_name}] ▶  Generating final output…")
 
         result_raw = await self.think(
-            _execution_prompt(clean, screening, human_response, approved)
+            json.dumps({
+                "approved":              approved,
+                "human_decision":        human_response.decision,
+                "human_comments":        human_response.comments,
+                "human_conditions":      human_response.conditions,
+                "human_modifications":   human_response.modifications,
+                "screening_findings":    screening.automated_findings,
+                "risk_level":            screening.risk_level,
+                "original_request":      clean,
+            }, indent=2, default=str)
         )
 
         final_result = (
@@ -371,7 +380,7 @@ class _HITLExecutorAgent(SimpleAgent):
 
         if self.verbose:
             status = final_result.get("status", "?")
-            print(f"[{saga_name}] ■  {status}  →  delivering '{self.result_type}' to '{caller}'")
+            print(f"[{agent_name}] ■  {status}  →  delivering '{self.result_type}' to '{caller}'")
 
         await self._ref.send(
             to      = caller,
@@ -513,48 +522,7 @@ class HITLAgent(CompositeAgent):
         )
 
 
-# ── Prompt builders (pure functions) ─────────────────────────────────────────
-
-def _analysis_prompt(payload: Dict[str, Any]) -> str:
-    return (
-        "Perform a thorough automated screening of the following request "
-        "and return a JSON object with EXACTLY these keys:\n\n"
-        "  summary            – one-sentence description of the request and "
-        "its primary risk factors\n"
-        "  automated_findings – detailed text: every flag raised, every check "
-        "passed, every data point considered; be specific\n"
-        "  risk_level         – aggregate risk assessment: one of "
-        "LOW | MEDIUM | HIGH | CRITICAL\n"
-        "  question           – the exact question the human reviewer must answer\n"
-        "  options            – JSON array of decision options, e.g. "
-        "[\"APPROVE\", \"APPROVE_WITH_CONDITIONS\", \"REJECT\"]\n\n"
-        f"REQUEST PAYLOAD:\n{json.dumps(payload, indent=2, default=str)}"
-    )
-
-
-def _execution_prompt(
-    payload:        Dict[str, Any],
-    screening:      ScreeningResult,
-    human_response: HumanReviewResponse,
-    approved:       bool,
-) -> str:
-    status_block = (
-        "STATUS: APPROVED — proceed with processing and incorporate all "
-        "human conditions into the final output."
-        if approved else
-        "STATUS: NOT APPROVED — produce a formal rejection notice with the "
-        "human's stated reasons and any required next steps."
-    )
-    return (
-        f"{status_block}\n\n"
-        f"ORIGINAL REQUEST:\n{json.dumps(payload, indent=2, default=str)}\n\n"
-        f"AUTOMATED SCREENING FINDINGS:\n{screening.automated_findings}\n\n"
-        f"HUMAN DECISION: {human_response.decision}\n"
-        f"HUMAN COMMENTS: {human_response.comments}\n"
-        f"CONDITIONS: {json.dumps(human_response.conditions)}\n"
-        f"MODIFICATIONS: {json.dumps(human_response.modifications, default=str)}"
-    )
-
+# ── Review request builder (pure function) ───────────────────────────────────
 
 def _build_review_request(
     payload:   Dict[str, Any],
