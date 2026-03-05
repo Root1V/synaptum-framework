@@ -61,6 +61,7 @@ Usage
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -196,6 +197,7 @@ class SwarmAgent(Agent):
         current_agent_name = self.entry
         history: List[Dict[str, Any]] = []   # [{agent, findings, action, confidence, reason}]
         turns = 0
+        t_swarm_start = time.perf_counter()
 
         if self.verbose:
             peer_names = list(self.participants.keys())
@@ -221,7 +223,9 @@ class SwarmAgent(Agent):
                 peer_names    = [n for n in self.participants if n != current_agent_name],
             )
 
+            t_turn_start = time.perf_counter()
             raw    = await agent.think(prompt)
+            elapsed_s = round(time.perf_counter() - t_turn_start, 2)
             decision = self._coerce_decision(raw)
 
             history.append({
@@ -231,11 +235,13 @@ class SwarmAgent(Agent):
                 "confidence": decision.confidence,
                 "reason":     decision.handoff_reason,
                 "handoff_to": decision.handoff_to,
+                "elapsed_s":  elapsed_s,
             })
 
             if self.verbose:
                 action_tag = f"[{decision.action}|{decision.confidence}]"
                 print(f"     {action_tag} {decision.findings[:100].replace(chr(10),' ')}…")
+                print(f"     ⏱  {elapsed_s:.2f}s")
                 if decision.handoff_to:
                     print(f"     → handoff to: {decision.handoff_to} — {decision.handoff_reason[:80]}")
                 else:
@@ -261,22 +267,24 @@ class SwarmAgent(Agent):
                 print(f"\n   ⚠  max_turns ({self.max_turns}) reached without termination.")
 
         # Final result
+        elapsed_total_s = round(time.perf_counter() - t_swarm_start, 2)
         final_turn  = history[-1] if history else {}
         final_action = final_turn.get("action", "UNKNOWN")
 
         if self.verbose:
-            print(f"\n   ■  Swarm complete — {turns} turn(s) — final action: {final_action}")
+            print(f"\n   ■  Swarm complete — {turns} turn(s) — {elapsed_total_s:.2f}s total — final action: {final_action}")
             print(f"   ■  Sending '{self.result_type}' to '{caller}'")
 
         await self._ref.send(
             to      = caller,
             type    = self.result_type,
             payload = {
-                "final_action": final_action,
-                "final_agent":  final_turn.get("agent", "unknown"),
-                "turns":        turns,
-                "history":      history,
-                "input":        payload,
+                "final_action":   final_action,
+                "final_agent":    final_turn.get("agent", "unknown"),
+                "turns":          turns,
+                "elapsed_total_s": elapsed_total_s,
+                "history":        history,
+                "input":          payload,
             },
             metadata = {"in_reply_to": message.id},
         )

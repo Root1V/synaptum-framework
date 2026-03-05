@@ -81,7 +81,7 @@ Usage
 
 from __future__ import annotations
 
-import json
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -93,6 +93,7 @@ from ..agents.message_agent import MessageAgent
 from ..agents.llm_agent import LLMAgent
 from ..prompts.template import PromptTemplate
 from ..prompts.provider import PromptProvider
+from ..utils.formatting import fmt_dict, fmt_list, fmt_records
 
 
 # ── Critique data structure ───────────────────────────────────────────────────
@@ -155,6 +156,9 @@ class _RunState:
     best_score:      float                     = -1.0
     iteration:       int                       = 0
     passed:          bool                      = False
+    t_start:         float                     = 0.0   # wall time when run began
+    t_phase:         float                     = 0.0   # wall time when last message was sent
+    _last_gen_elapsed: float                   = 0.0   # generate elapsed, held until critique done
 
 
 # ── ReflectionAgent ───────────────────────────────────────────────────────────
@@ -303,6 +307,7 @@ class ReflectionAgent(MessageAgent):
             caller          = message.reply_to or message.sender,
             original_msg_id = message.id,
             payload         = payload,
+            t_start         = time.perf_counter(),
         )
 
         if self.verbose:
@@ -333,6 +338,9 @@ class ReflectionAgent(MessageAgent):
     async def _on_generated(
         self, run_id: str, state: _RunState, message: Message
     ) -> None:
+        elapsed = round(time.perf_counter() - state.t_phase, 2)
+        state._last_gen_elapsed = elapsed
+
         raw = message.payload.get("answer", message.payload)
         output: Dict[str, Any] = (
             raw.model_dump()
@@ -344,6 +352,7 @@ class ReflectionAgent(MessageAgent):
         if self.verbose:
             preview = str(output)[:120].replace("\n", " ")
             print(f"     ✎ Generated: {preview}…")
+            print(f"     ⏱  generate: {elapsed:.2f}s")
 
         await self._send_critique(run_id, state, output)
 
@@ -352,20 +361,25 @@ class ReflectionAgent(MessageAgent):
     async def _on_critiqued(
         self, run_id: str, state: _RunState, message: Message
     ) -> None:
+        elapsed_crit = round(time.perf_counter() - state.t_phase, 2)
+
         raw_critique = message.payload.get("answer", message.payload)
         critique     = self._coerce_critique(raw_critique)
         output       = state.current_output or {}
 
         if self.verbose:
             dims = ", ".join(f"{k}={v:.1f}" for k, v in critique.dimension_scores.items())
-            print(f"     ✦ Score: {critique.score:.1f}/10  [{dims}]")
+            print(f"     ❖ Score: {critique.score:.1f}/10  [{dims}]")
+            print(f"     ⏱  critique: {elapsed_crit:.2f}s")
             if critique.weaknesses:
                 print(f"     ✗ Weaknesses: {'; '.join(critique.weaknesses[:2])}")
 
         state.history.append({
-            "iteration": state.iteration,
-            "output":    output,
-            "critique":  critique.model_dump(),
+            "iteration":        state.iteration,
+            "output":           output,
+            "critique":         critique.model_dump(),
+            "elapsed_generate_s": state._last_gen_elapsed,
+            "elapsed_critique_s": elapsed_crit,
         })
 
         if critique.score > state.best_score:
@@ -412,7 +426,7 @@ class ReflectionAgent(MessageAgent):
                     f"ReflectionAgent '{self.name}': no gen_prompt configured. "
                     "Pass 'gen_prompt' or 'gen_prompt_name'."
                 )
-            prompt = tpl.render(payload=self._fmt_dict(state.payload))
+            prompt = tpl.render(payload=fmt_dict(state.payload))
         else:
             tpl = self._revision_prompt_tpl
             if tpl is None:
@@ -423,9 +437,9 @@ class ReflectionAgent(MessageAgent):
             last     = state.history[-1]
             critique = last["critique"]
             prompt = tpl.render(
-                payload               = self._fmt_dict(state.payload),
+                payload               = fmt_dict(state.payload),
                 last_score            = f"{critique['score']:.1f}/10",
-                weaknesses            = self._fmt_list(critique.get("weaknesses", [])),
+                weaknesses            = fmt_list(critique.get("weaknesses", [])),
                 revision_instructions = critique.get("revision_instructions", ""),
             )
         msg_id = await self._ref.send(
@@ -435,6 +449,7 @@ class ReflectionAgent(MessageAgent):
             reply_to = self.name,
             metadata = {"run_id": run_id},
         )
+        state.t_phase = time.perf_counter()
         self._pending_msgs[msg_id] = (run_id, "generate")
 
     async def _send_critique(
@@ -446,10 +461,13 @@ class ReflectionAgent(MessageAgent):
                 "Pass 'crit_prompt' or 'crit_prompt_name'."
             )
         prompt = self._crit_prompt_tpl.render(
-            payload       = self._fmt_dict(state.payload),
-            output        = self._fmt_dict(output),
+            payload       = fmt_dict(state.payload),
+            output        = fmt_dict(output),
             iteration     = str(state.iteration),
-            prior_scores  = self._fmt_scores(state.history),
+            prior_scores  = fmt_records(
+                [{"iteration": h["iteration"], "score": h["critique"]["score"]} for h in state.history],
+                "Iteration {iteration}: {score:.1f}/10",
+            ),
         )
         msg_id = await self._ref.send(
             to       = self._critic_name,
@@ -458,54 +476,30 @@ class ReflectionAgent(MessageAgent):
             reply_to = self.name,
             metadata = {"run_id": run_id},
         )
+        state.t_phase = time.perf_counter()
         self._pending_msgs[msg_id] = (run_id, "critique")
 
     async def _deliver(self, run_id: str, state: _RunState) -> None:
+        elapsed_total_s = round(time.perf_counter() - state.t_start, 2)
+
         if self.verbose:
-            print(f"\n   ■  Sending '{self.result_type}' to '{state.caller}'")
+            print(f"\n   ■  Sending '{self.result_type}' to '{state.caller}'  ({elapsed_total_s:.2f}s total)")
 
         await self._ref.send(
             to      = state.caller,
             type    = self.result_type,
             payload = {
-                "result":          state.best_output,
-                "score":           state.best_score,
-                "passed":          state.passed,
-                "iterations_used": len(state.history),
-                "history":         state.history,
-                "input":           state.payload,
+                "result":           state.best_output,
+                "score":            state.best_score,
+                "passed":           state.passed,
+                "iterations_used":  len(state.history),
+                "elapsed_total_s":  elapsed_total_s,
+                "history":          state.history,
+                "input":            state.payload,
             },
             metadata = {"in_reply_to": state.original_msg_id},
         )
         self._runs.pop(run_id, None)
-
-    # ── Context serializers ───────────────────────────────────────────────────
-    # Python serialises raw data only — no headers, bullets, or framing text.
-    # All structural prompt text lives in the YAML templates.
-
-    @staticmethod
-    def _fmt_dict(d: Dict[str, Any], max_value_len: int = 500) -> str:
-        """Serialise a dict as 'key: value' lines."""
-        lines: List[str] = []
-        for k, v in d.items():
-            if isinstance(v, (dict, list)):
-                lines.append(f"{k}: {json.dumps(v, ensure_ascii=False)[:max_value_len]}")
-            else:
-                lines.append(f"{k}: {v}")
-        return "\n".join(lines)
-
-    @staticmethod
-    def _fmt_list(items: List[str], prefix: str = "· ") -> str:
-        """Serialise a list as prefixed lines."""
-        return "\n".join(f"{prefix}{item}" for item in items)
-
-    @staticmethod
-    def _fmt_scores(history: List[Dict[str, Any]]) -> str:
-        """Serialise iteration scores as plain lines."""
-        return "\n".join(
-            f"Iteration {h['iteration']}: {h['critique']['score']:.1f}/10"
-            for h in history
-        )
 
     # ── Coercion ──────────────────────────────────────────────────────────────
 

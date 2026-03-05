@@ -23,6 +23,8 @@ from .patterns.router import RouterPattern
 from .patterns.supervisor import SupervisorPattern
 from .patterns.graph import GraphPattern, GraphNode
 
+from .utils.formatting import fmt_dict, fmt_list, fmt_records
+
 __all__ = [
     "Message",
     "AgentContext",

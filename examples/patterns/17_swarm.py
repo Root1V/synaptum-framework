@@ -62,7 +62,8 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-from synaptum.agents.simple_agent import SimpleAgent
+from synaptum.agents import LLMAgent
+from synaptum.agents.message_agent import MessageAgent
 from synaptum.core.message import Message
 from synaptum.core.runtime import AgentRuntime
 from synaptum.messaging.in_memory_bus import InMemoryMessageBus
@@ -72,13 +73,14 @@ from synaptum.prompts import FilePromptProvider
 
 # ── Client handler ─────────────────────────────────────────────────────────────
 
-async def client_handler(agent: SimpleAgent, msg: Message, ctx):
+async def client_handler(agent: MessageAgent, msg: Message, ctx):
     if msg.type != "alert.decision":
         return
 
-    p       = msg.payload
-    history = p["history"]
-    inp     = p["input"]
+    p              = msg.payload
+    history        = p["history"]
+    inp            = p["input"]
+    elapsed_total  = p.get("elapsed_total_s", 0.0)
 
     action_colors = {
         "CLEAR":    "✅",
@@ -97,6 +99,7 @@ async def client_handler(agent: SimpleAgent, msg: Message, ctx):
         print(f"  Amount:         ${amount:,.2f}")
     print(f"  Turns:          {p['turns']}")
     print(f"  Final agent:    {p['final_agent']}")
+    print(f"  Total time:     {elapsed_total:.2f}s")
 
     icon = action_colors.get(p["final_action"], "❓")
     print(f"\n  {icon}  DECISION: {p['final_action']}")
@@ -105,8 +108,9 @@ async def client_handler(agent: SimpleAgent, msg: Message, ctx):
     # Print handoff chain
     print(f"\n  Investigation trail:")
     for i, turn in enumerate(history, 1):
+        elapsed = turn.get("elapsed_s", 0.0)
         arrow = "→" if turn.get("handoff_to") else "■"
-        print(f"\n  [{i}] {turn['agent']}  [{turn['action']}|{turn['confidence']}]")
+        print(f"\n  [{i}] {turn['agent']}  [{turn['action']}|{turn['confidence']}]  ⏱ {elapsed:.2f}s")
         # Print findings wrapped
         findings = turn["findings"]
         for line in findings.splitlines():
@@ -116,6 +120,18 @@ async def client_handler(agent: SimpleAgent, msg: Message, ctx):
             print(f"        reason: {turn['reason']}")
         else:
             print(f"      ■ TERMINATED — {turn['reason']}")
+
+    # Timing summary table
+    print(f"\n{'─' * W}")
+    print(f"  Timing breakdown:")
+    for turn in history:
+        elapsed = turn.get("elapsed_s", 0.0)
+        bar_len = min(int(elapsed * 2), 30)
+        bar     = "█" * bar_len + "░" * (30 - bar_len)
+        pct     = (elapsed / elapsed_total * 100) if elapsed_total else 0
+        print(f"    {turn['agent']:22s}  {elapsed:5.2f}s  {pct:4.0f}%  {bar}")
+    print(f"    {'─' * 22}  {'─' * 5}")
+    print(f"    {'TOTAL':22s}  {elapsed_total:5.2f}s")
 
     print(f"\n{'═' * W}\n")
 
@@ -128,22 +144,22 @@ async def main():
     runtime         = AgentRuntime(bus, prompts=prompt_provider)
 
     # ── Swarm participants ─────────────────────────────────────────────────────
-    fraud_analyst = SimpleAgent(
+    fraud_analyst = LLMAgent(
         "fraud-analyst",
         prompt_name  = "bank.swarm.fraud_analyst.system",
         output_model = HandoffDecision,
     )
-    aml_specialist = SimpleAgent(
+    aml_specialist = LLMAgent(
         "aml-specialist",
         prompt_name  = "bank.swarm.aml_specialist.system",
         output_model = HandoffDecision,
     )
-    sanctions_screener = SimpleAgent(
+    sanctions_screener = LLMAgent(
         "sanctions-screener",
         prompt_name  = "bank.swarm.sanctions_screener.system",
         output_model = HandoffDecision,
     )
-    compliance_officer = SimpleAgent(
+    compliance_officer = LLMAgent(
         "compliance-officer",
         prompt_name  = "bank.swarm.compliance_officer.system",
         output_model = HandoffDecision,
@@ -165,7 +181,7 @@ async def main():
         verbose     = True,
     )
 
-    client = SimpleAgent("client", handler=client_handler)
+    client = MessageAgent("client", handler=client_handler)
 
     runtime.register(investigation_swarm)
     runtime.register(client)

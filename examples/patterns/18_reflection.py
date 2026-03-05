@@ -51,6 +51,7 @@ import asyncio
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
+from typing import List
 
 load_dotenv()
 
@@ -65,15 +66,33 @@ from synaptum.prompts import FilePromptProvider
 
 # ── Output schema  ─────────────────────────────────────────────────────────────
 
+class FinancialRatio(BaseModel):
+    name:    str   = Field(description="Ratio name, e.g. 'ICR' or 'EBITDA margin'.")
+    formula: str   = Field(description="Full workings shown, e.g. 'EBIT / Interest = 1,120,000 / 490,000'.")
+    value:   float = Field(description="Numeric result.")
+    unit:    str   = Field(description="Suffix/unit: 'x', '%', or 'USD'.")
+
+
+class Risk(BaseModel):
+    factor:   str = Field(description="Specific risk factor — one concise sentence.")
+    severity: str = Field(description="LOW | MEDIUM | HIGH | CRITICAL")
+    mitigant: str = Field(description="Concrete mitigant — one concise sentence.")
+
+
 class CreditReport(BaseModel):
-    executive_summary:   str = Field(description="3-4 sentence summary with loan amount, purpose, and recommendation.")
-    applicant_profile:   str = Field(description="Business description, years in operation, industry, ownership.")
-    financial_analysis:  str = Field(description="Revenue trend, EBITDA margin, D/E ratio, ICR with workings, net debt/EBITDA, liquidity.")
-    risk_assessment:     str = Field(description="Credit risk rating (LOW/MEDIUM/HIGH/CRITICAL) + top 3-5 risks each with mitigant.")
-    collateral_analysis: str = Field(description="Description, estimated value, LTV ratio, enforceability.")
-    recommendation:      str = Field(description="APPROVE | APPROVE_WITH_CONDITIONS | DECLINE")
-    proposed_terms:      str = Field(description="Loan amount, tenor, rate, covenants if approved.")
-    regulatory_flags:    str = Field(description="IFRS 9 stage, provisioning estimate, Basel III / local regulatory notes.")
+    executive_summary:      str              = Field(description="3-4 sentences: loan amount, purpose, and recommendation.")
+    applicant_profile:      str              = Field(description="Business description, years in operation, industry, ownership — max 3 sentences.")
+    ratios:                 List[FinancialRatio] = Field(description="All key financial ratios with full workings: YoY revenue growth, EBITDA margin, D/E, ICR, net debt/EBITDA, current ratio.")
+    credit_risk_rating:     str              = Field(description="Overall credit risk: LOW | MEDIUM | HIGH | CRITICAL")
+    risks:                  List[Risk]       = Field(description="Top 3-5 specific risks, each with severity and mitigant.")
+    collateral_ltv:         float            = Field(description="Loan-to-value ratio as a percentage, e.g. 66.7")
+    collateral_notes:       str              = Field(description="Collateral description, enforceability, and priority — max 2 sentences.")
+    recommendation:         str              = Field(description="APPROVE | APPROVE_WITH_CONDITIONS | DECLINE")
+    conditions:             List[str]        = Field(description="Approval conditions if APPROVE_WITH_CONDITIONS, else empty list.")
+    proposed_terms:         str              = Field(description="Amount, tenor, rate, key covenants — max 2 sentences.")
+    ifrs9_stage:            int              = Field(ge=1, le=3, description="IFRS 9 stage: 1, 2, or 3.")
+    provision_estimate_pct: float            = Field(description="ECL provision estimate as percentage of loan amount, e.g. 2.5")
+    regulatory_notes:       str              = Field(description="Basel III or local regulatory considerations — max 2 sentences.")
 
 
 # ── Client handler ─────────────────────────────────────────────────────────────
@@ -82,13 +101,14 @@ async def client_handler(agent: MessageAgent, msg: Message, ctx):
     if msg.type != "credit.assessment.final":
         return
 
-    p        = msg.payload
-    report   = p["result"]
-    score    = p["score"]
-    passed   = p["passed"]
-    iters    = p["iterations_used"]
-    history  = p["history"]
-    inp      = p["input"]
+    p              = msg.payload
+    report         = p["result"]
+    score          = p["score"]
+    passed         = p["passed"]
+    iters          = p["iterations_used"]
+    history        = p["history"]
+    inp            = p["input"]
+    elapsed_total  = p.get("elapsed_total_s", 0.0)
 
     W = 64
     status = "✅ PASSED" if passed else "⚠️  BEST AVAILABLE"
@@ -98,6 +118,7 @@ async def client_handler(agent: MessageAgent, msg: Message, ctx):
     print(f"  Loan requested:  ${inp.get('loan_amount_usd', 0):,.0f}")
     print(f"  Iterations:      {iters}")
     print(f"  Final score:     {score:.1f}/10  {status}")
+    print(f"  Total time:      {elapsed_total:.2f}s")
     print(f"{'─' * W}")
 
     # Score history
@@ -109,17 +130,39 @@ async def client_handler(agent: MessageAgent, msg: Message, ctx):
             print(f"    Iter {h['iteration']}: {h['critique']['score']:4.1f}  {bar}")
 
     print(f"\n  RECOMMENDATION:  {report.get('recommendation','—')}")
+    conds = report.get("conditions", [])
+    if conds:
+        print(f"  Conditions:")
+        for c in conds:
+            print(f"    · {c}")
+
     print(f"\n  Executive Summary:")
     for line in report.get("executive_summary", "").splitlines():
         print(f"    {line}")
 
-    print(f"\n  Proposed Terms:")
-    for line in report.get("proposed_terms", "").splitlines():
-        print(f"    {line}")
+    print(f"\n  Proposed Terms:  {report.get('proposed_terms','—')}")
+    print(f"  IFRS 9 Stage:    {report.get('ifrs9_stage','—')}  "
+          f"— Provision: {report.get('provision_estimate_pct','—')}%")
+    print(f"  Regulatory:      {report.get('regulatory_notes','—')}")
 
-    print(f"\n  Regulatory Flags:")
-    for line in report.get("regulatory_flags", "").splitlines():
-        print(f"    {line}")
+    # Financial ratios table
+    ratios = report.get("ratios", [])
+    if ratios:
+        print(f"\n  Financial ratios:")
+        for r in ratios:
+            print(f"    {r['name']:20s}  {r['value']:>8.2f} {r['unit']:<3s}  {r['formula']}")
+
+    # Risk matrix
+    risks = report.get("risks", [])
+    sev_icon = {"LOW": "🟢", "MEDIUM": "🟡", "HIGH": "🔴", "CRITICAL": "⛔"}
+    if risks:
+        print(f"\n  Risk matrix ({report.get('credit_risk_rating','—')} overall):")
+        for r in risks:
+            icon = sev_icon.get(r['severity'], "❓")
+            print(f"    {icon} [{r['severity']:8s}] {r['factor']}")
+            print(f"               ↳ {r['mitigant']}")
+
+    print(f"\n  Collateral:  LTV {report.get('collateral_ltv','—'):.1f}%  — {report.get('collateral_notes','—')}")
 
     # Final critique breakdown
     final_critique = history[-1]["critique"]
@@ -140,6 +183,20 @@ async def client_handler(agent: MessageAgent, msg: Message, ctx):
         print(f"\n  Remaining issues:")
         for w in final_critique["weaknesses"]:
             print(f"    - {w}")
+
+    # Timing breakdown
+    print(f"\n{'─' * W}")
+    print(f"  Timing breakdown (generate vs critique per iteration):")
+    for h in history:
+        gen_s  = h.get("elapsed_generate_s", 0.0)
+        crit_s = h.get("elapsed_critique_s", 0.0)
+        iter_s = gen_s + crit_s
+        pct    = (iter_s / elapsed_total * 100) if elapsed_total else 0
+        bar_g  = "█" * min(int(gen_s  * 1.5), 20)
+        bar_c  = "░" * min(int(crit_s * 1.5), 20)
+        print(f"    Iter {h['iteration']}  generate {gen_s:5.2f}s {bar_g}  critique {crit_s:5.2f}s {bar_c}  total {iter_s:.2f}s ({pct:.0f}%)")
+    print(f"    {'─' * 56}")
+    print(f"    {'TOTAL':36s}  {elapsed_total:.2f}s")
 
     print(f"{'═' * W}\n")
 
