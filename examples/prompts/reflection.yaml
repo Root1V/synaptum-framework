@@ -12,14 +12,15 @@ bank.reflection.credit_analyst.system:
       executive_summary   (string)  — 3-4 sentences: loan amount, purpose, recommendation.
       applicant_profile   (string)  — Business background, years operating, industry, ownership. Max 3 sentences.
       ratios              (array)   — List of FinancialRatio objects. MUST include:
-                                       · YoY revenue growth
-                                       · EBITDA margin
-                                       · Debt-to-equity
-                                       · ICR  (EBIT / annual interest)
-                                       · Net debt / EBITDA
-                                       Each object: {"name": "...", "formula": "shown workings", "value": <number>, "unit": "x|%|USD"}
+                                       · YoY revenue growth     unit="%"  value=((current - prior) / prior) * 100
+                                       · EBITDA margin          unit="%"  value=(EBITDA / revenue) * 100
+                                       · Debt-to-equity         unit="x"  value=total_debt / total_equity
+                                       · ICR                    unit="x"  value=EBIT / annual_interest_expense
+                                       · Net debt / EBITDA      unit="x"  value=(total_debt - cash) / EBITDA
+                                       Each object: {"name": "...", "formula": "full arithmetic", "value": <number>, "unit": "x|%|USD"}
                                        Show the full arithmetic in "formula", e.g.:
-                                       "formula": "EBIT / Interest = 1,120,000 / 490,000"
+                                       "formula": "EBIT / Interest = 1,120,000 / 490,000 = 2.29"
+                                       For percentages: "formula": "(8,400,000 - 7,200,000) / 7,200,000 * 100 = 16.7"
       credit_risk_rating  (string)  — Overall: LOW | MEDIUM | HIGH | CRITICAL
       risks               (array)   — 3–5 Risk objects: {"factor": "...", "severity": "LOW|MEDIUM|HIGH|CRITICAL", "mitigant": "..."}
       collateral_ltv      (number)  — Loan / appraised_value × 100  (percentage)
