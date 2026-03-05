@@ -91,6 +91,8 @@ from ..core.context import AgentContext
 from ..core.message import Message
 from ..agents.message_agent import MessageAgent
 from ..agents.llm_agent import LLMAgent
+from ..prompts.template import PromptTemplate
+from ..prompts.provider import PromptProvider
 
 
 # ── Critique data structure ───────────────────────────────────────────────────
@@ -200,6 +202,25 @@ class ReflectionAgent(MessageAgent):
         Message type sent to the generator.
     critique_type : str
         Message type sent to the critic.
+    reply_type : str
+        Message type expected back from generator and critic. Default: ``agent.output``.
+    gen_prompt : PromptTemplate, optional
+        Template for the user turn sent to the generator on the FIRST iteration.
+        Variables available: ``{payload}``.
+    gen_prompt_name : str, optional
+        Name to resolve via the runtime's PromptProvider (deferred resolution).
+    revision_prompt : PromptTemplate, optional
+        Template for the user turn sent to the generator on RETRY iterations.
+        Variables available: ``{payload}``, ``{last_score}``, ``{weaknesses}``,
+        ``{revision_instructions}``.
+    revision_prompt_name : str, optional
+        Name to resolve via the runtime's PromptProvider (deferred resolution).
+    crit_prompt : PromptTemplate, optional
+        Template for the user turn sent to the critic.
+        Variables available: ``{payload}``, ``{output}``, ``{iteration}``,
+        ``{prior_scores}``.
+    crit_prompt_name : str, optional
+        Name to resolve via the runtime's PromptProvider (deferred resolution).
     verbose : bool
         Print iteration trace to stdout.
     """
@@ -216,6 +237,13 @@ class ReflectionAgent(MessageAgent):
         result_type:    str = "reflection.result",
         generate_type:  str = "reflect.generate.requested",
         critique_type:  str = "reflect.critique.requested",
+        reply_type:     str = "agent.output",
+        gen_prompt:            Optional[PromptTemplate] = None,
+        gen_prompt_name:       Optional[str] = None,
+        revision_prompt:       Optional[PromptTemplate] = None,
+        revision_prompt_name:  Optional[str] = None,
+        crit_prompt:           Optional[PromptTemplate] = None,
+        crit_prompt_name:      Optional[str] = None,
         verbose: bool = False,
     ) -> None:
         super().__init__(name)
@@ -227,17 +255,39 @@ class ReflectionAgent(MessageAgent):
         self.result_type     = result_type
         self.generate_type   = generate_type
         self.critique_type   = critique_type
+        self.reply_type      = reply_type
         self.verbose         = verbose
+
+        self._gen_prompt_tpl:       Optional[PromptTemplate] = gen_prompt
+        self._revision_prompt_tpl:  Optional[PromptTemplate] = revision_prompt
+        self._crit_prompt_tpl:      Optional[PromptTemplate] = crit_prompt
+        self._pending_gen_prompt_name:       Optional[str] = gen_prompt_name
+        self._pending_revision_prompt_name:  Optional[str] = revision_prompt_name
+        self._pending_crit_prompt_name:      Optional[str] = crit_prompt_name
 
         self._runs:         Dict[str, _RunState]       = {}
         self._pending_msgs: Dict[str, Tuple[str, str]] = {}  # msg_id → (run_id, phase)
+
+    # ── Prompt resolution ─────────────────────────────────────────────────────
+
+    def _inject_prompt_registry(self, provider: PromptProvider) -> None:
+        """Called by AgentRuntime.register() to resolve deferred prompt names."""
+        if self._pending_gen_prompt_name is not None:
+            self._gen_prompt_tpl = provider.get(self._pending_gen_prompt_name)
+            self._pending_gen_prompt_name = None
+        if self._pending_revision_prompt_name is not None:
+            self._revision_prompt_tpl = provider.get(self._pending_revision_prompt_name)
+            self._pending_revision_prompt_name = None
+        if self._pending_crit_prompt_name is not None:
+            self._crit_prompt_tpl = provider.get(self._pending_crit_prompt_name)
+            self._pending_crit_prompt_name = None
 
     # ── Message routing ───────────────────────────────────────────────────────
 
     async def on_message(self, message: Message, context: AgentContext) -> None:
         if message.type == self.submit_type:
             await self._handle_submit(message)
-        elif message.type == "agent.output":
+        elif message.type == self.reply_type:
             await self._handle_reply(message)
 
     # ── Initial request ───────────────────────────────────────────────────────
@@ -355,7 +405,29 @@ class ReflectionAgent(MessageAgent):
             label = "Initial draft" if state.iteration == 1 else f"Revision {state.iteration - 1}"
             print(f"\n   ▶ Iteration {state.iteration}/{self.max_iterations} — {label}")
 
-        prompt = self._gen_prompt(state.payload, state.history)
+        if state.iteration == 1:
+            tpl = self._gen_prompt_tpl
+            if tpl is None:
+                raise RuntimeError(
+                    f"ReflectionAgent '{self.name}': no gen_prompt configured. "
+                    "Pass 'gen_prompt' or 'gen_prompt_name'."
+                )
+            prompt = tpl.render(payload=self._fmt_dict(state.payload))
+        else:
+            tpl = self._revision_prompt_tpl
+            if tpl is None:
+                raise RuntimeError(
+                    f"ReflectionAgent '{self.name}': no revision_prompt configured. "
+                    "Pass 'revision_prompt' or 'revision_prompt_name'."
+                )
+            last     = state.history[-1]
+            critique = last["critique"]
+            prompt = tpl.render(
+                payload               = self._fmt_dict(state.payload),
+                last_score            = f"{critique['score']:.1f}/10",
+                weaknesses            = self._fmt_list(critique.get("weaknesses", [])),
+                revision_instructions = critique.get("revision_instructions", ""),
+            )
         msg_id = await self._ref.send(
             to       = self._generator_name,
             type     = self.generate_type,
@@ -368,7 +440,17 @@ class ReflectionAgent(MessageAgent):
     async def _send_critique(
         self, run_id: str, state: _RunState, output: Dict[str, Any]
     ) -> None:
-        prompt = self._crit_prompt(state.payload, output, state.iteration, state.history)
+        if self._crit_prompt_tpl is None:
+            raise RuntimeError(
+                f"ReflectionAgent '{self.name}': no crit_prompt configured. "
+                "Pass 'crit_prompt' or 'crit_prompt_name'."
+            )
+        prompt = self._crit_prompt_tpl.render(
+            payload       = self._fmt_dict(state.payload),
+            output        = self._fmt_dict(output),
+            iteration     = str(state.iteration),
+            prior_scores  = self._fmt_scores(state.history),
+        )
         msg_id = await self._ref.send(
             to       = self._critic_name,
             type     = self.critique_type,
@@ -397,98 +479,33 @@ class ReflectionAgent(MessageAgent):
         )
         self._runs.pop(run_id, None)
 
-    # ── Prompt builders ───────────────────────────────────────────────────────
+    # ── Context serializers ───────────────────────────────────────────────────
+    # Python serialises raw data only — no headers, bullets, or framing text.
+    # All structural prompt text lives in the YAML templates.
 
     @staticmethod
-    def _gen_prompt(
-        payload: Dict[str, Any],
-        history: List[Dict[str, Any]],
-    ) -> str:
+    def _fmt_dict(d: Dict[str, Any], max_value_len: int = 500) -> str:
+        """Serialise a dict as 'key: value' lines."""
         lines: List[str] = []
-
-        # Task context
-        lines.append("── TASK ────────────────────────────────────────────────")
-        for k, v in payload.items():
+        for k, v in d.items():
             if isinstance(v, (dict, list)):
-                lines.append(f"{k}: {json.dumps(v, ensure_ascii=False)[:500]}")
+                lines.append(f"{k}: {json.dumps(v, ensure_ascii=False)[:max_value_len]}")
             else:
                 lines.append(f"{k}: {v}")
-
-        # Prior attempts with critique
-        if history:
-            last = history[-1]
-            critique = last["critique"]
-            lines.append("")
-            lines.append("── PREVIOUS ATTEMPT AND CRITIQUE ───────────────────────")
-            lines.append(f"Iteration {last['iteration']} score: {critique['score']:.1f}/10")
-
-            if critique.get("weaknesses"):
-                lines.append("Weaknesses identified:")
-                for w in critique["weaknesses"]:
-                    lines.append(f"  · {w}")
-
-            if critique.get("revision_instructions"):
-                lines.append("")
-                lines.append("REVISION INSTRUCTIONS (follow these precisely):")
-                lines.append(critique["revision_instructions"])
-
-            lines.append("")
-            lines.append(
-                "Your previous output did NOT meet the quality standard. "
-                "Address ALL weaknesses above in your new response."
-            )
-        else:
-            lines.append("")
-            lines.append("Produce your best possible output for the task above.")
-
-        lines.append("")
-        lines.append("Respond ONLY with a valid JSON object matching the required schema.")
         return "\n".join(lines)
 
     @staticmethod
-    def _crit_prompt(
-        payload: Dict[str, Any],
-        output: Dict[str, Any],
-        iteration: int,
-        history: List[Dict[str, Any]],
-    ) -> str:
-        lines: List[str] = []
+    def _fmt_list(items: List[str], prefix: str = "· ") -> str:
+        """Serialise a list as prefixed lines."""
+        return "\n".join(f"{prefix}{item}" for item in items)
 
-        lines.append("── ORIGINAL TASK ───────────────────────────────────────")
-        for k, v in payload.items():
-            if isinstance(v, (dict, list)):
-                lines.append(f"{k}: {json.dumps(v, ensure_ascii=False)[:400]}")
-            else:
-                lines.append(f"{k}: {v}")
-
-        lines.append("")
-        lines.append(f"── OUTPUT TO EVALUATE (Iteration {iteration}) ──────────────")
-        for k, v in output.items():
-            if isinstance(v, (dict, list)):
-                lines.append(f"{k}: {json.dumps(v, ensure_ascii=False)[:400]}")
-            elif isinstance(v, str) and len(v) > 300:
-                lines.append(f"{k}:")
-                lines.append(f"  {v}")
-            else:
-                lines.append(f"{k}: {v}")
-
-        # Show improvement trend if prior iterations exist
-        if history:
-            prior_scores = [h["critique"]["score"] for h in history]
-            lines.append("")
-            lines.append(
-                f"── PRIOR SCORES (for context) ─────────────────────────────"
-            )
-            for i, s in enumerate(prior_scores, 1):
-                lines.append(f"  Iteration {i}: {s:.1f}/10")
-
-        lines.append("")
-        lines.append(
-            "Evaluate the output above rigorously against the task requirements. "
-            "Be strict — a score >= 8.0 means genuinely publication-ready quality."
+    @staticmethod
+    def _fmt_scores(history: List[Dict[str, Any]]) -> str:
+        """Serialise iteration scores as plain lines."""
+        return "\n".join(
+            f"Iteration {h['iteration']}: {h['critique']['score']:.1f}/10"
+            for h in history
         )
-        lines.append("Respond ONLY with a valid JSON object matching the Critique schema.")
-        return "\n".join(lines)
 
     # ── Coercion ──────────────────────────────────────────────────────────────
 

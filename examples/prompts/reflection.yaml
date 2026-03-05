@@ -125,3 +125,64 @@ bank.reflection.credit_reviewer.system:
       }
   version: "1.0"
   description: Evaluates credit assessment reports against quality criteria and returns structured critique.
+
+bank.reflection.gen_user_prompt:
+  content: |
+    ── LOAN APPLICATION ─────────────────────────────────────────────────
+    {payload}
+
+    Produce your best possible credit assessment report for this application.
+    Respond ONLY with a valid JSON object matching the CreditReport schema.
+  version: "1.0"
+  description: |
+    First-iteration user turn sent to the credit analyst.
+    Variables: {payload} — loan application as key:value lines.
+
+bank.reflection.revision_user_prompt:
+  content: |
+    ── LOAN APPLICATION ─────────────────────────────────────────────────
+    {payload}
+
+    ── PREVIOUS ATTEMPT SCORE ───────────────────────────────────────
+    {last_score}
+
+    ── WEAKNESSES IDENTIFIED ───────────────────────────────────────
+    {weaknesses}
+
+    ── REVISION INSTRUCTIONS (follow these precisely) ─────────────
+    {revision_instructions}
+
+    Your previous output did NOT meet the quality standard.
+    Address EVERY weakness listed above in your revised response.
+    Respond ONLY with a valid JSON object matching the CreditReport schema.
+  version: "1.0"
+  description: |
+    Retry user turn sent to the credit analyst when score < threshold.
+    Variables: {payload}               — loan application as key:value lines.
+               {last_score}            — previous score, e.g. "7.2/10".
+               {weaknesses}            — bullet-prefixed list of issues.
+               {revision_instructions} — prioritised fix instructions.
+
+bank.reflection.crit_user_prompt:
+  content: |
+    ── ORIGINAL LOAN APPLICATION ──────────────────────────────────────
+    {payload}
+
+    ── CREDIT ASSESSMENT REPORT TO EVALUATE (Iteration {iteration}) ──────
+    {output}
+
+    ── PRIOR SCORES (for context) ───────────────────────────────
+    {prior_scores}
+
+    Evaluate the report above rigorously against the quality criteria in your
+    instructions. Be strict — a score ≥ 8.0 means genuinely committee-ready
+    quality with no omissions and all ratios clearly shown with workings.
+
+    Respond ONLY with a valid JSON object matching the Critique schema.
+  version: "1.0"
+  description: |
+    User turn sent to the credit reviewer in each reflection iteration.
+    Variables: {payload}      — original loan application.
+               {output}       — the report to evaluate.
+               {iteration}    — current iteration number ("1", "2", ...).
+               {prior_scores} — plain score lines, empty on first iteration.

@@ -28,21 +28,23 @@ Use-case — pre-committee credit assessment:
   · ``credit-analyst``  — writes the report; revises based on feedback
   · ``credit-reviewer`` — scores the report; returns structured critique
 
-Execution flow:
+Execution flow (pure message choreography):
 
-  submit("credit.assessment.requested")
+  Client ──[credit.assessment.requested]──► credit-assessment-loop
          │
          ▼
-  credit-analyst.think(task)  →  CreditReport (draft)
-         │
+  credit-assessment-loop ──[reflect.generate.requested]──► credit-analyst
+         │                                                        │
+         │                                   [agent.output] ◄────┘
          ▼
-  credit-reviewer.think(report)  →  Critique (score, weaknesses, instructions)
-         │
-         ├─ score >= 7.5?  →  deliver report               ← passes in iteration N
-         │
-         └─ score < 7.5?   →  credit-analyst.think(task + critique)  → revised report
-                                      │
-                                      ▼  (repeat up to max_iterations)
+  credit-assessment-loop ──[reflect.critique.requested]──► credit-reviewer
+         │                                                        │
+         │                                   [agent.output] ◄────┘
+         ▼
+  score >= 7.5? ──YES──► [credit.assessment.final] ──► Client
+       │
+       NO (up to max_iterations)
+       └──► next [reflect.generate.requested] with critique feedback
 """
 
 import asyncio
@@ -53,7 +55,7 @@ from pydantic import BaseModel, Field
 load_dotenv()
 
 from synaptum.agents import LLMAgent
-from synaptum.agents.simple_agent import SimpleAgent
+from synaptum.agents.message_agent import MessageAgent
 from synaptum.core.message import Message
 from synaptum.core.runtime import AgentRuntime
 from synaptum.messaging.in_memory_bus import InMemoryMessageBus
@@ -76,7 +78,7 @@ class CreditReport(BaseModel):
 
 # ── Client handler ─────────────────────────────────────────────────────────────
 
-async def client_handler(agent: SimpleAgent, msg: Message, ctx):
+async def client_handler(agent: MessageAgent, msg: Message, ctx):
     if msg.type != "credit.assessment.final":
         return
 
@@ -164,16 +166,19 @@ async def main():
     # ── ReflectionAgent ───────────────────────────────────────────────────────
     reflection_loop = ReflectionAgent(
         "credit-assessment-loop",
-        generator      = credit_analyst,
-        critic         = credit_reviewer,
-        pass_threshold = 7.5,
-        max_iterations = 3,
-        submit_type    = "credit.assessment.requested",
-        result_type    = "credit.assessment.final",
-        verbose        = True,
+        generator             = credit_analyst,
+        critic                = credit_reviewer,
+        pass_threshold        = 7.5,
+        max_iterations        = 3,
+        submit_type           = "credit.assessment.requested",
+        result_type           = "credit.assessment.final",
+        gen_prompt_name       = "bank.reflection.gen_user_prompt",
+        revision_prompt_name  = "bank.reflection.revision_user_prompt",
+        crit_prompt_name      = "bank.reflection.crit_user_prompt",
+        verbose               = True,
     )
 
-    client = SimpleAgent("client", handler=client_handler)
+    client = MessageAgent("client", handler=client_handler)
 
     runtime.register(credit_analyst)
     runtime.register(credit_reviewer)
