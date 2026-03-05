@@ -125,3 +125,43 @@ bank.swarm.compliance_officer.system:
     Respond ONLY with a valid JSON object matching the HandoffDecision schema.
   version: "1.0"
   description: Final compliance decision-maker. Terminates the swarm with CLEAR / BLOCK / ESCALATE.
+
+# ── User-turn prompts ─────────────────────────────────────────────────────────
+# Injected by SwarmAgent as the user message for each participant turn.
+# All structural text lives here; Python only serialises the data variables.
+
+bank.swarm.turn_user_prompt:
+  content: |
+    ── CASE DETAILS ──────────────────────────────────────────────────────────
+    {payload}
+
+    ── YOUR TURN: {agent_name} ───────────────────────────────────────────────
+    You are the FIRST agent to receive this case.  Analyse the case details
+    above and apply your specialist expertise.
+
+    Available specialists for handoff (set handoff_to to the exact name):
+    {peer_names}
+
+    Set handoff_to to null ONLY when you are making a FINAL decision that
+    terminates the investigation — no further specialist review is needed.
+  version: "1.0"
+  description: First-turn user prompt sent to the entry agent (no prior history).
+
+bank.swarm.handoff_user_prompt:
+  content: |
+    ── CASE DETAILS ──────────────────────────────────────────────────────────
+    {payload}
+
+    ── PRIOR ANALYSIS (accumulated) ──────────────────────────────────────────
+    {history}
+    ── YOUR TURN: {agent_name} ───────────────────────────────────────────────
+    You are receiving control of this case.  Review the case details and all
+    prior analysis above, then apply your specialist expertise.
+
+    Available specialists for handoff (set handoff_to to the exact name):
+    {peer_names}
+
+    Set handoff_to to null ONLY when you are making a FINAL decision that
+    terminates the investigation — no further specialist review is needed.
+  version: "1.0"
+  description: Subsequent-turn user prompt sent after a handoff (includes accumulated history).

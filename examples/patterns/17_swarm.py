@@ -32,27 +32,27 @@ Use-case — cross-department fraud / AML / sanctions investigation:
   · ``compliance-officer``  — FINAL decision-maker; synthesises all findings
                                and issues CLEAR / BLOCK / ESCALATE verdict
 
-Execution flow (emerges at runtime, not predetermined):
+Architecture — pure message choreography (no direct think() calls):
 
-  submit("alert.triggered")
-         │
-         ▼
-  fraud-analyst.think(case)
-         │
-         │  "structuring pattern + offshore account → AML territory"
-         ▼
-  aml-specialist.think(case + fraud findings)
-         │
-         │  "BVI shell company, layering pattern → check sanctions/PEP"
-         ▼
-  sanctions-screener.think(case + prior findings)
-         │
-         │  "UBO name matches PEP database → compliance must decide"
-         ▼
-  compliance-officer.think(case + all prior findings)  ← terminates swarm
-         │
-         ▼
-  send("alert.decision") → client
+  client ──[alert.triggered]──▶ fraud-investigation-swarm (SwarmAgent)
+               │
+        [__swarm.turn__]──▶ fraud-analyst (LLMAgent)
+                                  │
+                           [agent.output]──▶ fraud-investigation-swarm
+                                  │  "structuring pattern + offshore → AML"
+                           [__swarm.turn__]──▶ aml-specialist (LLMAgent)
+                                                     │
+                                              [agent.output]──▶ fraud-investigation-swarm
+                                                     │  "BVI shell + layering → sanctions"
+                                              [__swarm.turn__]──▶ sanctions-screener (LLMAgent)
+                                                                         │
+                                                                  [agent.output]──▶ fraud-investigation-swarm
+                                                                         │  "PEP match → compliance must decide"
+                                                                  [__swarm.turn__]──▶ compliance-officer (LLMAgent)
+                                                                                            │
+                                                                                     [agent.output]──▶ fraud-investigation-swarm
+                                                                                            │  handoff_to=null → TERMINATE
+                                                                               [alert.decision]──▶ client
 """
 
 import asyncio
@@ -174,15 +174,22 @@ async def main():
             "sanctions-screener": sanctions_screener,
             "compliance-officer": compliance_officer,
         },
-        entry       = "fraud-analyst",
-        submit_type = "alert.triggered",
-        result_type = "alert.decision",
-        max_turns   = 8,
-        verbose     = True,
+        entry                = "fraud-analyst",
+        submit_type          = "alert.triggered",
+        result_type          = "alert.decision",
+        turn_prompt_name     = "bank.swarm.turn_user_prompt",
+        handoff_prompt_name  = "bank.swarm.handoff_user_prompt",
+        max_turns            = 8,
+        verbose              = True,
     )
 
     client = MessageAgent("client", handler=client_handler)
 
+    # Participants are registered independently — SwarmAgent does NOT auto-register them.
+    runtime.register(fraud_analyst)
+    runtime.register(aml_specialist)
+    runtime.register(sanctions_screener)
+    runtime.register(compliance_officer)
     runtime.register(investigation_swarm)
     runtime.register(client)
 

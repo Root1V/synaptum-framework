@@ -1,5 +1,5 @@
 """
-SwarmAgent — autonomous peer-to-peer handoff coordination pattern.
+SwarmAgent — autonomous peer-to-peer handoff coordination pattern  (choreography model).
 
 Design
 ------
@@ -9,15 +9,32 @@ specialist.  The decision comes from *inside* the agent based on what it
 discovers.
 
   1. **Entry**     — control starts at a designated entry agent.
-  2. **Think**     — the current agent analyses its input plus the full
-                     accumulated history of prior turns.
-  3. **Handoff**   — if the agent determines that another specialist is needed
-                     it returns ``handoff_to = "<agent-name>"``; the swarm
-                     engine transparently passes control to that agent, carrying
-                     the full context forward.
-  4. **Terminate** — any agent can end the swarm by returning
-                     ``handoff_to = None``.  The swarm then delivers the result
-                     to the original caller.
+  2. **Turn**      — the coordinator sends a bus message to the current agent,
+                     which calls its LLM and replies autonomously.
+  3. **Handoff**   — if the agent sets ``handoff_to``, the coordinator forwards
+                     control to that peer, carrying the full history forward.
+  4. **Terminate** — any agent can end the swarm by setting
+                     ``handoff_to = None``.  The result is delivered to the
+                     original caller.
+
+Architecture — pure message choreography
+-----------------------------------------
+``SwarmAgent`` never calls ``participant.think()`` directly.  Every exchange
+travels through the message bus:
+
+  Client       ──[submit_type]──►  SwarmAgent
+  SwarmAgent   ──[__swarm.turn__]──► current participant (LLMAgent)
+  participant  ──[agent.output] ──►  SwarmAgent   (reply_to=swarm)
+  SwarmAgent   → parse HandoffDecision
+               → next turn OR deliver result_type to Client
+
+In-flight state per run:
+  ``_runs``         run_id → _RunState
+  ``_pending_msgs`` sent_msg_id → run_id
+
+Participants are **registered independently** — ``SwarmAgent`` only records
+their bus names for routing and validation.  No participant is registered
+inside ``_bind_runtime``.
 
 Difference from other patterns
 -------------------------------
@@ -35,41 +52,54 @@ Usage
 -----
 ::
 
-    from synaptum.patterns.swarm import SwarmAgent
+    from synaptum.patterns.swarm import SwarmAgent, HandoffDecision
 
-    fraud_analyst   = SimpleAgent("fraud-analyst",  ...)
-    aml_specialist  = SimpleAgent("aml-specialist", ...)
-    compliance_mgr  = SimpleAgent("compliance-officer", ...)
+    fraud_analyst  = LLMAgent("fraud-analyst",  prompt_name="...", output_model=HandoffDecision)
+    aml_specialist = LLMAgent("aml-specialist", prompt_name="...", output_model=HandoffDecision)
+    compliance_mgr = LLMAgent("compliance-officer", prompt_name="...", output_model=HandoffDecision)
 
     swarm = SwarmAgent(
         "fraud-swarm",
         participants = {
-            "fraud-analyst":    fraud_analyst,
-            "aml-specialist":   aml_specialist,
+            "fraud-analyst":      fraud_analyst,
+            "aml-specialist":     aml_specialist,
             "compliance-officer": compliance_mgr,
         },
-        entry       = "fraud-analyst",
-        submit_type = "fraud.alert",
-        result_type = "fraud.decision",
-        max_turns   = 10,
-        verbose     = True,
+        entry                = "fraud-analyst",
+        submit_type          = "fraud.alert",
+        result_type          = "fraud.decision",
+        turn_prompt_name     = "bank.swarm.turn_user_prompt",
+        handoff_prompt_name  = "bank.swarm.handoff_user_prompt",
+        max_turns            = 10,
+        verbose              = True,
     )
 
+    # Register all agents independently — SwarmAgent does NOT auto-register them.
+    runtime.register(fraud_analyst)
+    runtime.register(aml_specialist)
+    runtime.register(compliance_mgr)
     runtime.register(swarm)
 """
 
 from __future__ import annotations
 
-import json
 import time
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-from ..core.agent import Agent
+from ..agents.message_agent import MessageAgent
 from ..core.context import AgentContext
 from ..core.message import Message
-from ..agents.agent_ref import AgentRef
+from ..prompts.template import PromptTemplate
+from ..prompts.provider import PromptProvider
+from ..utils.formatting import fmt_dict, fmt_list, fmt_records
+
+
+# ── Internal message type ─────────────────────────────────────────────────────
+
+_SWARM_TURN = "__swarm.turn__"
 
 
 # ── Handoff data structure ────────────────────────────────────────────────────
@@ -122,26 +152,54 @@ class HandoffDecision(BaseModel):
     )
 
 
+# ── Run state ─────────────────────────────────────────────────────────────────
+
+@dataclass
+class _RunState:
+    """Per-run mutable context held by SwarmAgent between messages."""
+    caller:          str
+    original_msg_id: str
+    payload:         Dict[str, Any]
+    current_agent:   str
+    history:         List[Dict[str, Any]] = field(default_factory=list)
+    turns:           int   = 0
+    t_start:         float = 0.0
+    t_phase:         float = 0.0
+
+
 # ── SwarmAgent ────────────────────────────────────────────────────────────────
 
-class SwarmAgent(Agent):
+class SwarmAgent(MessageAgent):
     """
-    Manages a pool of peer agents that autonomously pass control to each other.
+    Choreographs a pool of peer agents that autonomously pass control to each
+    other via the message bus.  No direct ``agent.think()`` calls are made.
 
     Parameters
     ----------
     name : str
         Bus address for this swarm coordinator.
-    participants : dict[str, Agent]
-        Pool of agents keyed by name.  Any agent can hand off to any other.
+    participants : dict[str, Any]
+        Pool of agents keyed by their bus name.  Only the **keys** are used
+        for routing and validation — register each agent independently via
+        ``runtime.register()``.
     entry : str
-        Name of the first agent to receive the initial message.
+        Bus name of the first agent to receive the initial message.
     submit_type : str
         Message type that triggers a swarm run.
     result_type : str
         Message type for the final result sent back to the caller.
+    reply_type : str
+        Message type expected back from participant agents (default: ``agent.output``).
+    turn_type : str
+        Message type sent to a participant for its turn (default: ``__swarm.turn__``).
     max_turns : int
         Safety ceiling on total agent invocations (default: 10).
+    turn_prompt_name : str, optional
+        YAML key for the first-turn user prompt template.
+        Variables: ``{payload}``, ``{agent_name}``, ``{peer_names}``.
+    handoff_prompt_name : str, optional
+        YAML key for subsequent-turn user prompt template.
+        Variables: ``{payload}``, ``{agent_name}``, ``{peer_names}``, ``{history}``.
     verbose : bool
         Print handoff trace to stdout.
     """
@@ -150,207 +208,228 @@ class SwarmAgent(Agent):
         self,
         name: str,
         *,
-        participants: Dict[str, Agent],
+        participants: Dict[str, Any],
         entry: str,
-        submit_type: str = "swarm.submitted",
-        result_type: str = "swarm.result",
-        max_turns: int = 10,
-        verbose: bool = False,
+        submit_type:         str = "swarm.submitted",
+        result_type:         str = "swarm.result",
+        reply_type:          str = "agent.output",
+        turn_type:           str = _SWARM_TURN,
+        max_turns:           int = 10,
+        turn_prompt_name:    Optional[str] = None,
+        handoff_prompt_name: Optional[str] = None,
+        verbose:             bool = False,
     ) -> None:
         super().__init__(name)
-        self.participants = participants
-        self.entry        = entry
-        self.submit_type  = submit_type
-        self.result_type  = result_type
-        self.max_turns    = max_turns
-        self.verbose      = verbose
-        self._ref: Optional[AgentRef] = None
+        self._participant_names: frozenset = frozenset(participants.keys())
+        self.entry              = entry
+        self.submit_type        = submit_type
+        self.result_type        = result_type
+        self.reply_type         = reply_type
+        self.turn_type          = turn_type
+        self.max_turns          = max_turns
+        self.verbose            = verbose
 
-    # ── Runtime binding ───────────────────────────────────────────────────────
+        self._turn_prompt_tpl:    Optional[PromptTemplate] = None
+        self._handoff_prompt_tpl: Optional[PromptTemplate] = None
+        self._pending_turn_prompt_name:    Optional[str] = turn_prompt_name
+        self._pending_handoff_prompt_name: Optional[str] = handoff_prompt_name
 
-    def _bind_runtime(self, runtime) -> None:
-        self._ref = AgentRef(self.name, runtime._bus)
-        for agent in self.participants.values():
-            runtime.register(agent)
+        self._runs:         Dict[str, _RunState] = {}
+        self._pending_msgs: Dict[str, str]       = {}  # sent_msg_id → run_id
 
-    # ── Message handling ──────────────────────────────────────────────────────
+    # ── Prompt resolution ─────────────────────────────────────────────────────
+
+    def _inject_prompt_registry(self, provider: PromptProvider) -> None:
+        """Called by AgentRuntime.register() to resolve deferred prompt names."""
+        if self._pending_turn_prompt_name is not None:
+            self._turn_prompt_tpl = provider.get(self._pending_turn_prompt_name)
+            self._pending_turn_prompt_name = None
+        if self._pending_handoff_prompt_name is not None:
+            self._handoff_prompt_tpl = provider.get(self._pending_handoff_prompt_name)
+            self._pending_handoff_prompt_name = None
+
+    # ── Message routing ───────────────────────────────────────────────────────
 
     async def on_message(self, message: Message, context: AgentContext) -> None:
         if message.type == self.submit_type:
-            await self._execute(message)
+            await self._handle_submit(message)
+        elif message.type == self.reply_type:
+            await self._handle_reply(message)
 
-    # ── Execution ─────────────────────────────────────────────────────────────
+    # ── Initial request ───────────────────────────────────────────────────────
 
-    async def _execute(self, message: Message) -> None:
-        if self._ref is None:
-            raise RuntimeError(
-                f"SwarmAgent '{self.name}' has not been bound to a runtime."
-            )
-
+    async def _handle_submit(self, message: Message) -> None:
         payload = (
             message.payload
             if isinstance(message.payload, dict)
             else {"data": message.payload}
         )
-        caller = message.reply_to or message.sender
-
-        current_agent_name = self.entry
-        history: List[Dict[str, Any]] = []   # [{agent, findings, action, confidence, reason}]
-        turns = 0
-        t_swarm_start = time.perf_counter()
+        run_id = message.id
+        self._runs[run_id] = _RunState(
+            caller          = message.reply_to or message.sender,
+            original_msg_id = message.id,
+            payload         = payload,
+            current_agent   = self.entry,
+            t_start         = time.perf_counter(),
+        )
 
         if self.verbose:
-            peer_names = list(self.participants.keys())
+            peers = sorted(self._participant_names)
             print(f"\n── [{self.name}]  SWARM START  entry={self.entry} ──")
-            print(f"   Peers: {', '.join(peer_names)}")
+            print(f"   Peers: {', '.join(peers)}")
 
-        while turns < self.max_turns:
-            agent = self.participants.get(current_agent_name)
-            if agent is None:
-                raise KeyError(
-                    f"Swarm: no participant named '{current_agent_name}'. "
-                    f"Available: {list(self.participants.keys())}"
-                )
+        await self._send_turn(run_id)
 
-            turns += 1
-            if self.verbose:
-                print(f"\n   ▶ Turn {turns} — {current_agent_name}")
+    # ── Reply router ──────────────────────────────────────────────────────────
 
-            prompt = self._build_prompt(
-                payload       = payload,
-                agent_name    = current_agent_name,
-                history       = history,
-                peer_names    = [n for n in self.participants if n != current_agent_name],
-            )
+    async def _handle_reply(self, message: Message) -> None:
+        in_reply_to = message.metadata.get("in_reply_to")
+        run_id = self._pending_msgs.pop(in_reply_to, None)
+        if run_id is None:
+            return  # reply not addressed to this swarm
 
-            t_turn_start = time.perf_counter()
-            raw    = await agent.think(prompt)
-            elapsed_s = round(time.perf_counter() - t_turn_start, 2)
-            decision = self._coerce_decision(raw)
+        state = self._runs.get(run_id)
+        if state is None:
+            return
 
-            history.append({
-                "agent":      current_agent_name,
-                "findings":   decision.findings,
-                "action":     decision.action,
-                "confidence": decision.confidence,
-                "reason":     decision.handoff_reason,
-                "handoff_to": decision.handoff_to,
-                "elapsed_s":  elapsed_s,
-            })
+        await self._on_turn_result(run_id, state, message)
 
-            if self.verbose:
-                action_tag = f"[{decision.action}|{decision.confidence}]"
-                print(f"     {action_tag} {decision.findings[:100].replace(chr(10),' ')}…")
-                print(f"     ⏱  {elapsed_s:.2f}s")
-                if decision.handoff_to:
-                    print(f"     → handoff to: {decision.handoff_to} — {decision.handoff_reason[:80]}")
-                else:
-                    print(f"     ■ TERMINATE — {decision.handoff_reason[:80]}")
+    # ── Process turn result ───────────────────────────────────────────────────
 
-            if decision.handoff_to is None:
-                # Swarm terminates — last agent made final decision
-                break
+    async def _on_turn_result(
+        self, run_id: str, state: _RunState, message: Message
+    ) -> None:
+        elapsed_s = round(time.perf_counter() - state.t_phase, 2)
 
-            # Validate handoff target before proceeding
-            if decision.handoff_to not in self.participants:
-                raise KeyError(
-                    f"Agent '{current_agent_name}' tried to hand off to "
-                    f"'{decision.handoff_to}', which is not in the swarm pool. "
-                    f"Available: {list(self.participants.keys())}"
-                )
+        raw      = message.payload.get("answer", message.payload)
+        decision = self._coerce_decision(raw)
 
-            current_agent_name = decision.handoff_to
+        state.history.append({
+            "turn":       state.turns,
+            "agent":      state.current_agent,
+            "findings":   decision.findings,
+            "action":     decision.action,
+            "confidence": decision.confidence,
+            "reason":     decision.handoff_reason,
+            "handoff_to": decision.handoff_to,
+            "elapsed_s":  elapsed_s,
+        })
 
-        else:
-            # max_turns exceeded — record this
+        if self.verbose:
+            action_tag = f"[{decision.action}|{decision.confidence}]"
+            print(f"     {action_tag} {decision.findings[:100].replace(chr(10), ' ')}…")
+            print(f"     ⏱  {elapsed_s:.2f}s")
+            if decision.handoff_to:
+                print(f"     → handoff to: {decision.handoff_to} — {decision.handoff_reason[:80]}")
+            else:
+                print(f"     ■ TERMINATE — {decision.handoff_reason[:80]}")
+
+        # Terminate: agent decided, or safety ceiling reached
+        if decision.handoff_to is None:
+            await self._deliver(run_id, state)
+            return
+
+        if state.turns >= self.max_turns:
             if self.verbose:
                 print(f"\n   ⚠  max_turns ({self.max_turns}) reached without termination.")
+            await self._deliver(run_id, state)
+            return
 
-        # Final result
-        elapsed_total_s = round(time.perf_counter() - t_swarm_start, 2)
-        final_turn  = history[-1] if history else {}
+        # Validate handoff target
+        if decision.handoff_to not in self._participant_names:
+            raise KeyError(
+                f"Agent '{state.current_agent}' tried to hand off to "
+                f"'{decision.handoff_to}', which is not in the swarm pool. "
+                f"Available: {sorted(self._participant_names)}"
+            )
+
+        state.current_agent = decision.handoff_to
+        await self._send_turn(run_id)
+
+    # ── Send next turn ────────────────────────────────────────────────────────
+
+    async def _send_turn(self, run_id: str) -> None:
+        state = self._runs[run_id]
+        state.turns += 1
+
+        if self.verbose:
+            print(f"\n   ▶ Turn {state.turns} — {state.current_agent}")
+
+        peer_names = sorted(
+            n for n in self._participant_names if n != state.current_agent
+        )
+
+        if not state.history:
+            # First turn — no prior analysis accumulated yet
+            tpl = self._turn_prompt_tpl
+            if tpl is None:
+                raise RuntimeError(
+                    f"SwarmAgent '{self.name}': no turn_prompt_name configured. "
+                    "Pass 'turn_prompt_name' to SwarmAgent."
+                )
+            prompt = tpl.render(
+                payload    = fmt_dict(state.payload),
+                agent_name = state.current_agent,
+                peer_names = fmt_list(peer_names),
+            )
+        else:
+            # Handoff turn — include full accumulated history
+            tpl = self._handoff_prompt_tpl
+            if tpl is None:
+                raise RuntimeError(
+                    f"SwarmAgent '{self.name}': no handoff_prompt_name configured. "
+                    "Pass 'handoff_prompt_name' to SwarmAgent."
+                )
+            prompt = tpl.render(
+                payload    = fmt_dict(state.payload),
+                agent_name = state.current_agent,
+                peer_names = fmt_list(peer_names),
+                history    = fmt_records(
+                    state.history,
+                    "Turn {turn} — {agent} [{action}|{confidence}]\n"
+                    "Findings: {findings}\n"
+                    "Reason for handoff: {reason}\n",
+                ),
+            )
+
+        msg_id = await self._ref.send(
+            to       = state.current_agent,
+            type     = self.turn_type,
+            payload  = {"text": prompt},
+            reply_to = self.name,
+            metadata = {"run_id": run_id},
+        )
+        state.t_phase = time.perf_counter()
+        self._pending_msgs[msg_id] = run_id
+
+    # ── Deliver result ────────────────────────────────────────────────────────
+
+    async def _deliver(self, run_id: str, state: _RunState) -> None:
+        elapsed_total_s = round(time.perf_counter() - state.t_start, 2)
+        final_turn   = state.history[-1] if state.history else {}
         final_action = final_turn.get("action", "UNKNOWN")
 
         if self.verbose:
-            print(f"\n   ■  Swarm complete — {turns} turn(s) — {elapsed_total_s:.2f}s total — final action: {final_action}")
-            print(f"   ■  Sending '{self.result_type}' to '{caller}'")
+            print(
+                f"\n   ■  Swarm complete — {state.turns} turn(s) — "
+                f"{elapsed_total_s:.2f}s total — final action: {final_action}"
+            )
+            print(f"   ■  Sending '{self.result_type}' to '{state.caller}'")
 
         await self._ref.send(
-            to      = caller,
+            to      = state.caller,
             type    = self.result_type,
             payload = {
-                "final_action":   final_action,
-                "final_agent":    final_turn.get("agent", "unknown"),
-                "turns":          turns,
+                "final_action":    final_action,
+                "final_agent":     final_turn.get("agent", "unknown"),
+                "turns":           state.turns,
                 "elapsed_total_s": elapsed_total_s,
-                "history":        history,
-                "input":          payload,
+                "history":         state.history,
+                "input":           state.payload,
             },
-            metadata = {"in_reply_to": message.id},
+            metadata = {"in_reply_to": state.original_msg_id},
         )
-
-    # ── Prompt builder ────────────────────────────────────────────────────────
-
-    @staticmethod
-    def _build_prompt(
-        payload:    Dict[str, Any],
-        agent_name: str,
-        history:    List[Dict[str, Any]],
-        peer_names: List[str],
-    ) -> str:
-        lines: List[str] = []
-
-        # ── Original case ──────────────────────────────────────────────────
-        lines.append("── CASE DETAILS ──────────────────────────────────────")
-        for k, v in payload.items():
-            if isinstance(v, (dict, list)):
-                lines.append(f"{k}: {json.dumps(v, ensure_ascii=False)[:400]}")
-            else:
-                lines.append(f"{k}: {v}")
-
-        # ── Prior turns ────────────────────────────────────────────────────
-        if history:
-            lines.append("")
-            lines.append("── PRIOR ANALYSIS (from other agents) ────────────────")
-            for i, turn in enumerate(history, 1):
-                lines.append(
-                    f"Turn {i} — {turn['agent']} [{turn['action']}|{turn['confidence']}]:"
-                )
-                lines.append(f"  Findings: {turn['findings']}")
-                lines.append(f"  Reason for handoff: {turn['reason']}")
-                lines.append("")
-
-        # ── Current agent instructions ─────────────────────────────────────
-        lines.append(f"── YOUR TURN: {agent_name} ───────────────────────────")
-        lines.append(
-            "You are receiving control of this case. Review the case details "
-            "and all prior analysis above, then apply your specialist expertise."
-        )
-
-        if peer_names:
-            lines.append("")
-            lines.append(
-                "You may hand off to ONE of the following specialists "
-                "(use the exact name) if their expertise is required:"
-            )
-            for n in peer_names:
-                lines.append(f"  · {n}")
-            lines.append(
-                "Set handoff_to to null ONLY when you are making a FINAL decision "
-                "that terminates the investigation — no further specialist review needed."
-            )
-        else:
-            lines.append(
-                "You are the only remaining specialist. "
-                "YOU MUST terminate by setting handoff_to to null."
-            )
-
-        lines.append("")
-        lines.append(
-            "Respond ONLY with a valid JSON object matching the HandoffDecision schema."
-        )
-
-        return "\n".join(lines)
+        self._runs.pop(run_id, None)
 
     # ── Coercion ──────────────────────────────────────────────────────────────
 
