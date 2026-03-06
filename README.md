@@ -4,7 +4,7 @@
 
 Synaptum sits between your LLM SDK and your agent platform. It gives you the minimal primitives — agents, a message bus, a runtime, and prompt management — to build reliable, testable agent applications without opinion on your infrastructure.
 
-> **Version:** 0.3.0 · **Python:** ≥ 3.13 · **License:** MIT
+> **Version:** 0.4.0 · **Python:** ≥ 3.13 · **License:** MIT
 
 ---
 
@@ -80,30 +80,29 @@ Synaptum sits between your LLM SDK and your agent platform. It gives you the min
 │  ┌──────────────────────┐      ┌───────────────┴───────────────────────┐    │
 │  │   Prompt System      │      │              Agents                   │    │
 │  │                      │      │                                       │    │
-│  │  PromptRegistry      │      │  SimpleAgent      LLMToolAgent        │    │
-│  │  FilePromptProvider  │      │  ┌────────────┐  ┌────────────────┐   │    │
-│  │  InMemoryProvider    │      │  │ name       │  │ name           │   │    │
-│  │                      │      │  │ prompt     │  │ system_prompt  │   │    │
-│  │  PromptTemplate      │      │  │ handler()  │  │ tools          │   │    │
-│  │  - content           │      │  │ on_message │  │ on_message     │   │    │
-│  │  - version           │      │  └─────┬──────┘  └────────┬───────┘   │    │
-│  │  - variables         │      │        │                  │           │    │
-│  └──────────────────────┘      └────────┼──────────────────┼───────────┘    │
-│                                         │                  │                │
-│  ┌──────────────────────┐               │                  │                │
-│  │    LLM Layer         │◀──────────────┘                  │                │
-│  │                      │                                  │                │
-│  │  LLMClient (ABC)     │                                  │                │
-│  │  LlamaClient         │      ┌───────────────────────────┘                │
-│  │  (axonium SDK)       │      │                                            │
-│  └──────────────────────┘      ▼                                            │
-│                         ┌──────────────────────┐                            │
-│                         │   Patterns           │                            │
-│                         │                      │                            │
-│                         │  RouterPattern       │                            │
-│                         │  SupervisorPattern   │                            │
-│                         │  GraphPattern        │                            │
-│                         └──────────────────────┘                            │
+│  │  PromptRegistry      │      │  MessageAgent   LLMAgent              │    │
+│  │  FilePromptProvider  │      │  ┌────────────┐ ┌──────────────────┐  │    │
+│  │  InMemoryProvider    │      │  │ name       │ │ name             │  │    │
+│  │                      │      │  │ _ref       │ │ _ref (inherited) │  │    │
+│  │  PromptTemplate      │      │  │ on_message │ │ think()          │  │    │
+│  │  - content           │      │  └─────┬──────┘ │ output_model     │  │    │
+│  │  - version           │      │        │        └────────┬─────────┘  │    │
+│  │  - variables         │      │        └────────────┬────┘            │    │
+│  └──────────────────────┘      │               CompositeAgent          │    │
+│                                │       (ConsensusAgent, HITLAgent,     │    │
+│  ┌──────────────────────┐      │        SagaAgent — auto-register      │    │
+│  │    LLM Layer         │◀─────┤        their sub-agent topology)      │    │
+│  │                      │      └───────────────────────────────────────┘    │
+│  │  LLMClient (ABC)     │                                                   │
+│  │  LlamaClient         │      ┌───────────────────────────────────────┐    │
+│  │  (axonium SDK)       │      │   Patterns                            │    │
+│  └──────────────────────┘      │                                       │    │
+│                                │  MapReduceAgent   PlanAndExecuteAgent │    │
+│                                │  SwarmAgent       ReflectionAgent     │    │
+│                                │  ConsensusAgent   HITLAgent           │    │
+│                                │  SagaAgent        RouterPattern       │    │
+│                                │  SupervisorPattern  GraphBuilder      │    │
+│                                └───────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -265,19 +264,61 @@ asyncio.run(main())
 
 Synaptum includes ready-to-use coordination patterns in `synaptum.patterns`:
 
-| Pattern | API | Use case |
-|---|---|---|
-| Request / Reply | `SimpleAgent` | Single agent query/response |
-| Router | `RouterPattern` | LLM decides which specialist handles the task |
-| Supervisor / Worker | `SupervisorPattern` | LLM plans tasks and distributes to workers |
-| Graph — sequential | `GraphBuilder` | State machine with typed state and conditional transitions |
-| Graph — parallel | `parallel()` + `GraphBuilder` | Fork/join: independent agents run concurrently via `asyncio.gather()` |
-| Supervisor Queue | `SimpleAgent` + handlers | Worker pool with dynamic task dispatching |
-| Pipeline | `SimpleAgent` chain | Fixed linear processing steps |
-| Pub/Sub | `SimpleAgent` + bus | Broadcast events to multiple subscribers |
-| Blackboard | `SimpleAgent` + shared state | Agents read/write a common knowledge store |
+| # | Pattern | API | Use case |
+|---|---|---|---|
+| 06 | Request / Reply | `SimpleAgent` | Single agent query/response |
+| 07 | Supervisor Queue | `SimpleAgent` + handlers | Worker pool with dynamic task dispatching |
+| 08 | Pipeline | `SimpleAgent` chain | Fixed linear processing steps |
+| 09 | Pub/Sub | `SimpleAgent` + bus | Broadcast events to multiple subscribers |
+| 10 | Debate / Critique | `SimpleAgent` × 2 | Two agents argue iteratively toward a conclusion |
+| 11 | Router Dispatcher | `RouterPattern` | LLM decides which specialist handles the task |
+| 12 | Blackboard | `SimpleAgent` + shared state | Agents read/write a common knowledge store |
+| 13 | Graph — sequential | `GraphBuilder` | State machine with typed state and conditional transitions |
+| 14 | Graph — parallel | `parallel()` + `GraphBuilder` | Fork/join: independent agents run concurrently |
+| 15 | Map-Reduce | `MapReduceAgent` | Same agent runs over N independent chunks simultaneously; reducer aggregates |
+| 16 | Plan-and-Execute | `PlanAndExecuteAgent` | Planner generates a step-by-step plan; specialists execute each step; replanner may revise mid-run |
+| 17 | Swarm / Handoff | `SwarmAgent` | Peer agents autonomously hand off control to each other; no central dispatcher |
+| 18 | Reflection Loop | `ReflectionAgent` | Generator produces output; critic scores it; generator iterates until quality threshold |
+| 19 | Consensus / Voting | `ConsensusAgent` | N panelists vote independently on the same input; judge synthesises a final decision |
+| 20 | Human-in-the-Loop | `HITLAgent` | Automated screening pauses for a mandatory human decision gate before executing |
+| 21 | Saga | `SagaAgent` | Ordered steps with per-step compensators; failure triggers LIFO rollback |
 
 See the [`examples/`](examples/) directory for runnable code for each pattern.
+
+### Pattern decision guide
+
+```
+Single agent?
+└─ Request/Reply (06)
+
+Fixed sequence of agents?
+├─ Linear chain           → Pipeline (08)
+├─ Typed state machine    → Graph sequential (13)
+└─ State + parallel fork  → Graph parallel (14)
+
+Dynamic dispatch?
+├─ LLM picks a specialist → Router (11)
+├─ LLM assigns subtasks   → Supervisor Queue (07)
+└─ Same agent, N chunks   → Map-Reduce (15)
+
+Plan upfront, then execute?
+└─ Plan-and-Execute (16)     ← plan can be revised mid-run
+
+Agents decide the flow themselves?
+└─ Swarm / Handoff (17)      ← no central authority
+
+Iterative quality improvement?
+└─ Reflection Loop (18)      ← critic drives revisions
+
+Multiple independent opinions?
+└─ Consensus / Voting (19)   ← fan-out + judge synthesises
+
+Human must review before proceeding?
+└─ Human-in-the-Loop (20)    ← execution pauses at decision gate
+
+Distributed transaction with rollback?
+└─ Saga (21)                 ← LIFO compensating transactions
+```
 
 ---
 
@@ -291,8 +332,11 @@ synaptum/
 │   ├── message.py        # Message dataclass
 │   └── context.py        # AgentContext — run_id, metadata, agent_names()
 ├── agents/
-│   ├── simple_agent.py   # SimpleAgent — LLM + prompt + custom handler
-│   ├── graph_agent.py    # GraphAgent — drives a compiled Graph (internal)
+│   ├── simple_agent.py   # SimpleAgent — LLM + prompt + optional handler (legacy)
+│   ├── message_agent.py  # MessageAgent — bus messaging, no LLM; base for all agents
+│   ├── llm_agent.py      # LLMAgent — MessageAgent + think() + structured output
+│   ├── composite_agent.py# CompositeAgent — owns a sub-agent topology; auto-registers children
+│   ├── graph_agent.py    # GraphAgent — drives a compiled Graph (internal, created by GraphBuilder)
 │   └── llm_tool_agent.py # LLMToolAgent — tool-use loop
 ├── prompts/
 │   ├── template.py       # PromptTemplate — content, version, variables
@@ -309,10 +353,40 @@ synaptum/
 ├── patterns/
 │   ├── router.py         # RouterPattern
 │   ├── supervisor.py     # SupervisorPattern
-│   └── graph_builder.py  # GraphBuilder, Graph, ParallelNode, parallel(), END
+│   ├── graph_builder.py  # GraphBuilder, Graph, ParallelNode, parallel(), END
+│   ├── map_reduce.py     # MapReduceAgent — fan-out/fan-in over N independent chunks
+│   ├── plan_execute.py   # PlanAndExecuteAgent — upfront plan + adaptive replan
+│   ├── swarm.py          # SwarmAgent — peer handoff choreography
+│   ├── reflection.py     # ReflectionAgent — generate / critique / revise loop
+│   ├── consensus.py      # ConsensusAgent — fan-out panelists + judge synthesis
+│   ├── hitl.py           # HITLAgent — screener → human gate → executor
+│   └── saga.py           # SagaAgent — ordered steps + LIFO compensating transactions
 ├── tools/                # Tool registry for LLMToolAgent
 └── memory/               # Pluggable memory store
 ```
+
+### Agent class hierarchy
+
+```
+Agent (ABC)
+└── MessageAgent          bus messaging + _ref; no LLM
+    ├── LLMAgent          adds think() + structured output via Pydantic
+    └── CompositeAgent    owns a sub-agent topology; auto-registers children
+        ├── ConsensusAgent
+        ├── HITLAgent
+        └── SagaAgent
+
+SimpleAgent               legacy; combines LLM + optional handler (pre-0.4)
+```
+
+### When to use each agent base
+
+| Base class | Use when |
+|---|---|
+| `MessageAgent` | Deterministic routing, client stubs, human gates, aggregators — anything that sends/receives but never calls an LLM |
+| `LLMAgent` | Any agent whose primary job is to call the language model and produce structured or free-text output |
+| `CompositeAgent` | Your agent wires together a topology of sub-agents registered automatically by the runtime (e.g. `ConsensusAgent`, `HITLAgent`, `SagaAgent`) |
+| `SimpleAgent` | Legacy — kept for backward compatibility with examples 06–14 |
 
 ---
 
@@ -348,6 +422,21 @@ class DBPromptProvider(PromptProvider):
 ---
 
 ## Changelog
+
+### [0.4.0] — 2026-03-06
+
+- **`MessageAgent`** — new base class for all bus-capable, non-LLM agents; provides `self._ref` (`AgentRef`) and `_bind_runtime` automatically; replaces boilerplate in every pattern class
+- **`LLMAgent(MessageAgent)`** — new base for all LLM agents; inherits bus wiring from `MessageAgent`, adds `think(user_message) → str | BaseModel`; replaces direct `SimpleAgent` usage in patterns 16–20
+- **`CompositeAgent(MessageAgent)`** — new base for agents that own a sub-agent topology; `sub_agents()` → runtime auto-registers all children on `register(composite)`; used by `ConsensusAgent`, `HITLAgent`, `SagaAgent`
+- **`MapReduceAgent`** — new pattern (example 15); splits input into N independent chunks, maps the same agent concurrently over all chunks via `asyncio.gather()`, reduces all results with an aggregator agent; single `runtime.register()` call also registers mapper and reducer
+- **`PlanAndExecuteAgent(MessageAgent)`** — refactored to pure async message choreography (example 16); planner, replanner, finalizer, and executor agents are external; all LLM calls go through the bus (`_PE_PLAN / _PE_EXECUTE / _PE_REPLAN / _PE_FINALIZE` internal message types); `_pending_msgs` correlates replies to in-flight phases; per-step timing via `time.perf_counter()`; all prompt text in YAML (`plan/exec/replan/final_user_prompt` keys)
+- **`SwarmAgent(MessageAgent)`** — new pattern (example 17); peer agents autonomously hand off control via `HandoffDecision` (Pydantic model with `handoff_to`); no external orchestrator; `_SWARM_TURN` internal message type; participants registered independently; all structural prompt text in YAML
+- **`ReflectionAgent(MessageAgent)`** — new pattern (example 18); `Critique` model with `score / passed / dimension_scores / revision_instructions`; passes best output to caller even if budget exhausted without passing; per-iteration timing; YAML-driven generate and critique user prompts
+- **`ConsensusAgent(CompositeAgent)`** — new pattern (example 19); `_PanelistAgent(LLMAgent)` fan-out → `_AggregatorAgent(MessageAgent)` fan-in → `_JudgeAgent(LLMAgent)` synthesis; `PanelistVerdict` Pydantic model; single `runtime.register(consensus)` registers all internal agents
+- **`HITLAgent(CompositeAgent)`** — new pattern (example 20); `_HITLScreenerAgent` → `_HITLGateAgent` (human pause, no LLM) → `_HITLExecutorAgent`; `HumanReviewRequest / HumanReviewResponse` Pydantic models; `ReviewHandler` type alias for the async callable; `_APPROVAL_DECISIONS` set for case-insensitive approval matching
+- **`SagaAgent(CompositeAgent)`** — new pattern (example 21); `_SagaForwardAgent / _SagaCompensatorAgent / _SagaOutcomeAgent` internal nodes; `SagaStep` Pydantic model (name, description, forward_prompt, compensate_prompt); `StepResult / StepAuditEntry / SagaOutcome` models; full LIFO rollback on failure; all saga state carried immutably in `__saga__` key of message payload — no shared mutable state anywhere
+- **YAML-first rule** — from pattern 16 onward, all structural prompt text lives in YAML; Python only serialises data variables (`fmt_dict`, `fmt_list`, `fmt_records` from `synaptum.utils.formatting`)
+- **Independent registration rule** — from pattern 16 onward, all participant agents are registered independently via `runtime.register()` (no implicit cascade); `CompositeAgent` sub-agents are the only exception (auto-registered once)
 
 ### [0.3.0] — 2026-03-01
 
