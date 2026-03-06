@@ -74,7 +74,7 @@ Usage
         verbose              = True,
     )
 
-    # Register all agents independently — SwarmAgent does NOT auto-register them.
+    # Participants are external agents — register each independently, then register the swarm.
     runtime.register(fraud_analyst)
     runtime.register(aml_specialist)
     runtime.register(compliance_mgr)
@@ -174,14 +174,18 @@ class SwarmAgent(MessageAgent):
     Choreographs a pool of peer agents that autonomously pass control to each
     other via the message bus.  No direct ``agent.think()`` calls are made.
 
+    Participants are **external agents created and registered by the caller**,
+    just like ``ReflectionAgent``'s generator and critic.  They are independent
+    named agents — not private implementation details of the swarm.  Register
+    each one explicitly via ``runtime.register()`` before registering the swarm.
+
     Parameters
     ----------
     name : str
         Bus address for this swarm coordinator.
-    participants : dict[str, Any]
-        Pool of agents keyed by their bus name.  Only the **keys** are used
-        for routing and validation — register each agent independently via
-        ``runtime.register()``.
+    participants : dict[str, Agent]
+        Pool of agents keyed by their bus name.  Must be registered
+        independently via ``runtime.register()``.
     entry : str
         Bus name of the first agent to receive the initial message.
     submit_type : str

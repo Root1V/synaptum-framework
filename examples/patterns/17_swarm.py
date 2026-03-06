@@ -185,7 +185,7 @@ async def main():
 
     client = MessageAgent("client", handler=client_handler)
 
-    # Participants are registered independently — SwarmAgent does NOT auto-register them.
+    # Participants are external agents — register each independently, then the swarm and client.
     runtime.register(fraud_analyst)
     runtime.register(aml_specialist)
     runtime.register(sanctions_screener)
