@@ -243,6 +243,70 @@ bank.plan_execute.restructuring_specialist.system:
   version: "1.0"
   description: Designs the optimal debt restructuring solution from all prior analyses.
 
+# ── User-turn prompts ────────────────────────────────────────────────────────
+# Injected by PlanAndExecuteAgent as the user message for each phase.
+# All structural text lives here; Python only serialises data variables.
+
+bank.plan_execute.plan_user_prompt:
+  content: |
+    {payload}
+
+    Available executors (use exact names in the 'executor' field):
+    {executor_names}
+
+    Analyse the request above and produce an ordered analytical plan.
+  version: "1.0"
+  description: User turn sent to the planner to generate the initial plan.
+
+bank.plan_execute.exec_user_prompt:
+  content: |
+    Overall goal: {goal}
+
+    Your task [{step_id}]: {step_description}
+    Rationale: {step_rationale}
+
+    Results from prior steps:
+    {completed_steps}
+
+    Original request:
+    {payload}
+  version: "1.0"
+  description: User turn sent to each executor agent for its assigned step.
+
+bank.plan_execute.replan_user_prompt:
+  content: |
+    Overall goal: {goal}
+
+    Just completed: [{last_step_id}] {last_executor}
+    Result:
+    {last_result}
+
+    Remaining steps in current plan:
+    {remaining_steps}
+
+    Available executors (exact names only):
+    {executor_names}
+
+    Decide whether the result above requires revising the remaining steps.
+    Set should_replan: true only if the plan genuinely needs adjustment.
+    If replanning, provide the complete revised list of remaining steps.
+  version: "1.0"
+  description: User turn sent to the replanner after each completed step.
+
+bank.plan_execute.final_user_prompt:
+  content: |
+    Overall goal: {goal}
+
+    All steps have been executed. Results:
+    {completed_steps}
+
+    Original request:
+    {payload}
+
+    Synthesise all findings into the final Credit Committee Memorandum.
+  version: "1.0"
+  description: User turn sent to the finalizer to produce the Credit Memo.
+
 bank.plan_execute.finalizer.system:
   content: |
     You are the Senior Credit Officer at a commercial bank. All specialist

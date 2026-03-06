@@ -54,7 +54,8 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-from synaptum.agents.simple_agent import SimpleAgent
+from synaptum.agents import LLMAgent
+from synaptum.agents.message_agent import MessageAgent
 from synaptum.core.message import Message
 from synaptum.core.runtime import AgentRuntime
 from synaptum.messaging.in_memory_bus import InMemoryMessageBus
@@ -182,7 +183,7 @@ class CreditMemo(BaseModel):
 
 # ── Client handler ─────────────────────────────────────────────────────────────
 
-async def client_handler(agent: SimpleAgent, msg: Message, ctx):
+async def client_handler(agent: MessageAgent, msg: Message, ctx):
     if msg.type != "restructuring.memo":
         return
 
@@ -242,39 +243,39 @@ async def main():
     runtime         = AgentRuntime(bus, prompts=prompt_provider)
 
     # ── Planner agents ────────────────────────────────────────────────────────
-    planner = SimpleAgent(
+    planner = LLMAgent(
         "deal-planner",
         prompt_name  = "bank.plan_execute.planner.system",
         output_model = Plan,
     )
-    replanner = SimpleAgent(
+    replanner = LLMAgent(
         "deal-replanner",
         prompt_name  = "bank.plan_execute.replan.system",
         output_model = ReplanDecision,
     )
-    finalizer = SimpleAgent(
+    finalizer = LLMAgent(
         "deal-writer",
         prompt_name  = "bank.plan_execute.finalizer.system",
         output_model = CreditMemo,
     )
 
     # ── Specialist executors ──────────────────────────────────────────────────
-    financial_analyst = SimpleAgent(
+    financial_analyst = LLMAgent(
         "financial-analyst",
         prompt_name  = "bank.plan_execute.financial_analyst.system",
         output_model = FinancialAnalysis,
     )
-    market_analyst = SimpleAgent(
+    market_analyst = LLMAgent(
         "market-analyst",
         prompt_name  = "bank.plan_execute.market_analyst.system",
         output_model = MarketAnalysis,
     )
-    legal_advisor = SimpleAgent(
+    legal_advisor = LLMAgent(
         "legal-advisor",
         prompt_name  = "bank.plan_execute.legal_advisor.system",
         output_model = LegalAnalysis,
     )
-    restructuring_specialist = SimpleAgent(
+    restructuring_specialist = LLMAgent(
         "restructuring-specialist",
         prompt_name  = "bank.plan_execute.restructuring_specialist.system",
         output_model = RestructuringProposal,
@@ -283,24 +284,36 @@ async def main():
     # ── PlanAndExecuteAgent ───────────────────────────────────────────────────
     processor = PlanAndExecuteAgent(
         "debt-restructuring",
-        planner   = planner,
-        replanner = replanner,
-        finalizer = finalizer,
-        executors = {
+        planner             = planner,
+        replanner           = replanner,
+        finalizer           = finalizer,
+        executors           = {
             "financial-analyst":        financial_analyst,
             "market-analyst":           market_analyst,
             "legal-advisor":            legal_advisor,
             "restructuring-specialist": restructuring_specialist,
         },
-        submit_type = "restructuring.submitted",
-        result_type = "restructuring.memo",
-        max_replans = 2,
-        verbose     = True,
+        submit_type         = "restructuring.submitted",
+        result_type         = "restructuring.memo",
+        plan_prompt_name    = "bank.plan_execute.plan_user_prompt",
+        exec_prompt_name    = "bank.plan_execute.exec_user_prompt",
+        replan_prompt_name  = "bank.plan_execute.replan_user_prompt",
+        final_prompt_name   = "bank.plan_execute.final_user_prompt",
+        max_replans         = 2,
+        verbose             = True,
     )
 
-    client = SimpleAgent("client", handler=client_handler)
+    client = MessageAgent("client", handler=client_handler)
 
-    runtime.register(processor)  # also registers all child agents
+    # Agents are external — register each independently, then the coordinator.
+    runtime.register(planner)
+    runtime.register(replanner)
+    runtime.register(finalizer)
+    runtime.register(financial_analyst)
+    runtime.register(market_analyst)
+    runtime.register(legal_advisor)
+    runtime.register(restructuring_specialist)
+    runtime.register(processor)
     runtime.register(client)
 
     await runtime.start(run_id="run-hec-restructuring-2026")
