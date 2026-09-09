@@ -62,7 +62,50 @@ def test_usage_total_counts_reasoning_tokens():
 
 def test_cache_hit_ratio_is_the_input_served_from_cache():
     assert Usage(input=25, cache_read=75).cache_hit_ratio == 0.75
-    assert Usage().cache_hit_ratio == 0.0
+    assert Usage(input=10, cache_read=0).cache_hit_ratio == 0.0
+
+
+# ── Medido, derivado y sin medir son tres cosas distintas ─────────────────────
+
+def test_an_unmeasured_counter_is_none_not_zero():
+    """Cero dice «no hubo»; la verdad puede ser «nadie lo midió»."""
+    prometheus = Usage(input=100, output=20, cache_read=80)
+    assert prometheus.cache_write is None, "llama.cpp no reporta escritura de caché"
+    assert prometheus.reasoning is None
+    assert Usage(cache_write=0).cache_write == 0, "esto sí es un cero medido"
+
+
+def test_an_unmeasured_counter_makes_the_total_unknown():
+    """Sumar solo lo conocido daría una cota inferior con aspecto de cifra exacta."""
+    assert Usage(input=10, output=5, reasoning=2).total == 17
+    assert Usage(input=10, output=5).total is None
+
+
+def test_the_ratio_is_unknown_when_the_cache_was_not_measured():
+    assert Usage(input=10).cache_hit_ratio is None
+    assert Usage().cache_hit_ratio is None
+
+
+def test_unknown_propagates_through_accumulation():
+    """Si un solo tramo no midió un contador, el total tampoco se sabe."""
+    total = Usage.zero() + Usage(input=10, output=5, reasoning=0, cache_read=0, cache_write=0)
+    total = total + Usage(input=10, output=5, reasoning=0, cache_read=0)
+
+    assert total.input == 20
+    assert total.cache_write is None, "un tramo no lo reportó: el total no se sabe"
+
+
+def test_zero_is_the_starting_point_and_differs_from_nothing_measured():
+    assert Usage.zero().input == 0
+    assert Usage().input is None
+
+
+def test_an_estimate_contaminates_the_sum():
+    """Un total que contiene una estimación es una estimación."""
+    derived = Usage(input=100, output=20, estimated=True)
+    reported = Usage(input=50, output=10)
+    assert (reported + derived).estimated is True
+    assert (reported + reported).estimated is False
 
 
 def test_usage_refuses_to_add_foreign_types():

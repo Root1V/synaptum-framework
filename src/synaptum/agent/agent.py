@@ -134,7 +134,7 @@ class Agent:
         replay = Replay(state)
 
         messages: list[Message] = [Message.user(task)]
-        total = Usage()
+        total = Usage.zero()
         seq = 0
         turns = 0
 

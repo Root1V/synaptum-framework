@@ -259,38 +259,72 @@ class Message:
 class Usage:
     """Contadores de tokens — H3.
 
-    Cinco campos, no dos.  ``reasoning`` lo expone OpenAI en
-    ``output_tokens_details``, Anthropic por estimación de bloques y Gemini en
-    ``thoughtsTokenCount``.  ``cache_read`` y ``cache_write`` son la entrada de
-    la economía de contexto: sin ellos el bucle no puede decidir si compactar
-    sale más barato que conservar.
+    Cinco campos, y **ninguno por defecto a cero**.  ``None`` significa «nadie
+    lo midió»; ``0`` significa «se midió y fue cero».  La distinción no es
+    purismo: si ``cache_write`` llega como cero cuando en realidad la fuente no
+    lo reporta, el bucle concluye que escribir en caché es gratis y decide mal
+    en cada compactación.  Ese fallo no salta — solo cuadra mal.
+
+    No es hipotético.  Prometheus con backend llama.cpp solo puede alimentar
+    ``input``, ``output`` y ``cache_read``; ``reasoning`` y ``cache_write`` no
+    existen en la fuente.
+
+    ``estimated`` marca los contadores **derivados** en vez de reportados —
+    llama.cpp obliga a deducirlos de los ``timings`` del chunk final.  Sin ese
+    bit, FinOps factura sobre una estimación creyéndola exacta.
     """
 
-    input: int = 0
-    output: int = 0
-    reasoning: int = 0
-    cache_read: int = 0
-    cache_write: int = 0
+    input: int | None = None
+    output: int | None = None
+    reasoning: int | None = None
+    cache_read: int | None = None
+    cache_write: int | None = None
+    estimated: bool = False
+
+    @staticmethod
+    def zero() -> "Usage":
+        """Punto de partida para acumular.  Distinto de ``Usage()``, que es
+        «nada medido»."""
+        return Usage(input=0, output=0, reasoning=0, cache_read=0, cache_write=0)
 
     @property
-    def total(self) -> int:
-        return self.input + self.output + self.reasoning
+    def total(self) -> int | None:
+        """Tokens facturables, o ``None`` si falta alguno por medir.
+
+        Devolver la suma de lo conocido sería un total que parece completo y no
+        lo es — justo el error que estos campos existen para hacer visible.
+        """
+        parts = (self.input, self.output, self.reasoning)
+        return None if any(p is None for p in parts) else sum(p for p in parts if p is not None)
 
     @property
-    def cache_hit_ratio(self) -> float:
-        """Fracción de la entrada servida desde caché.  0.0 si no hubo entrada."""
+    def cache_hit_ratio(self) -> float | None:
+        """Fracción de la entrada servida desde caché, o ``None`` si no se midió."""
+        if self.input is None or self.cache_read is None:
+            return None
         billed = self.input + self.cache_read
         return self.cache_read / billed if billed else 0.0
 
     def __add__(self, other: object) -> "Usage":
+        """Suma propagando lo desconocido.
+
+        Si un solo tramo del run no midió un contador, el total de ese contador
+        tampoco se sabe.  Sumar solo lo conocido daría una cota inferior con
+        aspecto de cifra exacta.
+        """
         if not isinstance(other, Usage):
             return NotImplemented
+
+        def add(a: int | None, b: int | None) -> int | None:
+            return None if a is None or b is None else a + b
+
         return Usage(
-            input=self.input + other.input,
-            output=self.output + other.output,
-            reasoning=self.reasoning + other.reasoning,
-            cache_read=self.cache_read + other.cache_read,
-            cache_write=self.cache_write + other.cache_write,
+            input=add(self.input, other.input),
+            output=add(self.output, other.output),
+            reasoning=add(self.reasoning, other.reasoning),
+            cache_read=add(self.cache_read, other.cache_read),
+            cache_write=add(self.cache_write, other.cache_write),
+            estimated=self.estimated or other.estimated,
         )
 
 
