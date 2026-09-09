@@ -111,13 +111,17 @@ class Agent:
         *,
         model: str,
         instructions: str | None = None,
-        tools: Sequence[ToolDefinition] = (),
+        tools: Sequence[Any] = (),
         limits: Limits | None = None,
     ) -> None:
         self.name = name
         self.model = model
         self.instructions = instructions
-        self.tools = tuple(tools)
+        # Acepta ToolDefinition o cualquier objeto que la exponga — un `@tool`,
+        # sin que el bucle tenga que importar el decorador.
+        self.tools: tuple[ToolDefinition, ...] = tuple(
+            t.definition if hasattr(t, "definition") else t for t in tools
+        )
         self.limits = limits or Limits()
         self._by_name = {t.name: t for t in self.tools}
 

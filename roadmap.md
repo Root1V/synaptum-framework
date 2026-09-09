@@ -64,7 +64,7 @@ Un agente único, provider-agnóstico, reanudable. Es el mínimo que Aeon puede 
 | SYN-17 | `PENDIENTE` | Registro de proveedores por entry points | Resolución de `"provider:modelo"` vía `importlib.metadata`. Sin conocimiento previo de los plugins |
 | SYN-18 | `PENDIENTE` | Adaptadores Python de proveedor | Subconjunto de desarrollo, **no paridad** con el gateway. Solo los presentes en ambos lados necesitan fixtures de SYN-03 |
 | SYN-19 | `HECHO` | Bucle del agente como stream de eventos | `async for step in agent.run(...)`. El motor es `await`, no una cola. Cada `yield` es frontera de checkpoint |
-| SYN-20 | `PENDIENTE` | Decorador `@tool` | JSON Schema derivado de la firma tipada. Sin duplicar la descripción a mano |
+| SYN-20 | `HECHO` | Decorador `@tool` | JSON Schema derivado de la firma tipada. Un tipo intraducible **falla al decorar**, no al invocar. Resuelve tipos declarados dentro de una función capturando el ámbito de la decoración |
 | SYN-21 | `HECHO` | Niveles de riesgo de tool | `read / soft_write / hard_write / destructive`. Synaptum **declara**; Aeon **decide** |
 | SYN-22 | `HECHO` | Journal con durabilidad por clase | Escritura anticipada de la intención antes de todo efecto no idempotente |
 | SYN-23 | `HECHO` | `Checkpointer` en memoria | Implementación de referencia para tests y notebooks |
@@ -74,7 +74,7 @@ Un agente único, provider-agnóstico, reanudable. Es el mínimo que Aeon puede 
 | SYN-27 | `HECHO` | Límites del bucle | `max_steps`, `max_retries`, reserva de salida del 20–25 % de la ventana. Corrección, no política |
 | SYN-28 | `PENDIENTE` | Sistema de prompts | Portado desde v0.4: `PromptTemplate` versionado, providers encadenados, disciplina YAML-first |
 | SYN-29 | `PENDIENTE` | Suite de tests del núcleo | **Íntegramente sobre `FakeModel`**, sin depender de inferencia real — obligatorio por P10, no preferible. Cierra la contradicción de la v0.4, que vendía testabilidad sin un solo test |
-| SYN-65 | `PENDIENTE` | `FakeModel` como infraestructura de primera clase | Por P10 es la **vía principal de desarrollo**, no una utilidad. Respuestas guionizadas, simulación de tool calls, de streaming con cancelación, de `Usage` con tokens de caché y razonamiento, e inyección de errores de la taxonomía |
+| SYN-65 | `HECHO` | `FakeGateway` como infraestructura de primera clase | Por P10 es la **vía principal de desarrollo**, no una utilidad. Respuestas guionizadas, simulación de tool calls, de streaming con cancelación, de `Usage` con tokens de caché y razonamiento, e inyección de errores de la taxonomía |
 | SYN-66 | `PENDIENTE` | `ReplayModel` sobre el corpus de fixtures | Los fixtures dorados de `SYN-03` sirven doble: además de probar equivalencia, respaldan un modelo que reproduce respuestas reales grabadas. Da comportamiento realista con cero acceso y cero coste — la mejor respuesta disponible a la limitación de P10 |
 | SYN-30 | `HECHO` | Empaquetado con extras | Cero dependencias duras. `[pydantic]`, `[anthropic]`, `[openai]`, `[mcp]`, `[otel]`. Elimina el arrastre de torch vía llm-guard. El extra `[axonium]` espera a SYN-48: un extra irresoluble rompe `uv lock` entero, no solo su instalación |
 | SYN-31 | `BLOQUEADO` | Suite de conformidad de la costura | Artefacto **conjunto**. Se escribe tras congelar el contrato. Denegación honrada, idempotencia, traza preservada, `Usage` correcto, cancelación a mitad de stream |

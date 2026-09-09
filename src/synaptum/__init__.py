@@ -86,6 +86,7 @@ from .core import UncertainEffect
 from .core import __all__ as _core_all
 from .agent import Agent, Limits, Session
 from .run import Journal, MemoryCheckpointer, Replay
+from .tools import Tool, json_schema_for, tool
 
 __version__ = "1.0.0.dev0"
 __all__ = [
@@ -97,5 +98,8 @@ __all__ = [
     "Journal",
     "MemoryCheckpointer",
     "Replay",
+    "Tool",
+    "tool",
+    "json_schema_for",
     "__version__",
 ]
