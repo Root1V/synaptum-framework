@@ -39,16 +39,16 @@ Congelar antes de escribir implementación. Es la fase que impide reescrituras p
 | RM-01 | `HECHO` | Vocabulario unificado de modelo | `Message`, `ContentPart` (8 tipos), `Request`, `Response`, `StreamEvent`, `FinishReason`. Contrato compartido versionado, no interno de Synaptum |
 | RM-02 | `LISTO` | Especificación de normalización entre proveedores | Colocación de resultados de tool, extracción del mensaje de sistema, bloques de razonamiento, reconstrucción de tool calls en streaming. Vive en el repo de contratos, no en ninguno de los dos proyectos |
 | RM-03 | `LISTO` | Corpus de fixtures dorados de normalización | Respuestas nativas grabadas por proveedor con su salida unificada esperada. Es lo único que impide que las implementaciones Go y Python diverjan bajo la opción D |
-| RM-04 | `LISTO` | Taxonomía de errores | Jerarquía con `retryable`. No reintentar 400/401/403/404/422; sí 429/5xx/timeouts |
+| RM-04 | `HECHO` | Taxonomía de errores | Jerarquía con `retryable`. No reintentar 400/401/403/404/422; sí 429/5xx/timeouts |
 | RM-05 | `HECHO` | Taxonomía de eventos del bucle | `ModelStep`, `ToolStep`, `DelegateStep`, `ApprovalStep`, `FinalStep`. Unión tipada, inmutable y ordenada |
 | RM-06 | `EN CURSO` | Identidad determinista de paso | Especificación **abierta**, no interna. Cualquier framework que la implemente obtiene durabilidad de Nivel 1. Es también la clave de idempotencia del journal |
-| RM-07 | `LISTO` | Protocolo `Checkpointer` | `append(run_id, event)` / `load(run_id)`. Idempotente por `(run_id, step_id, phase)`; un duplicado es no-op |
-| RM-08 | `LISTO` | Protocolo de la costura de aplicación | Síncrona, denegable, fuera del proceso del bucle. Separada del `Checkpointer` porque vetar y recordar tienen presupuestos opuestos |
+| RM-07 | `HECHO` | Protocolo `Checkpointer` | `append(run_id, event)` / `load(run_id)`. Idempotente por `(run_id, step_id, phase)`; un duplicado es no-op |
+| RM-08 | `HECHO` | Protocolo de la costura de aplicación | Síncrona, denegable, fuera del proceso del bucle. Separada del `Checkpointer` porque vetar y recordar tienen presupuestos opuestos |
 | RM-09 | `HECHO` | Disposición de denegación como tipo | Tres valores más código de razón y mensaje legible. Sin esto el bucle no sabe si replanificar o parar |
-| RM-10 | `LISTO` | Contrato de streaming con cancelación | Bidireccional desde v0.1. Habilita el corte de presupuesto en caliente |
-| RM-11 | `LISTO` | Propagación de contexto de traza | `traceparent` / `tracestate` W3C en ambos sentidos de la costura, o los spans del bucle y los de E/S quedan en árboles distintos |
-| RM-12 | `LISTO` | Handshake de versión de la costura | Versión declarada, compatibilidad hacia atrás, ventana N = 2 |
-| RM-13 | `LISTO` | Referencia versionada de esquema de tool | El esquema viaja fuera de la llamada para no romper el prefijo estable de caché. Handshake resuelve contra registro existente o registra por sesión |
+| RM-10 | `HECHO` | Contrato de streaming con cancelación | Bidireccional desde v0.1. Habilita el corte de presupuesto en caliente |
+| RM-11 | `HECHO` | Propagación de contexto de traza | `traceparent` / `tracestate` W3C en ambos sentidos de la costura, o los spans del bucle y los de E/S quedan en árboles distintos |
+| RM-12 | `HECHO` | Handshake de versión de la costura | `Hello` / `Welcome` en un solo viaje con RM-13: ambas cosas ocurren antes del primer turno y ninguna puede repetirse a mitad de sesión. Ventana N = 2 **en total**, contando la actual |
+| RM-13 | `HECHO` | Referencia versionada de esquema de tool | El esquema viaja fuera de la llamada para no romper el prefijo estable de caché. Handshake resuelve contra registro existente o registra por sesión |
 | RM-14 | `HECHO` | Clases de durabilidad por evento | Intención y resultado de efecto no idempotente: síncronos y durables. Resto: diferible. Corrige el supuesto de `append` asíncrono |
 
 ---

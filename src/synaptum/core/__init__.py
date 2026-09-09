@@ -1,5 +1,20 @@
 """Núcleo de Synaptum — tipos y contratos. Sin dependencias fuera de stdlib."""
 
+from .errors import (
+    AbortError,
+    ConfigurationError,
+    Denied,
+    InvalidToolCallError,
+    LimitExceeded,
+    NetworkError,
+    NoObjectGeneratedError,
+    ProviderError,
+    RequestTimeoutError,
+    SeamVersionError,
+    SynaptumError,
+    ToolExecutionError,
+    retryable_for_status,
+)
 from .events import (
     ALLOW,
     ApprovalStep,
@@ -16,6 +31,18 @@ from .events import (
     ToolStep,
     idempotency_key,
     make_step_id,
+)
+from .protocols import (
+    SEAM_VERSION,
+    SUPPORT_WINDOW,
+    CallContext,
+    Checkpointer,
+    Gateway,
+    Hello,
+    RunState,
+    Welcome,
+    negotiate,
+    supported_versions,
 )
 from .types import (
     AUTO,
@@ -108,4 +135,29 @@ __all__ = [
     "Event",
     "make_step_id",
     "idempotency_key",
+    # RM-04 · taxonomía de errores
+    "SynaptumError",
+    "ConfigurationError",
+    "SeamVersionError",
+    "ProviderError",
+    "RequestTimeoutError",
+    "NetworkError",
+    "AbortError",
+    "Denied",
+    "LimitExceeded",
+    "InvalidToolCallError",
+    "ToolExecutionError",
+    "NoObjectGeneratedError",
+    "retryable_for_status",
+    # RM-07 · RM-08 · costuras
+    "SEAM_VERSION",
+    "SUPPORT_WINDOW",
+    "supported_versions",
+    "negotiate",
+    "CallContext",
+    "Hello",
+    "Welcome",
+    "Gateway",
+    "RunState",
+    "Checkpointer",
 ]
