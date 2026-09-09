@@ -98,6 +98,9 @@ class Replay:
     * **Hecho** — hay resultado registrado.  Se devuelve y no se ejecuta nada.
       Aquí es donde se ahorra la inferencia.
     * **Nuevo** — no hay rastro.  Se ejecuta con normalidad.
+    * **Denegado** — hay resultado, y dice que la costura no dejó ocurrir el
+      efecto.  Se vuelve a intentar: entre una reanudación y otra alguien pudo
+      aprobar lo que antes se denegó.
     * **Incierto** — hay intención sin resultado.  El proceso cayó en medio, así
       que el efecto **pudo haber ocurrido**.
     """
@@ -106,6 +109,8 @@ class Replay:
         self._state = state
         self.replayed = 0
         """Cuántos pasos se han saltado.  Métrica, no lógica."""
+        self.denied = 0
+        """Cuántos se reintentan por haber sido denegados antes."""
 
     @property
     def next_seq(self) -> int:
@@ -115,6 +120,11 @@ class Replay:
     def active(self) -> bool:
         """``True`` si hay algo que reproducir."""
         return self._state is not None and bool(self._state.events)
+
+    @property
+    def closed(self) -> StepEvent | None:
+        """El cierre del run, si ya lo hubo."""
+        return self._state.final if self._state else None
 
     def resolve(self, step_id: str, *, idempotent: bool = True) -> StepEvent | None:
         """Devuelve el resultado ya registrado, o ``None`` si toca ejecutar.
@@ -134,6 +144,11 @@ class Replay:
 
         done = self._state.result_of(step_id)
         if done is not None:
+            if done.decision is not None and not done.decision.allowed:
+                # Denegado antes de ejecutar: desenlace conocido, efecto que no
+                # ocurrió.  No es el caso incierto, y se puede reintentar.
+                self.denied += 1
+                return None
             self.replayed += 1
             return done
 

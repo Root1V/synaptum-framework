@@ -177,7 +177,8 @@ def test_a_resumed_run_does_not_pay_for_inference_twice():
     assert second.model_calls == 0, "no debe haberse llamado al modelo"
     assert second.tool_calls == 0, "no debe haberse ejecutado la tool"
     assert events[-1].output == "resultado"
-    assert events[-1].meta["replayed_steps"] == 3
+    # Un run cerrado devuelve su cierre registrado, no vuelve a recorrerse.
+    assert [type(e).__name__ for e in events] == ["FinalStep"]
 
 
 def test_a_run_that_crashed_midway_resumes_where_it_stopped():
@@ -200,6 +201,7 @@ def test_a_run_that_crashed_midway_resumes_where_it_stopped():
     assert resumed.model_calls == 1, "solo la inferencia que quedó pendiente"
     assert resumed.tool_calls == 0, "la tool ya estaba hecha"
     assert events[-1].output == "resultado"
+    assert events[-1].meta["replayed_steps"] == 2, "el modelo y la tool ya hechos; faltaba una inferencia"
 
 
 def test_the_context_window_is_re_derived_not_stored():

@@ -193,7 +193,7 @@ def test_a_run_resumes_after_the_process_is_gone(tmp_path):
     assert second.model_calls == 0, "no debe volver a inferir tras reiniciar"
     assert second.tool_calls == 0
     assert events[-1].output == "resultado"
-    assert events[-1].meta["replayed_steps"] == 3
+    assert [type(e).__name__ for e in events] == ["FinalStep"]
 
 
 def test_a_crash_mid_run_resumes_from_disk(tmp_path):
@@ -312,3 +312,87 @@ def test_a_provider_without_streaming_is_served_anyway_and_says_so():
     events = asyncio.run(go())
     assert events[-1].kind == "finish"
     assert events[-1].response.provider_metadata["streamed"] is False
+
+
+# ── Reanudar un run suspendido por una aprobación ─────────────────────────────
+
+def test_a_run_paused_for_approval_can_be_resumed(tmp_path):
+    """Un paso denegado antes de ejecutar es un desenlace conocido, no un silencio.
+
+    Sin esto, el replay veía intención sin resultado —el patrón del caso
+    incierto— y levantaba ``UncertainEffect`` sobre un efecto que sabemos con
+    certeza que no ocurrió. Solo se ve cuando el journal sobrevive al proceso.
+    """
+    db = tmp_path / "runs.db"
+    agent = Agent("a", model="fake:m", tools=[borrar])
+
+    pausing = FakeGateway(
+        calls("borrar", path="/x"),
+        tools=[borrar],
+        deny_tools={"borrar": Decision(Disposition.REQUIRE_APPROVAL, reason_code="risk.destructive")},
+    )
+    with SqliteCheckpointer(db) as store:
+        events = drain(agent, "borra /x", Session("run-1", pausing, store))
+
+    assert isinstance(events[-1], ApprovalStep)
+    denied = next(e for e in events if isinstance(e, ToolStep) and e.phase is Phase.RESULT)
+    assert denied.decision is not None
+    assert denied.decision.disposition is Disposition.REQUIRE_APPROVAL
+    assert denied.result is None, "no hubo efecto que registrar"
+
+    # La persona aprueba: el gateway ya no deniega y el paso se reintenta.
+    approved = FakeGateway(says("borrado y confirmado"), tools=[borrar])
+    with SqliteCheckpointer(db) as store:
+        events = drain(agent, "borra /x", Session("run-1", approved, store))
+
+    assert approved.tool_calls == 1, "la tool se ejecuta ahora que hay permiso"
+    assert approved.model_calls == 1, "solo la inferencia que faltaba"
+    assert events[-1].output == "borrado y confirmado"
+
+
+def test_a_denied_step_is_not_mistaken_for_an_uncertain_one(tmp_path):
+    """La diferencia entre «no ocurrió» y «no se sabe» tiene que sobrevivir al disco."""
+    db = tmp_path / "runs.db"
+    agent = Agent("a", model="fake:m", tools=[borrar])
+
+    pausing = FakeGateway(
+        calls("borrar", path="/x"),
+        tools=[borrar],
+        deny_tools={"borrar": Decision(Disposition.REQUIRE_APPROVAL)},
+    )
+    with SqliteCheckpointer(db) as store:
+        drain(agent, "borra", Session("run-1", pausing, store))
+
+    from synaptum import UncertainEffect
+
+    again = FakeGateway(
+        tools=[borrar],
+        deny_tools={"borrar": Decision(Disposition.REQUIRE_APPROVAL)},
+    )
+    with SqliteCheckpointer(db) as store:
+        try:
+            drain(agent, "borra", Session("run-1", again, store))
+        except UncertainEffect:  # pragma: no cover
+            pytest.fail("un paso denegado no es un paso incierto")
+
+
+def test_a_closed_run_returns_its_recorded_outcome(tmp_path):
+    """Un run cerrado no se reabre: devuelve lo que pasó."""
+    db = tmp_path / "runs.db"
+    agent = Agent("a", model="fake:m", tools=[borrar])
+
+    terminating = FakeGateway(
+        calls("borrar", path="/x"),
+        tools=[borrar],
+        deny_tools={"borrar": Decision(Disposition.TERMINATE_RUN, reason_code="budget.exhausted")},
+    )
+    with SqliteCheckpointer(db) as store:
+        drain(agent, "borra", Session("run-1", terminating, store))
+
+    empty = FakeGateway(tools=[borrar])
+    with SqliteCheckpointer(db) as store:
+        events = drain(agent, "borra", Session("run-1", empty, store))
+
+    assert [type(e).__name__ for e in events] == ["FinalStep"]
+    assert events[-1].meta["reason_code"] == "budget.exhausted"
+    assert empty.model_calls == 0 and empty.tool_calls == 0

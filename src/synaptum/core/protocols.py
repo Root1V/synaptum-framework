@@ -221,6 +221,18 @@ class RunState:
         """Número de secuencia que le toca al siguiente paso."""
         return max((e.seq for e in self.events), default=-1) + 1
 
+    @property
+    def final(self) -> StepEvent | None:
+        """El evento de cierre, si el run ya terminó.
+
+        Un run cerrado no se reabre: reanudarlo devuelve lo que pasó, no lo
+        intenta otra vez.
+        """
+        for event in reversed(self.events):
+            if event.kind == "final":
+                return event
+        return None
+
     def result_of(self, step_id: str) -> StepEvent | None:
         """Resultado ya registrado de un paso, si lo hay.
 

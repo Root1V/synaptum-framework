@@ -137,6 +137,12 @@ class Agent:
         journal = Journal(session.checkpointer, session.run_id)
         replay = Replay(state)
 
+        closed = replay.closed
+        if closed is not None:
+            # Un run que ya terminó devuelve lo que pasó, no lo intenta otra vez.
+            yield closed
+            return
+
         messages: list[Message] = [Message.user(task)]
         total = Usage.zero()
         seq = 0
@@ -176,8 +182,14 @@ class Agent:
                     try:
                         response = await self._call_model(session, request, step_id)
                     except Denied as denial:
-                        async for event in self._on_denial(
-                            denial, session, journal, seq, total, subject="llamada al modelo"
+                        async for event in self._close_denied(
+                            denial, session, journal, seq, total,
+                            step=ModelStep(
+                                run_id=session.run_id, step_id=step_id, seq=seq - 1,
+                                phase=Phase.RESULT, at=time.time(),
+                                decision=denial.decision,
+                            ),
+                            subject="llamada al modelo",
                         ):
                             yield event
                         return
@@ -234,8 +246,14 @@ class Agent:
                                 is_error=True,
                             )
                         else:
-                            async for event in self._on_denial(
+                            async for event in self._close_denied(
                                 denial, session, journal, seq, total,
+                                step=ToolStep(
+                                    run_id=session.run_id, step_id=step_id, seq=seq - 1,
+                                    phase=Phase.RESULT, at=time.time(),
+                                    call=call, risk=risk, idempotent=idempotent,
+                                    decision=denial.decision,
+                                ),
                                 subject=f"herramienta '{call.name}'",
                             ):
                                 yield event
@@ -307,7 +325,7 @@ class Agent:
 
     # ── Cierre por denegación ─────────────────────────────────────────────────
 
-    async def _on_denial(
+    async def _close_denied(
         self,
         denial: Denied,
         session: Session,
@@ -315,14 +333,22 @@ class Agent:
         seq: int,
         total: Usage,
         *,
+        step: StepEvent,
         subject: str,
     ) -> AsyncIterator[StepEvent]:
-        """Traduce una denegación terminal en el evento de cierre que le toca.
+        """Registra el desenlace del paso denegado y cierra como corresponda.
+
+        El ``RESULT`` del paso se escribe **con la decisión y sin efecto**.  Es
+        lo que permite que una reanudación sepa que ahí no pasó nada, en vez de
+        encontrarse una intención huérfana y tratarla como el caso incierto.
 
         ``require_approval`` suspende: emite un ``ApprovalStep`` y termina el
         stream **sin** cerrar el run.  Volver a llamar con el mismo ``run_id``
         retoma donde quedó.  ``terminate_run`` cierra de verdad.
         """
+        await journal.record(step)
+        yield step
+
         if denial.disposition is Disposition.REQUIRE_APPROVAL:
             pause = ApprovalStep(
                 run_id=session.run_id, step_id=make_step_id(seq, "approval"), seq=seq,

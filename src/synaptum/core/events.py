@@ -162,6 +162,17 @@ class StepEvent:
     """Contexto de traza W3C y cualquier acompañante opaco.  Se propaga sin
     interpretarse."""
 
+    decision: Decision | None = None
+    """Presente en ``RESULT`` cuando el paso se resolvió **sin que el efecto
+    ocurriera**, porque la costura de aplicación lo denegó antes de ejecutarlo.
+
+    Es lo que distingue «no ejecutado porque se denegó» de «no se sabe si
+    ejecutó».  Sin este campo, un paso denegado deja intención sin resultado —
+    exactamente el patrón del caso incierto— y la reanudación lo trata como
+    ambiguo cuando en realidad no hay ninguna ambigüedad: sabemos con certeza
+    que no pasó nada.
+    """
+
     kind: str = "step"
 
     @property
@@ -268,9 +279,12 @@ class ApprovalStep(StepEvent):
 
     kind: str = "approval"
     subject: str = ""
-    """Qué se somete a decisión, en términos legibles."""
-    decision: Decision | None = None
-    """Presente en ``RESULT``."""
+    """Qué se somete a decisión, en términos legibles.
+
+    La ``Decision`` de quien resuelve va en el campo heredado ``decision``,
+    en fase ``RESULT``.  El bucle no puede escribirla: no está corriendo cuando
+    alguien decide.
+    """
 
     @property
     def durability(self) -> Durability:
