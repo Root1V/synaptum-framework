@@ -68,7 +68,7 @@ def drain(agent: Agent, task: str, session: Session) -> list:
 
 def test_an_event_survives_a_round_trip_through_json():
     original = ModelStep(
-        run_id="run-1", step_id=make_step_id(0, "model"), seq=0, phase=Phase.RESULT,
+        run_id="run-1", step_id=make_step_id(0, "model"), step_seq=0, phase=Phase.COMPLETED,
         response=Response(
             message=Message(Role.ASSISTANT, (Thinking(text="pensando", signature="s1"), Text("hola"))),
             finish_reason=FinishReason.STOP,
@@ -91,7 +91,7 @@ def test_an_event_survives_a_round_trip_through_json():
 def test_an_unmeasured_counter_survives_as_none_not_zero():
     """El bit que Axonium pidió tiene que cruzar el disco intacto."""
     original = ModelStep(
-        run_id="r", step_id="000000-model", seq=0, phase=Phase.RESULT,
+        run_id="r", step_id="000000-model", step_seq=0, phase=Phase.COMPLETED,
         usage=Usage(input=100, output=20, cache_read=80, estimated=True),
     )
     restored = decode_event(json.loads(dumps(original)))
@@ -101,7 +101,7 @@ def test_an_unmeasured_counter_survives_as_none_not_zero():
 
 def test_a_tool_step_keeps_its_risk_and_idempotence():
     original = ToolStep(
-        run_id="r", step_id="000001-tool", seq=1, phase=Phase.RESULT,
+        run_id="r", step_id="000001-tool", step_seq=1, phase=Phase.COMPLETED,
         call=ToolCall(id="c1", name="borrar", arguments={"path": "/x"}),
         risk=Risk.DESTRUCTIVE, idempotent=False,
     )
@@ -113,15 +113,25 @@ def test_a_tool_step_keeps_its_risk_and_idempotence():
 def test_an_unknown_event_kind_fails_loudly():
     """Mejor que devolver un evento a medias que el replay lea como no hecho."""
     with pytest.raises(ValueError, match="Evento desconocido"):
-        decode_event({"kind": "inventado", "run_id": "r", "step_id": "x", "seq": 0, "phase": "result"})
+        decode_event({"kind": "inventado", "run_id": "r", "step_id": "x", "seq": 0, "phase": "completed"})
 
 
 def test_a_journal_written_by_an_older_version_stays_readable():
-    """Un campo que no existía se queda en su default, no revienta la lectura."""
-    payload = {"kind": "model", "run_id": "r", "step_id": "000000-model", "seq": 0, "phase": "result"}
+    """Un campo opcional que no existía se queda en su default.
+
+    La garantía cubre los campos **con** default, que son los que un formato
+    puede ganar con el tiempo. Los que forman parte de la identidad del paso son
+    obligatorios a propósito: rellenarlos con un valor inventado daría un diario
+    que se lee sin error y miente.
+    """
+    payload = {
+        "kind": "model", "run_id": "r", "step_id": "000000-model",
+        "step_seq": 0, "phase": "completed",
+    }
     restored = decode_event(payload)
-    assert restored.response is None
-    assert restored.usage.input is None
+    assert restored.response is None, "no había resultado registrado"
+    assert restored.usage.input is None, "nadie lo midió"
+    assert restored.decision is None, "campo añadido después: default, no error"
 
 
 # ── SYN-24 · SQLite ───────────────────────────────────────────────────────────
@@ -129,7 +139,7 @@ def test_a_journal_written_by_an_older_version_stays_readable():
 def test_the_primary_key_is_the_idempotency_guarantee():
     """No es una comprobación antes de insertar: es que la tabla no lo admite."""
     store = SqliteCheckpointer()
-    event = ModelStep(run_id="r", step_id="000000-model", seq=0, phase=Phase.RESULT)
+    event = ModelStep(run_id="r", step_id="000000-model", step_seq=0, phase=Phase.COMPLETED)
 
     async def go():
         await store.append("r", event)
@@ -146,16 +156,18 @@ def test_events_come_back_in_write_order():
     async def go():
         for n in (0, 1, 2):
             await store.append(
-                "r", ModelStep(run_id="r", step_id=make_step_id(n, "model"), seq=n, phase=Phase.RESULT)
+                "r", ModelStep(run_id="r", step_id=make_step_id(n, "model"), step_seq=n, phase=Phase.COMPLETED)
             )
         return await store.load("r")
 
     state = asyncio.run(go())
-    assert [e.seq for e in state.events] == [0, 1, 2]
+    assert [e.step_seq for e in state.events] == [0, 1, 2]
 
 
-def test_loading_an_unknown_run_returns_none():
-    assert asyncio.run(SqliteCheckpointer().load("no-existe")) is None
+def test_an_unknown_run_loads_as_an_empty_journal_not_an_error():
+    """Preguntar «¿dónde estaba?» antes del primer checkpoint es la llamada normal."""
+    state = asyncio.run(SqliteCheckpointer().load("no-existe"))
+    assert state.events == () and state.next_seq == 0
 
 
 def test_runs_are_kept_apart():
@@ -164,7 +176,7 @@ def test_runs_are_kept_apart():
     async def go():
         for run in ("a", "b"):
             await store.append(
-                run, ModelStep(run_id=run, step_id="000000-model", seq=0, phase=Phase.RESULT)
+                run, ModelStep(run_id=run, step_id="000000-model", step_seq=0, phase=Phase.COMPLETED)
             )
         return store.runs()
 
@@ -335,7 +347,7 @@ def test_a_run_paused_for_approval_can_be_resumed(tmp_path):
         events = drain(agent, "borra /x", Session("run-1", pausing, store))
 
     assert isinstance(events[-1], ApprovalStep)
-    denied = next(e for e in events if isinstance(e, ToolStep) and e.phase is Phase.RESULT)
+    denied = next(e for e in events if isinstance(e, ToolStep) and e.phase is Phase.COMPLETED)
     assert denied.decision is not None
     assert denied.decision.disposition is Disposition.REQUIRE_APPROVAL
     assert denied.result is None, "no hubo efecto que registrar"

@@ -77,7 +77,7 @@ Un agente único, provider-agnóstico, reanudable. Es el mínimo que Aeon puede 
 | SYN-65 | `HECHO` | `FakeGateway` como infraestructura de primera clase | Por P10 es la **vía principal de desarrollo**, no una utilidad. Respuestas guionizadas, simulación de tool calls, de streaming con cancelación, de `Usage` con tokens de caché y razonamiento, e inyección de errores de la taxonomía |
 | SYN-66 | `PENDIENTE` | `ReplayModel` sobre el corpus de fixtures | Los fixtures dorados de `SYN-03` sirven doble: además de probar equivalencia, respaldan un modelo que reproduce respuestas reales grabadas. Da comportamiento realista con cero acceso y cero coste — la mejor respuesta disponible a la limitación de P10 |
 | SYN-30 | `HECHO` | Empaquetado con extras | Cero dependencias duras. `[pydantic]`, `[anthropic]`, `[openai]`, `[mcp]`, `[otel]`. Elimina el arrastre de torch vía llm-guard. El extra `[axonium]` espera a SYN-48: un extra irresoluble rompe `uv lock` entero, no solo su instalación |
-| SYN-31 | `BLOQUEADO` | Suite de conformidad de la costura | Artefacto **conjunto**. Se escribe tras congelar el contrato. Denegación honrada, idempotencia, traza preservada, `Usage` correcto, cancelación a mitad de stream |
+| SYN-31 | `EN CURSO` | Suite de conformidad de la costura | Artefacto **conjunto**. La parte de durabilidad ya corre: los 8 casos dorados de `contratos/costura-durabilidad` pasan contra `MemoryCheckpointer` y `SqliteCheckpointer`. Falta la de la costura de aplicación, que espera al congelado |
 
 ---
 

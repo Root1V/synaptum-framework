@@ -24,7 +24,7 @@ from pathlib import Path
 
 from ..core.codec import decode_event
 from ..core.events import StepEvent
-from ..core.protocols import RunState
+from ..core.protocols import AppendResult, RunState
 from ..core.types import dumps
 
 __all__ = ["SqliteCheckpointer"]
@@ -32,15 +32,15 @@ __all__ = ["SqliteCheckpointer"]
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS journal (
-    run_id  TEXT    NOT NULL,
-    step_id TEXT    NOT NULL,
-    phase   TEXT    NOT NULL,
-    seq     INTEGER NOT NULL,
-    written INTEGER NOT NULL,
-    payload TEXT    NOT NULL,
+    run_id   TEXT    NOT NULL,
+    step_id  TEXT    NOT NULL,
+    phase    TEXT    NOT NULL,
+    seq      INTEGER NOT NULL,
+    step_seq INTEGER NOT NULL,
+    payload  TEXT    NOT NULL,
     PRIMARY KEY (run_id, step_id, phase)
 );
-CREATE INDEX IF NOT EXISTS journal_order ON journal (run_id, written);
+CREATE INDEX IF NOT EXISTS journal_order ON journal (run_id, seq);
 """
 
 
@@ -52,26 +52,44 @@ class SqliteCheckpointer:
         self._db = sqlite3.connect(self.path, check_same_thread=False)
         self._db.executescript(_SCHEMA)
         self._db.commit()
-        self._written = 0
 
     # ── Contrato ──────────────────────────────────────────────────────────────
 
-    async def append(self, run_id: str, event: StepEvent) -> None:
+    async def append(self, run_id: str, event: StepEvent) -> AppendResult:
         """Añade un evento.  Un duplicado es no-op, garantizado por la clave.
 
         ``INSERT OR IGNORE`` sobre la clave primaria: no hay ventana entre
         comprobar y escribir, así que dos procesos reintentando la misma unidad
         de trabajo no pueden colarse a la vez.
         """
-        self._written += 1
-        self._db.execute(
+        payload = dumps(event)
+        existing = self._db.execute(
+            "SELECT seq, payload FROM journal WHERE run_id=? AND step_id=? AND phase=?",
+            (run_id, event.step_id, event.phase.value),
+        ).fetchone()
+        if existing is not None:
+            return AppendResult(seq=existing[0], duplicate=True, payload_diverged=existing[1] != payload)
+
+        position = self._db.execute(
+            "SELECT COUNT(*) FROM journal WHERE run_id = ?", (run_id,)
+        ).fetchone()[0]
+        cursor = self._db.execute(
             "INSERT OR IGNORE INTO journal "
-            "(run_id, step_id, phase, seq, written, payload) VALUES (?,?,?,?,?,?)",
-            (run_id, event.step_id, event.phase.value, event.seq, self._written, dumps(event)),
+            "(run_id, step_id, phase, seq, step_seq, payload) VALUES (?,?,?,?,?,?)",
+            (run_id, event.step_id, event.phase.value, position, event.step_seq, payload),
         )
         self._db.commit()
+        if cursor.rowcount == 0:
+            # Carrera perdida: otro escritor insertó entre el SELECT y aquí.
+            # La clave primaria es el respaldo, no la comprobación previa.
+            row = self._db.execute(
+                "SELECT seq, payload FROM journal WHERE run_id=? AND step_id=? AND phase=?",
+                (run_id, event.step_id, event.phase.value),
+            ).fetchone()
+            return AppendResult(seq=row[0], duplicate=True, payload_diverged=row[1] != payload)
+        return AppendResult(seq=position)
 
-    async def load(self, run_id: str) -> RunState | None:
+    async def load(self, run_id: str) -> RunState:
         """Reconstruye el estado del run, o ``None`` si no existe.
 
         Los eventos vuelven en **orden de escritura**, no de número de paso.  El
@@ -79,10 +97,8 @@ class SqliteCheckpointer:
         de llegada y el de numeración dejan de coincidir.
         """
         rows = self._db.execute(
-            "SELECT payload FROM journal WHERE run_id = ? ORDER BY written", (run_id,)
+            "SELECT payload FROM journal WHERE run_id = ? ORDER BY seq", (run_id,)
         ).fetchall()
-        if not rows:
-            return None
         return RunState(run_id, tuple(decode_event(json.loads(row[0])) for row in rows))
 
     # ── Operación ─────────────────────────────────────────────────────────────

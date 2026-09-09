@@ -36,7 +36,7 @@ from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Mapping, Protocol, Sequence, runtime_checkable
 
 from .errors import SeamVersionError
-from .events import Risk, StepEvent
+from .events import Phase, Risk, StepEvent
 from .types import Request, Response, StreamEvent, ToolCall, ToolDefinition, ToolResult
 
 __all__ = [
@@ -48,6 +48,7 @@ __all__ = [
     "Hello",
     "Welcome",
     "Gateway",
+    "AppendResult",
     "RunState",
     "Checkpointer",
 ]
@@ -204,6 +205,24 @@ class Gateway(Protocol):
 # ── Costura 2 · memoria — RM-07 ───────────────────────────────────────────────
 
 @dataclass(frozen=True, slots=True)
+class AppendResult:
+    """Lo que devuelve un ``append`` — contrato compartido de la costura.
+
+    Los tres campos son informativos: quien corre bajo *at-least-once* nunca
+    debe necesitarlos para ser correcto.  Pero ``payload_diverged`` es la señal
+    que convierte un no-determinismo real en algo visible: dos intentos del
+    mismo paso con resultados distintos, tragados en silencio, hacen el diario
+    peor que no tenerlo.
+    """
+
+    seq: int
+    """Posición en el diario.  En un duplicado, la de la entrada que ya
+    existía."""
+    duplicate: bool = False
+    payload_diverged: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class RunState:
     """Lo que ``load`` devuelve: el journal de un run, en orden.
 
@@ -218,8 +237,14 @@ class RunState:
 
     @property
     def next_seq(self) -> int:
-        """Número de secuencia que le toca al siguiente paso."""
-        return max((e.seq for e in self.events), default=-1) + 1
+        """Posición que ocupará la siguiente entrada del diario.
+
+        Es el tamaño del diario, no el ordinal del siguiente paso: las
+        posiciones son contiguas desde cero y un duplicado no consume número.
+        Eso es lo que hace que signifique «por dónde continúa el diario» y no
+        «algún número mayor que el último».
+        """
+        return len(self.events)
 
     @property
     def final(self) -> StepEvent | None:
@@ -239,7 +264,7 @@ class RunState:
         Que exista significa que el efecto ocurrió y no debe repetirse.
         """
         for event in reversed(self.events):
-            if event.step_id == step_id and event.phase.value == "result":
+            if event.step_id == step_id and event.phase is Phase.COMPLETED:
                 return event
         return None
 
@@ -247,12 +272,18 @@ class RunState:
         return self.result_of(step_id) is not None
 
     def attempted(self, step_id: str) -> bool:
-        """``True`` si hay intención registrada, con o sin resultado.
+        """``True`` si hay intención **y no** resultado.
 
-        Una intención sin resultado es el caso incierto: el proceso cayó entre
-        el registro y el efecto, así que el efecto **pudo haber ocurrido**.  Si
-        no es idempotente, repetirlo a ciegas es lo peor que se puede hacer.
+        Es excluyente de ``completed`` a propósito: un paso terminado no está
+        intentado, está hecho, y quien pregunta «¿qué hago ahora?» necesita una
+        respuesta, no dos.
+
+        Este es el caso incierto — el proceso cayó entre el registro y el
+        efecto, así que el efecto **pudo haber ocurrido**.  Si no es
+        idempotente, repetirlo a ciegas es lo peor que se puede hacer.
         """
+        if self.completed(step_id):
+            return False
         return any(e.step_id == step_id for e in self.events)
 
 
@@ -265,7 +296,7 @@ class Checkpointer(Protocol):
     agente, ni la lógica de replay, ni cómo se acuñan los identificadores.
     """
 
-    async def append(self, run_id: str, event: StepEvent) -> None:
+    async def append(self, run_id: str, event: StepEvent) -> AppendResult:
         """Añade un evento al journal.
 
         **Debe ser idempotente por ``(run_id, step_id, phase)``.**  Un ``append``
@@ -281,9 +312,12 @@ class Checkpointer(Protocol):
         """
         ...
 
-    async def load(self, run_id: str) -> RunState | None:
-        """Reconstruye el estado de un run.  ``None`` si no existe.
+    async def load(self, run_id: str) -> RunState:
+        """Reconstruye el diario de un run, en orden de escritura.
 
-        Los eventos vuelven en orden de ejecución.
+        Un run desconocido devuelve un **diario vacío, no un error**.  Preguntar
+        «¿dónde estaba?» antes del primer checkpoint es la llamada normal, no un
+        fallo; devolver ausencia obligaría a todos los llamantes a tratar el
+        camino feliz como caso especial.
         """
         ...

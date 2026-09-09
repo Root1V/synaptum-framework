@@ -5,8 +5,8 @@ El bucle del agente no es un ``while`` oculto: cede el control en cada frontera
 significativa emitiendo un evento tipado.  Quien itera puede mirar, medir,
 aprobar, denegar o cortar — sin que el bucle sepa quién está al otro lado.
 
-Cada evento se emite **dos veces**: una con ``Phase.INTENT``, antes del efecto,
-y otra con ``Phase.RESULT``, después.  Ambas comparten ``step_id`` y difieren en
+Cada evento se emite **dos veces**: una con ``Phase.ATTEMPTED``, antes del efecto,
+y otra con ``Phase.COMPLETED``, después.  Ambas comparten ``step_id`` y difieren en
 ``phase``.  Eso es lo que permite tres cosas a la vez:
 
 * **Escritura anticipada.**  Si el proceso cae entre la intención y el
@@ -55,8 +55,15 @@ __all__ = [
 # ── Fases y durabilidad ───────────────────────────────────────────────────────
 
 class Phase(str, Enum):
-    INTENT = "intent"
-    RESULT = "result"
+    """Las dos fases de un paso, con los nombres del contrato compartido.
+
+    ``attempted`` y ``completed`` describen el **estado** del paso, no el
+    contenido del evento — y coinciden con los nombres de las consultas
+    derivadas de ``RunState``, que es donde se leen.
+    """
+
+    ATTEMPTED = "attempted"
+    COMPLETED = "completed"
 
 
 class Durability(str, Enum):
@@ -149,7 +156,14 @@ class StepEvent:
 
     run_id: str
     step_id: str
-    seq: int
+    step_seq: int
+    """Ordinal del paso dentro del run, determinista.
+
+    **No es la posición en el diario.**  Esa la asigna el almacén al escribir y
+    se llama ``seq`` en el contrato de la costura; con pasos concurrentes los
+    dos números dejan de coincidir.  Compartir el nombre daba un diario mal
+    leído sin dar ningún error.
+    """
     phase: Phase
     at: float | None = None
     """Marca temporal en épocas, solo para observabilidad.
@@ -163,7 +177,7 @@ class StepEvent:
     interpretarse."""
 
     decision: Decision | None = None
-    """Presente en ``RESULT`` cuando el paso se resolvió **sin que el efecto
+    """Presente en ``COMPLETED`` cuando el paso se resolvió **sin que el efecto
     ocurriera**, porque la costura de aplicación lo denegó antes de ejecutarlo.
 
     Es lo que distingue «no ejecutado porque se denegó» de «no se sabe si
@@ -195,9 +209,9 @@ class ModelStep(StepEvent):
 
     kind: str = "model"
     request: Request | None = None
-    """Presente en ``INTENT``."""
+    """Presente en ``ATTEMPTED``."""
     response: Response | None = None
-    """Presente en ``RESULT``."""
+    """Presente en ``COMPLETED``."""
     usage: Usage = field(default_factory=Usage)
     """Vuelve por la costura aunque el span lo emita quien ejecutó — H3 con A5."""
 
@@ -213,7 +227,7 @@ class ModelStep(StepEvent):
 
         Lo que se ahorra no es una escritura, es una **espera antes del efecto**.
         """
-        return Durability.DEFERRABLE if self.phase is Phase.INTENT else Durability.DURABLE
+        return Durability.DEFERRABLE if self.phase is Phase.ATTEMPTED else Durability.DURABLE
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -228,9 +242,9 @@ class ToolStep(StepEvent):
 
     kind: str = "tool"
     call: ToolCall | None = None
-    """Presente en ``INTENT``."""
+    """Presente en ``ATTEMPTED``."""
     result: ToolResult | None = None
-    """Presente en ``RESULT``."""
+    """Presente en ``COMPLETED``."""
     risk: Risk = Risk.READ
     idempotent: bool = False
     """Conservador por defecto: quien no declara nada paga durabilidad."""
@@ -258,9 +272,9 @@ class DelegateStep(StepEvent):
     kind: str = "delegate"
     agent: str = ""
     brief: str = ""
-    """Presente en ``INTENT``."""
+    """Presente en ``ATTEMPTED``."""
     result: Any = None
-    """Presente en ``RESULT``."""
+    """Presente en ``COMPLETED``."""
     usage: Usage = field(default_factory=Usage)
     """Consumo agregado del subagente, para atribuir el coste de orquestar."""
 
@@ -282,7 +296,7 @@ class ApprovalStep(StepEvent):
     """Qué se somete a decisión, en términos legibles.
 
     La ``Decision`` de quien resuelve va en el campo heredado ``decision``,
-    en fase ``RESULT``.  El bucle no puede escribirla: no está corriendo cuando
+    en fase ``COMPLETED``.  El bucle no puede escribirla: no está corriendo cuando
     alguien decide.
     """
 

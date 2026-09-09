@@ -21,7 +21,8 @@ from __future__ import annotations
 
 from ..core.errors import UncertainEffect
 from ..core.events import Durability, StepEvent
-from ..core.protocols import Checkpointer, RunState
+from ..core.types import dumps
+from ..core.protocols import AppendResult, Checkpointer, RunState
 
 __all__ = ["Journal", "MemoryCheckpointer", "Replay"]
 
@@ -38,18 +39,30 @@ class MemoryCheckpointer:
 
     def __init__(self) -> None:
         self._runs: dict[str, list[StepEvent]] = {}
-        self._keys: set[tuple[str, str, str]] = set()
+        self._index: dict[tuple[str, str, str], tuple[int, str]] = {}
 
-    async def append(self, run_id: str, event: StepEvent) -> None:
-        """Idempotente por ``(run_id, step_id, phase)``.  Un duplicado es no-op."""
-        if event.key in self._keys:
-            return
-        self._keys.add(event.key)
-        self._runs.setdefault(run_id, []).append(event)
+    async def append(self, run_id: str, event: StepEvent) -> AppendResult:
+        """Idempotente por ``(run_id, step_id, phase)``.  Un duplicado es no-op.
 
-    async def load(self, run_id: str) -> RunState | None:
-        events = self._runs.get(run_id)
-        return RunState(run_id, tuple(events)) if events is not None else None
+        La divergencia de payload se compara de forma **semántica**, no de
+        bytes: ``dumps`` ordena las claves, así que reserializar el mismo objeto
+        en otro orden no cuenta como divergencia.  Comparar bytes convertiría en
+        falsa alarma cada reintento desde un lenguaje sin orden garantizado.
+        """
+        payload = dumps(event)
+        seen = self._index.get(event.key)
+        if seen is not None:
+            position, stored = seen
+            return AppendResult(seq=position, duplicate=True, payload_diverged=payload != stored)
+
+        entries = self._runs.setdefault(run_id, [])
+        position = len(entries)
+        entries.append(event)
+        self._index[event.key] = (position, payload)
+        return AppendResult(seq=position)
+
+    async def load(self, run_id: str) -> RunState:
+        return RunState(run_id, tuple(self._runs.get(run_id, ())))
 
     # Conveniencias para tests; no forman parte del protocolo.
     def event_count(self, run_id: str) -> int:
@@ -105,7 +118,7 @@ class Replay:
       que el efecto **pudo haber ocurrido**.
     """
 
-    def __init__(self, state: RunState | None) -> None:
+    def __init__(self, state: RunState) -> None:
         self._state = state
         self.replayed = 0
         """Cuántos pasos se han saltado.  Métrica, no lógica."""
@@ -113,18 +126,14 @@ class Replay:
         """Cuántos se reintentan por haber sido denegados antes."""
 
     @property
-    def next_seq(self) -> int:
-        return self._state.next_seq if self._state else 0
-
-    @property
     def active(self) -> bool:
         """``True`` si hay algo que reproducir."""
-        return self._state is not None and bool(self._state.events)
+        return bool(self._state.events)
 
     @property
     def closed(self) -> StepEvent | None:
         """El cierre del run, si ya lo hubo."""
-        return self._state.final if self._state else None
+        return self._state.final
 
     def resolve(self, step_id: str, *, idempotent: bool = True) -> StepEvent | None:
         """Devuelve el resultado ya registrado, o ``None`` si toca ejecutar.
@@ -139,9 +148,6 @@ class Replay:
                 efecto no es idempotente.  El bucle no tiene la información
                 para decidir, así que no la inventa: la levanta.
         """
-        if self._state is None:
-            return None
-
         done = self._state.result_of(step_id)
         if done is not None:
             if done.decision is not None and not done.decision.allowed:

@@ -55,29 +55,29 @@ def _model_step(phase: Phase, *, at: float | None = None) -> ModelStep:
     return ModelStep(
         run_id="run-1",
         step_id=make_step_id(3, "model"),
-        seq=3,
+        step_seq=3,
         phase=phase,
         at=at,
-        request=Request(model="p:m") if phase is Phase.INTENT else None,
+        request=Request(model="p:m") if phase is Phase.ATTEMPTED else None,
     )
 
 
 def test_the_key_is_run_step_and_phase():
-    step = _model_step(Phase.INTENT)
-    assert idempotency_key(step) == ("run-1", "000003-model", "intent")
+    step = _model_step(Phase.ATTEMPTED)
+    assert idempotency_key(step) == ("run-1", "000003-model", "attempted")
     assert step.key == idempotency_key(step)
 
 
 def test_the_timestamp_is_not_part_of_the_identity():
     """Un reintento con distinto reloj sigue siendo el mismo paso."""
-    first = _model_step(Phase.INTENT, at=1000.0)
-    again = _model_step(Phase.INTENT, at=2000.0)
+    first = _model_step(Phase.ATTEMPTED, at=1000.0)
+    again = _model_step(Phase.ATTEMPTED, at=2000.0)
     assert first.key == again.key
 
 
 def test_intent_and_result_share_the_step_and_differ_in_phase():
-    intent = _model_step(Phase.INTENT)
-    result = _model_step(Phase.RESULT)
+    intent = _model_step(Phase.ATTEMPTED)
+    result = _model_step(Phase.COMPLETED)
     assert intent.step_id == result.step_id
     assert intent.key != result.key
 
@@ -86,15 +86,15 @@ def test_intent_and_result_share_the_step_and_differ_in_phase():
 
 def test_a_model_result_is_always_durable():
     """Cuesta dinero y no es reproducible: una vez escrito, no se repite."""
-    assert _model_step(Phase.RESULT).durability is Durability.DURABLE
+    assert _model_step(Phase.COMPLETED).durability is Durability.DURABLE
 
 
 def _tool_step(*, idempotent: bool, risk: Risk = Risk.READ) -> ToolStep:
     return ToolStep(
         run_id="run-1",
         step_id=make_step_id(4, "tool"),
-        seq=4,
-        phase=Phase.INTENT,
+        step_seq=4,
+        phase=Phase.ATTEMPTED,
         call=ToolCall(id="c1", name="leer"),
         risk=risk,
         idempotent=idempotent,
@@ -109,25 +109,25 @@ def test_tool_durability_follows_the_idempotency_of_the_effect():
 
 def test_a_tool_that_declares_nothing_pays_durability():
     """Conservador por defecto: el caso silencioso es el seguro."""
-    step = ToolStep(run_id="r", step_id="000001-tool", seq=1, phase=Phase.INTENT)
+    step = ToolStep(run_id="r", step_id="000001-tool", step_seq=1, phase=Phase.ATTEMPTED)
     assert step.idempotent is False
     assert step.durability is Durability.DURABLE
 
 
 def test_an_approval_is_durable_so_nobody_is_asked_twice():
     step = ApprovalStep(
-        run_id="run-1", step_id="000005-approval", seq=5,
-        phase=Phase.INTENT, subject="transferencia de 420.000 EUR",
+        run_id="run-1", step_id="000005-approval", step_seq=5,
+        phase=Phase.ATTEMPTED, subject="transferencia de 420.000 EUR",
     )
     assert step.durability is Durability.DURABLE
 
 
 def test_delegation_and_closure_are_durable():
     delegate = DelegateStep(
-        run_id="r", step_id="000006-delegate", seq=6,
-        phase=Phase.INTENT, agent="analista", brief="evalúa el riesgo",
+        run_id="r", step_id="000006-delegate", step_seq=6,
+        phase=Phase.ATTEMPTED, agent="analista", brief="evalúa el riesgo",
     )
-    final = FinalStep(run_id="r", step_id="000007-final", seq=7, phase=Phase.RESULT)
+    final = FinalStep(run_id="r", step_id="000007-final", step_seq=7, phase=Phase.COMPLETED)
     assert delegate.durability is Durability.DURABLE
     assert final.durability is Durability.DURABLE
 
@@ -164,14 +164,14 @@ def test_a_refusal_carries_a_stable_code_and_a_readable_message():
 
 def test_events_serialise_deterministically():
     """El journal es append-only y comparable entre ejecución y replay."""
-    a = _model_step(Phase.RESULT)
-    b = _model_step(Phase.RESULT)
+    a = _model_step(Phase.COMPLETED)
+    b = _model_step(Phase.COMPLETED)
     assert dumps(a) == dumps(b)
 
 
 def test_an_event_carries_opaque_metadata_for_trace_context():
     step = ModelStep(
-        run_id="r", step_id="000001-model", seq=1, phase=Phase.INTENT,
+        run_id="r", step_id="000001-model", step_seq=1, phase=Phase.ATTEMPTED,
         meta={"traceparent": "00-abc-def-01"},
         usage=Usage(input=10),
     )
@@ -182,14 +182,14 @@ def test_an_event_carries_opaque_metadata_for_trace_context():
 
 def test_a_model_intent_is_deferrable_and_its_result_is_not():
     """Lo que se ahorra no es una escritura: es una espera antes del efecto."""
-    assert _model_step(Phase.INTENT).durability is Durability.DEFERRABLE
-    assert _model_step(Phase.RESULT).durability is Durability.DURABLE
+    assert _model_step(Phase.ATTEMPTED).durability is Durability.DEFERRABLE
+    assert _model_step(Phase.COMPLETED).durability is Durability.DURABLE
 
 
 def test_a_non_idempotent_tool_blocks_on_both_phases():
     """Escritura anticipada: la intención en disco antes de que ocurra el efecto."""
-    for phase in (Phase.INTENT, Phase.RESULT):
+    for phase in (Phase.ATTEMPTED, Phase.COMPLETED):
         step = ToolStep(
-            run_id="r", step_id="000001-tool", seq=1, phase=phase, idempotent=False
+            run_id="r", step_id="000001-tool", step_seq=1, phase=phase, idempotent=False
         )
         assert step.durability is Durability.DURABLE

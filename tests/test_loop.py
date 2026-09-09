@@ -109,7 +109,7 @@ def test_a_single_turn_yields_intent_result_and_close():
     events = run(make_agent(), "¿cuánto?", Session("run-1", gateway))
 
     assert [type(e).__name__ for e in events] == ["ModelStep", "ModelStep", "FinalStep"]
-    assert [e.phase for e in events[:2]] == [Phase.INTENT, Phase.RESULT]
+    assert [e.phase for e in events[:2]] == [Phase.ATTEMPTED, Phase.COMPLETED]
     assert events[-1].output == "42"
 
 
@@ -136,10 +136,10 @@ def test_a_tool_round_trip_feeds_the_result_back_to_the_model():
 
     kinds = [(type(e).__name__, e.phase.value) for e in events]
     assert kinds == [
-        ("ModelStep", "intent"), ("ModelStep", "result"),
-        ("ToolStep", "intent"), ("ToolStep", "result"),
-        ("ModelStep", "intent"), ("ModelStep", "result"),
-        ("FinalStep", "result"),
+        ("ModelStep", "attempted"), ("ModelStep", "completed"),
+        ("ToolStep", "attempted"), ("ToolStep", "completed"),
+        ("ModelStep", "attempted"), ("ModelStep", "completed"),
+        ("FinalStep", "completed"),
     ]
     assert gateway.model_calls == 2 and gateway.tool_calls == 1
     assert events[-1].output == "el fichero dice hola"
@@ -281,7 +281,7 @@ def test_deny_step_is_handed_back_to_the_model_so_it_can_try_something_else():
         Session("run-1", gateway),
     )
 
-    result = next(e for e in events if isinstance(e, ToolStep) and e.phase is Phase.RESULT)
+    result = next(e for e in events if isinstance(e, ToolStep) and e.phase is Phase.COMPLETED)
     assert result.result is not None and result.result.is_error is True
     assert "risk.destructive" in result.result.content[0].text
     assert events[-1].output == "entendido, no lo borro", "el bucle siguió"
@@ -377,7 +377,7 @@ def test_every_durable_event_reaches_the_store_in_execution_order():
 
     state = asyncio.run(store.load("run-1"))
     assert state is not None
-    assert [e.seq for e in state.events] == sorted(e.seq for e in state.events)
+    assert [e.step_seq for e in state.events] == sorted(e.step_seq for e in state.events)
     # La tool es idempotente, así que sus dos eventos son diferibles pero acaban
     # igualmente en el journal al vaciar.
     assert len(state.events) == 7
@@ -386,7 +386,7 @@ def test_every_durable_event_reaches_the_store_in_execution_order():
 def test_the_store_ignores_a_duplicate_write():
     store = MemoryCheckpointer()
     event = ModelStep(
-        run_id="run-1", step_id=make_step_id(0, "model"), seq=0, phase=Phase.RESULT
+        run_id="run-1", step_id=make_step_id(0, "model"), step_seq=0, phase=Phase.COMPLETED
     )
 
     async def go():

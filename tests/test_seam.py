@@ -136,13 +136,14 @@ def test_the_call_context_carries_w3c_trace_headers():
 
 def _step(seq: int, phase: Phase) -> ModelStep:
     return ModelStep(
-        run_id="run-1", step_id=make_step_id(seq, "model"), seq=seq, phase=phase
+        run_id="run-1", step_id=make_step_id(seq, "model"), step_seq=seq, phase=phase
     )
 
 
-def test_next_seq_continues_after_the_last_recorded_step():
-    state = RunState("run-1", (_step(0, Phase.INTENT), _step(0, Phase.RESULT), _step(1, Phase.INTENT)))
-    assert state.next_seq == 2
+def test_next_seq_is_the_size_of_the_journal_not_the_step_ordinal():
+    """Posiciones contiguas desde cero: «por dónde continúa el diario»."""
+    state = RunState("run-1", (_step(0, Phase.ATTEMPTED), _step(0, Phase.COMPLETED), _step(1, Phase.ATTEMPTED)))
+    assert state.next_seq == 3
 
 
 def test_next_seq_starts_at_zero_for_an_empty_run():
@@ -151,22 +152,33 @@ def test_next_seq_starts_at_zero_for_an_empty_run():
 
 def test_a_step_with_a_recorded_result_is_complete():
     """Que exista el resultado significa que el efecto ocurrió: no se repite."""
-    state = RunState("run-1", (_step(0, Phase.INTENT), _step(0, Phase.RESULT)))
+    state = RunState("run-1", (_step(0, Phase.ATTEMPTED), _step(0, Phase.COMPLETED)))
     step_id = make_step_id(0, "model")
     assert state.completed(step_id) is True
     assert state.result_of(step_id) is not None
 
 
+def test_attempted_is_exclusive_of_completed():
+    """Un paso terminado no está intentado, está hecho.
+
+    Quien pregunta «¿qué hago ahora?» necesita una respuesta, no dos.
+    """
+    state = RunState("run-1", (_step(0, Phase.ATTEMPTED), _step(0, Phase.COMPLETED)))
+    step_id = make_step_id(0, "model")
+    assert state.completed(step_id) is True
+    assert state.attempted(step_id) is False
+
+
 def test_an_intent_without_a_result_is_the_uncertain_case():
     """El proceso cayó entre el registro y el efecto: pudo haber ocurrido."""
-    state = RunState("run-1", (_step(0, Phase.INTENT),))
+    state = RunState("run-1", (_step(0, Phase.ATTEMPTED),))
     step_id = make_step_id(0, "model")
     assert state.attempted(step_id) is True
     assert state.completed(step_id) is False
 
 
 def test_an_unseen_step_was_never_attempted():
-    state = RunState("run-1", (_step(0, Phase.RESULT),))
+    state = RunState("run-1", (_step(0, Phase.COMPLETED),))
     assert state.attempted(make_step_id(9, "model")) is False
 
 
@@ -222,7 +234,7 @@ def test_append_is_idempotent_under_a_repeated_write():
 
     async def scenario():
         journal = _Journal()
-        event = _step(0, Phase.RESULT)
+        event = _step(0, Phase.COMPLETED)
         await journal.append("run-1", event)
         await journal.append("run-1", event)
         state = await journal.load("run-1")

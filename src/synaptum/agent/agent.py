@@ -7,8 +7,8 @@ aprobar, interrumpir o guardar — sin que el bucle sepa quién está al otro la
 
     async for step in agent.run(tarea, session=session):
         match step:
-            case ModelStep(phase=Phase.RESULT, usage=u):  ...
-            case ToolStep(phase=Phase.INTENT, risk=Risk.DESTRUCTIVE): ...
+            case ModelStep(phase=Phase.COMPLETED, usage=u):  ...
+            case ToolStep(phase=Phase.ATTEMPTED, risk=Risk.DESTRUCTIVE): ...
             case FinalStep(output=salida): ...
 
 Cuatro propiedades salen de esa forma, y ninguna otra estructura las da a la vez:
@@ -173,8 +173,8 @@ class Agent:
                     yield done
                 else:
                     intent = ModelStep(
-                        run_id=session.run_id, step_id=step_id, seq=seq - 1,
-                        phase=Phase.INTENT, at=time.time(), request=request,
+                        run_id=session.run_id, step_id=step_id, step_seq=seq - 1,
+                        phase=Phase.ATTEMPTED, at=time.time(), request=request,
                     )
                     await journal.record(intent)
                     yield intent
@@ -185,8 +185,8 @@ class Agent:
                         async for event in self._close_denied(
                             denial, session, journal, seq, total,
                             step=ModelStep(
-                                run_id=session.run_id, step_id=step_id, seq=seq - 1,
-                                phase=Phase.RESULT, at=time.time(),
+                                run_id=session.run_id, step_id=step_id, step_seq=seq - 1,
+                                phase=Phase.COMPLETED, at=time.time(),
                                 decision=denial.decision,
                             ),
                             subject="llamada al modelo",
@@ -195,8 +195,8 @@ class Agent:
                         return
 
                     result = ModelStep(
-                        run_id=session.run_id, step_id=step_id, seq=seq - 1,
-                        phase=Phase.RESULT, at=time.time(),
+                        run_id=session.run_id, step_id=step_id, step_seq=seq - 1,
+                        phase=Phase.COMPLETED, at=time.time(),
                         response=response, usage=response.usage,
                     )
                     await journal.record(result)
@@ -226,8 +226,8 @@ class Agent:
                         continue
 
                     intent = ToolStep(
-                        run_id=session.run_id, step_id=step_id, seq=seq - 1,
-                        phase=Phase.INTENT, at=time.time(),
+                        run_id=session.run_id, step_id=step_id, step_seq=seq - 1,
+                        phase=Phase.ATTEMPTED, at=time.time(),
                         call=call, risk=risk, idempotent=idempotent,
                     )
                     await journal.record(intent)
@@ -249,8 +249,8 @@ class Agent:
                             async for event in self._close_denied(
                                 denial, session, journal, seq, total,
                                 step=ToolStep(
-                                    run_id=session.run_id, step_id=step_id, seq=seq - 1,
-                                    phase=Phase.RESULT, at=time.time(),
+                                    run_id=session.run_id, step_id=step_id, step_seq=seq - 1,
+                                    phase=Phase.COMPLETED, at=time.time(),
                                     call=call, risk=risk, idempotent=idempotent,
                                     decision=denial.decision,
                                 ),
@@ -260,8 +260,8 @@ class Agent:
                             return
 
                     tool_result = ToolStep(
-                        run_id=session.run_id, step_id=step_id, seq=seq - 1,
-                        phase=Phase.RESULT, at=time.time(),
+                        run_id=session.run_id, step_id=step_id, step_seq=seq - 1,
+                        phase=Phase.COMPLETED, at=time.time(),
                         call=call, result=outcome, risk=risk, idempotent=idempotent,
                     )
                     await journal.record(tool_result)
@@ -271,8 +271,8 @@ class Agent:
                 messages.append(Message.tool_results(*results))
 
             final = FinalStep(
-                run_id=session.run_id, step_id=make_step_id(seq, "final"), seq=seq,
-                phase=Phase.RESULT, at=time.time(),
+                run_id=session.run_id, step_id=make_step_id(seq, "final"), step_seq=seq,
+                phase=Phase.COMPLETED, at=time.time(),
                 output=messages[-1].text, usage=total,
                 meta={"replayed_steps": replay.replayed} if replay.replayed else {},
             )
@@ -351,8 +351,8 @@ class Agent:
 
         if denial.disposition is Disposition.REQUIRE_APPROVAL:
             pause = ApprovalStep(
-                run_id=session.run_id, step_id=make_step_id(seq, "approval"), seq=seq,
-                phase=Phase.INTENT, at=time.time(),
+                run_id=session.run_id, step_id=make_step_id(seq, "approval"), step_seq=seq,
+                phase=Phase.ATTEMPTED, at=time.time(),
                 subject=subject, decision=denial.decision,
             )
             await journal.record(pause)
@@ -360,8 +360,8 @@ class Agent:
             return
 
         closing = FinalStep(
-            run_id=session.run_id, step_id=make_step_id(seq, "final"), seq=seq,
-            phase=Phase.RESULT, at=time.time(),
+            run_id=session.run_id, step_id=make_step_id(seq, "final"), step_seq=seq,
+            phase=Phase.COMPLETED, at=time.time(),
             output=None, usage=total,
             meta={
                 "disposition": denial.disposition.value,
