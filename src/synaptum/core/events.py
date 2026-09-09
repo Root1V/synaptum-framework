@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
-from .types import Request, Response, ToolCall, ToolResult, Usage
+from .types import Request, Response, Risk, ToolCall, ToolResult, Usage
 
 __all__ = [
     "Phase",
@@ -74,20 +74,6 @@ class Durability(str, Enum):
     DEFERRABLE = "deferrable"
     """Puede diferirse o agruparse por lotes.  Perderlo cuesta como mucho
     repetir trabajo que no tiene consecuencias externas."""
-
-
-class Risk(str, Enum):
-    """Nivel de riesgo de un efecto — RM-21.
-
-    Synaptum **declara**; Aeon **decide**.  El bucle garantiza que un paso
-    destructivo no se ejecuta antes de tener una decisión; cuál sea esa decisión
-    no es asunto suyo.
-    """
-
-    READ = "read"
-    SOFT_WRITE = "soft_write"
-    HARD_WRITE = "hard_write"
-    DESTRUCTIVE = "destructive"
 
 
 # ── Decisión de la costura de aplicación — H4 ─────────────────────────────────
@@ -206,7 +192,17 @@ class ModelStep(StepEvent):
 
     @property
     def durability(self) -> Durability:
-        return Durability.DURABLE
+        """La intención es diferible; el resultado, no.
+
+        Una llamada al modelo no tiene efecto externo más allá de su coste, así
+        que saber que *se intentó* no cambia ninguna decisión: si el registro se
+        pierde, se vuelve a inferir, que es caro pero correcto.  El resultado sí
+        es durable, y esa es la garantía que importa — **una vez escrito, no se
+        repite**.
+
+        Lo que se ahorra no es una escritura, es una **espera antes del efecto**.
+        """
+        return Durability.DEFERRABLE if self.phase is Phase.INTENT else Durability.DURABLE
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -230,6 +226,13 @@ class ToolStep(StepEvent):
 
     @property
     def durability(self) -> Durability:
+        """Depende del efecto, y ambas fases por igual.
+
+        Si el efecto no puede repetirse, la intención tiene que estar en disco
+        **antes** de que ocurra: es la única forma de que, tras una caída, se
+        sepa que pudo haber ocurrido.  Es la escritura anticipada clásica, y es
+        la única espera bloqueante que el bucle impone en todo un turno.
+        """
         return Durability.DEFERRABLE if self.idempotent else Durability.DURABLE
 
 

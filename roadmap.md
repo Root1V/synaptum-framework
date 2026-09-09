@@ -37,8 +37,8 @@ Congelar antes de escribir implementación. Es la fase que impide reescrituras p
 | ID | Estado | Feature | Implica |
 |---|---|---|---|
 | RM-01 | `HECHO` | Vocabulario unificado de modelo | `Message`, `ContentPart` (8 tipos), `Request`, `Response`, `StreamEvent`, `FinishReason`. Contrato compartido versionado, no interno de Synaptum |
-| RM-02 | `LISTO` | Especificación de normalización entre proveedores | Colocación de resultados de tool, extracción del mensaje de sistema, bloques de razonamiento, reconstrucción de tool calls en streaming. Vive en el repo de contratos, no en ninguno de los dos proyectos |
-| RM-03 | `LISTO` | Corpus de fixtures dorados de normalización | Respuestas nativas grabadas por proveedor con su salida unificada esperada. Es lo único que impide que las implementaciones Go y Python diverjan bajo la opción D |
+| RM-02 | `LISTO` | Especificación de normalización entre proveedores · repo `Root1V/agentic-seam-contracts` | Colocación de resultados de tool, extracción del mensaje de sistema, bloques de razonamiento, reconstrucción de tool calls en streaming. Vive en el repo de contratos, no en ninguno de los dos proyectos |
+| RM-03 | `LISTO` | Corpus de fixtures dorados · desbloqueado, el repo lo crea Aeon | Respuestas nativas grabadas por proveedor con su salida unificada esperada. Es lo único que impide que las implementaciones Go y Python diverjan bajo la opción D |
 | RM-04 | `HECHO` | Taxonomía de errores | Jerarquía con `retryable`. No reintentar 400/401/403/404/422; sí 429/5xx/timeouts |
 | RM-05 | `HECHO` | Taxonomía de eventos del bucle | `ModelStep`, `ToolStep`, `DelegateStep`, `ApprovalStep`, `FinalStep`. Unión tipada, inmutable y ordenada |
 | RM-06 | `EN CURSO` | Identidad determinista de paso | Especificación **abierta**, no interna. Cualquier framework que la implemente obtiene durabilidad de Nivel 1. Es también la clave de idempotencia del journal |
@@ -63,15 +63,15 @@ Un agente único, provider-agnóstico, reanudable. Es el mínimo que Aeon puede 
 | RM-16 | `PENDIENTE` | Protocolo `Schema` y adaptadores | `json_schema()` + `validate()`. Hace opcional a Pydantic; soporta también dataclasses y msgspec |
 | RM-17 | `PENDIENTE` | Registro de proveedores por entry points | Resolución de `"provider:modelo"` vía `importlib.metadata`. Sin conocimiento previo de los plugins |
 | RM-18 | `PENDIENTE` | Adaptadores Python de proveedor | Subconjunto de desarrollo, **no paridad** con el gateway. Solo los presentes en ambos lados necesitan fixtures de RM-03 |
-| RM-19 | `PENDIENTE` | Bucle del agente como stream de eventos | `async for step in agent.run(...)`. El motor es `await`, no una cola. Cada `yield` es frontera de checkpoint |
+| RM-19 | `HECHO` | Bucle del agente como stream de eventos | `async for step in agent.run(...)`. El motor es `await`, no una cola. Cada `yield` es frontera de checkpoint |
 | RM-20 | `PENDIENTE` | Decorador `@tool` | JSON Schema derivado de la firma tipada. Sin duplicar la descripción a mano |
-| RM-21 | `PENDIENTE` | Niveles de riesgo de tool | `read / soft_write / hard_write / destructive`. Synaptum **declara**; Aeon **decide** |
-| RM-22 | `PENDIENTE` | Journal con durabilidad por clase | Escritura anticipada de la intención antes de todo efecto no idempotente |
-| RM-23 | `PENDIENTE` | `Checkpointer` en memoria | Implementación de referencia para tests y notebooks |
+| RM-21 | `HECHO` | Niveles de riesgo de tool | `read / soft_write / hard_write / destructive`. Synaptum **declara**; Aeon **decide** |
+| RM-22 | `HECHO` | Journal con durabilidad por clase | Escritura anticipada de la intención antes de todo efecto no idempotente |
+| RM-23 | `HECHO` | `Checkpointer` en memoria | Implementación de referencia para tests y notebooks |
 | RM-24 | `PENDIENTE` | `Checkpointer` SQLite | Implementación de referencia persistente. Nunca un motor de producción |
-| RM-25 | `PENDIENTE` | Replay con fast-forward | Al reanudar, saltar pasos ya registrados sin repetir inferencia ya pagada. Es la propiedad que justifica toda la arquitectura |
+| RM-25 | `HECHO` | Replay con fast-forward | Al reanudar, saltar pasos ya registrados sin repetir inferencia ya pagada. Es la propiedad que justifica toda la arquitectura |
 | RM-26 | `PENDIENTE` | Costura de aplicación local permisiva | Ejecuta contra credenciales del entorno y registra lo que habría comprobado. **Con aviso explícito de que no es aplicación real** |
-| RM-27 | `PENDIENTE` | Límites del bucle | `max_steps`, `max_retries`, reserva de salida del 20–25 % de la ventana. Corrección, no política |
+| RM-27 | `HECHO` | Límites del bucle | `max_steps`, `max_retries`, reserva de salida del 20–25 % de la ventana. Corrección, no política |
 | RM-28 | `PENDIENTE` | Sistema de prompts | Portado desde v0.4: `PromptTemplate` versionado, providers encadenados, disciplina YAML-first |
 | RM-29 | `PENDIENTE` | Suite de tests del núcleo | **Íntegramente sobre `FakeModel`**, sin depender de inferencia real — obligatorio por P10, no preferible. Cierra la contradicción de la v0.4, que vendía testabilidad sin un solo test |
 | RM-65 | `PENDIENTE` | `FakeModel` como infraestructura de primera clase | Por P10 es la **vía principal de desarrollo**, no una utilidad. Respuestas guionizadas, simulación de tool calls, de streaming con cancelación, de `Usage` con tokens de caché y razonamiento, e inyección de errores de la taxonomía |
@@ -169,7 +169,7 @@ Synaptum depende del resultado; no bloquean la Fase 0 ni la Fase 1.
 | RM-55 | `EXTERNO` | Streaming con cancelación en el Model Gateway | Hoy es petición/respuesta puro. Sin esto no hay corte de presupuesto en caliente para ningún cliente |
 | RM-60 | `EXTERNO` | Axonium: dos modos de credencial, permanentes | **Gobernado** (Aeon/Go): proveedor inyectado, el SDK nunca ve un secreto, y el proveedor es autoridad completa — Axonium cede su refresco anticipado y se queda con reintento reactivo. **Autónomo** (Synaptum/Python): `client_id`/`client_secret`, el SDK acuña y refresca. Exactamente uno debe suministrarse, validado en construcción |
 | RM-61 | `EXTERNO` | `TokenProvider` con señal de invalidación | Con Axonium en proceso, **es Axonium quien ve el 401**, no la capa HTTP de Aeon. `Token(ctx, forceRefresh)` mínimo. Falta fijar la **semántica concurrente**: dos llamadas que reciben 401 del mismo token no deben acuñar dos tokens. Alternativa que lo hace trivialmente correcto: pasar el token rechazado en vez de un booleano |
-| RM-62 | `EXTERNO` | Confirmar anclaje de reloj en el `TokenSource` de Aeon | Axonium cede su refresco anticipado anclado al header `Date` del servidor. Si el `TokenSource` de Aeon usa reloj local, el modo gobernado pierde la protección contra desfase que Axonium ya tenía — cesión que cambia un problema resuelto por uno abierto |
+| RM-62 | `HECHO` | Anclaje de reloj del `TokenSource` — cerrado por Aeon | Ni reloj de servidor ni local: Go usa reloj **monótono**, que mide tiempo transcurrido y es inmune al desfase y a saltos de NTP. Mejor que anclar al `Date`. Residuo declarado: suspensión del sistema, que se resuelve por el camino 401 → reacuñación |
 | RM-63 | `EXTERNO` | Regla local→Prometheus como política de routing | En `ModelPolicyBundle`, config-as-code, **no borrando `openai_compatible`**. Condición derivada de forma independiente por Aeon y por Axonium: la política debe poder **negar y fallar en cerrado**, con la denegación observable. Enrutar no basta |
 | RM-56 | `EXTERNO` | `Checkpointer` de Aeon con deduplicación | Por `(run_id, step_id, phase)`, resuelve el reintento *at-least-once* de Activities de Temporal |
 | RM-57 | `EXTERNO` | Nivel de durabilidad como campo consultable | Campo del run y atributo de traza. Un operador debe poder saber en un incidente si ese run repite inferencia al reanudarse |

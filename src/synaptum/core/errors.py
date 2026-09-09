@@ -8,14 +8,14 @@ error**, no en una tabla de códigos repartida por el código.
 
 Regla de clasificación
 ----------------------
-* **No reintentable** — 400, 401, 403, 404, 413, 422.  La petición está mal, o
-  no hay permiso, o no existe: repetirla da el mismo resultado y cuesta lo
-  mismo.
+* **No reintentable** — 400, 401, 403, 404, 413, 422, y **cualquier otro 4xx**.
+  La familia entera significa «tu petición es el problema»: repetirla sin
+  cambiarla da el mismo resultado y cuesta lo mismo.  El 429 es la excepción y
+  va aparte.
 * **Reintentable** — 429, 5xx, timeouts y fallos de red.  El fallo es del otro
   lado o del camino, y la misma petición puede funcionar dentro de un momento.
-* **Desconocido** — reintentable por defecto.  Un error que no sabemos
-  clasificar se parece más a un problema transitorio que a una petición
-  inválida, y el coste de equivocarse es menor.
+* **Sin estado** — reintentable.  Un fallo que ni siquiera llegó a tener
+  respuesta se parece a un problema de camino, no a una petición inválida.
 
 ``Denied`` no es un fallo
 -------------------------
@@ -42,6 +42,7 @@ __all__ = [
     "ToolExecutionError",
     "NoObjectGeneratedError",
     "LimitExceeded",
+    "UncertainEffect",
     "SeamVersionError",
     "retryable_for_status",
 ]
@@ -231,3 +232,25 @@ def retryable_for_status(status: int | None) -> bool:
     if 400 <= status < 500:
         return False
     return True
+
+
+class UncertainEffect(SynaptumError):
+    """Al reanudar hay una intención registrada sin resultado, y el efecto no es
+    idempotente.
+
+    El proceso cayó entre el registro y el efecto, así que el efecto **pudo
+    haber ocurrido** y no hay forma de saberlo desde aquí.  Repetirlo a ciegas
+    es lo peor posible; ignorarlo, tampoco es correcto.
+
+    El bucle no puede resolverlo por sí mismo — lo levanta para que lo decida
+    quien tiene la información: el harness, o una persona.
+    """
+
+    retryable = False
+
+    def __init__(self, step_id: str, *, detail: str = "") -> None:
+        self.step_id = step_id
+        super().__init__(
+            f"El paso '{step_id}' quedó intentado sin resultado y su efecto no es "
+            f"idempotente. {detail}".strip()
+        )

@@ -13,6 +13,7 @@ from .errors import (
     SeamVersionError,
     SynaptumError,
     ToolExecutionError,
+    UncertainEffect,
     retryable_for_status,
 )
 from .events import (
@@ -46,6 +47,7 @@ from .protocols import (
 )
 from .types import (
     AUTO,
+    Risk,
     Audio,
     ContentPart,
     Document,
@@ -148,6 +150,7 @@ __all__ = [
     "InvalidToolCallError",
     "ToolExecutionError",
     "NoObjectGeneratedError",
+    "UncertainEffect",
     "retryable_for_status",
     # RM-07 · RM-08 · costuras
     "SEAM_VERSION",

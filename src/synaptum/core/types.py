@@ -39,6 +39,7 @@ from enum import Enum
 from typing import Any, Literal, Mapping, Sequence
 
 __all__ = [
+    "Risk",
     "Role",
     "Text",
     "Image",
@@ -76,6 +77,24 @@ __all__ = [
 
 
 # ── Roles ─────────────────────────────────────────────────────────────────────
+
+class Risk(str, Enum):
+    """Nivel de riesgo del efecto de una herramienta — RM-21.
+
+    Synaptum **declara**; el harness **decide**.  El bucle garantiza que un paso
+    destructivo no se ejecuta antes de tener una decisión; cuál sea esa decisión
+    no es asunto suyo.
+
+    Vive aquí, junto a ``ToolDefinition``, porque es parte del contrato de la
+    herramienta: viaja con ella en el handshake y el gateway lo necesita para
+    decidir antes de ejecutar.
+    """
+
+    READ = "read"
+    SOFT_WRITE = "soft_write"
+    HARD_WRITE = "hard_write"
+    DESTRUCTIVE = "destructive"
+
 
 class Role(str, Enum):
     """Los cinco roles que cualquier proveedor sabe expresar."""
@@ -299,6 +318,13 @@ class ToolDefinition:
     description: str = ""
     parameters: Mapping[str, Any] = field(default_factory=dict)
     ref: str | None = None
+    risk: Risk = Risk.READ
+    """Conservador por defecto en durabilidad, permisivo por defecto en riesgo:
+    quien no declara nada obtiene la clase más inocua, y declararse destructivo
+    es un acto explícito."""
+    idempotent: bool = False
+    """Si el efecto puede repetirse sin consecuencias.  Conservador por defecto:
+    determina si el replay puede reintentar el paso tras una caída."""
 
 
 @dataclass(frozen=True, slots=True)

@@ -84,9 +84,8 @@ def test_intent_and_result_share_the_step_and_differ_in_phase():
 
 # ── Política de durabilidad — RM-14 ───────────────────────────────────────────
 
-def test_a_model_call_is_always_durable():
-    """Cuesta dinero y no es reproducible: perder su registro es el fallo a evitar."""
-    assert _model_step(Phase.INTENT).durability is Durability.DURABLE
+def test_a_model_result_is_always_durable():
+    """Cuesta dinero y no es reproducible: una vez escrito, no se repite."""
     assert _model_step(Phase.RESULT).durability is Durability.DURABLE
 
 
@@ -177,3 +176,20 @@ def test_an_event_carries_opaque_metadata_for_trace_context():
         usage=Usage(input=10),
     )
     assert step.meta["traceparent"] == "00-abc-def-01"
+
+
+# ── Durabilidad por fase, no solo por tipo ────────────────────────────────────
+
+def test_a_model_intent_is_deferrable_and_its_result_is_not():
+    """Lo que se ahorra no es una escritura: es una espera antes del efecto."""
+    assert _model_step(Phase.INTENT).durability is Durability.DEFERRABLE
+    assert _model_step(Phase.RESULT).durability is Durability.DURABLE
+
+
+def test_a_non_idempotent_tool_blocks_on_both_phases():
+    """Escritura anticipada: la intención en disco antes de que ocurra el efecto."""
+    for phase in (Phase.INTENT, Phase.RESULT):
+        step = ToolStep(
+            run_id="r", step_id="000001-tool", seq=1, phase=phase, idempotent=False
+        )
+        assert step.durability is Durability.DURABLE
