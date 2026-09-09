@@ -68,9 +68,9 @@ Un agente único, provider-agnóstico, reanudable. Es el mínimo que Aeon puede 
 | SYN-21 | `HECHO` | Niveles de riesgo de tool | `read / soft_write / hard_write / destructive`. Synaptum **declara**; Aeon **decide** |
 | SYN-22 | `HECHO` | Journal con durabilidad por clase | Escritura anticipada de la intención antes de todo efecto no idempotente |
 | SYN-23 | `HECHO` | `Checkpointer` en memoria | Implementación de referencia para tests y notebooks |
-| SYN-24 | `PENDIENTE` | `Checkpointer` SQLite | Implementación de referencia persistente. Nunca un motor de producción |
+| SYN-24 | `HECHO` | `Checkpointer` SQLite | Implementación de referencia persistente. La idempotencia **es la clave primaria**, no una comprobación previa. Incluye el codec de vuelta: sin decodificación no hay journal fuera de memoria |
 | SYN-25 | `HECHO` | Replay con fast-forward | Al reanudar, saltar pasos ya registrados sin repetir inferencia ya pagada. Es la propiedad que justifica toda la arquitectura |
-| SYN-26 | `PENDIENTE` | Costura de aplicación local permisiva | Ejecuta contra credenciales del entorno y registra lo que habría comprobado. **Con aviso explícito de que no es aplicación real** |
+| SYN-26 | `HECHO` | Costura de aplicación local permisiva | Ejecuta contra credenciales del entorno y registra lo que habría comprobado. **Con aviso explícito de que no es aplicación real** |
 | SYN-27 | `HECHO` | Límites del bucle | `max_steps`, `max_retries`, reserva de salida del 20–25 % de la ventana. Corrección, no política |
 | SYN-28 | `PENDIENTE` | Sistema de prompts | Portado desde v0.4: `PromptTemplate` versionado, providers encadenados, disciplina YAML-first |
 | SYN-29 | `PENDIENTE` | Suite de tests del núcleo | **Íntegramente sobre `FakeModel`**, sin depender de inferencia real — obligatorio por P10, no preferible. Cierra la contradicción de la v0.4, que vendía testabilidad sin un solo test |
