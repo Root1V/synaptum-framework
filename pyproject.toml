@@ -1,12 +1,33 @@
 [project]
 name = "synaptum"
-version = "0.4.0"
-description = "Minimal Agent Development Framework (bus-driven) above an LLM SDK and below an agent platform"
+version = "1.0.0.dev0"
+description = "Provider-agnostic agent framework and durable runtime. Owns execution semantics; the harness owns the substrate."
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
-    "axonium>=0.6.0",
-]
+license = "MIT"
+authors = [{ name = "Emeric Espiritu Santiago", email = "emericespiritusantiago@gmail.com" }]
+
+# RM-30 — cero dependencias duras. El núcleo es stdlib puro.
+dependencies = []
+
+[project.optional-dependencies]
+pydantic  = ["pydantic>=2"]
+anthropic = ["anthropic>=1"]
+openai    = ["openai>=2"]
+mcp       = ["mcp>=1"]
+otel      = ["opentelemetry-sdk>=1.30"]
+# El extra 'axonium' se añade cuando el SDK esté publicado (RM-48) junto con el
+# adaptador que lo consume (RM-52).  Declararlo antes rompe `uv lock`: la
+# resolución cubre todos los extras, así que uno inalcanzable bloquea el
+# bloqueo entero del proyecto, no solo su instalación.
+
+# RM-17 — los proveedores se descubren por entry point, sin que el núcleo los conozca.
+[project.entry-points."synaptum.providers"]
+
+[project.entry-points."synaptum.checkpointers"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
 
 [build-system]
 requires = ["hatchling"]
@@ -14,3 +35,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/synaptum"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

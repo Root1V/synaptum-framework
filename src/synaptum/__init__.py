@@ -1,52 +1,65 @@
-from .core.message import Message
-from .core.context import AgentContext
-from .core.state import AgentState
-from .core.agent import Agent
-from .core.runtime import AgentRuntime, RuntimeConfig
+"""
+Synaptum — framework de agentes y runtime durable, agnóstico al proveedor.
 
-from .messaging.in_memory_bus import InMemoryMessageBus
+Es dueño de la *semántica* de ejecución: qué es un paso, dónde puede cortarse,
+qué puede repetirse y cómo se re-deriva el contexto.  El *sustrato* — dónde se
+persiste, con qué retención y bajo qué política — pertenece al harness.
 
-from .tools.registry import ToolRegistry
-from .memory.in_memory import InMemoryMemoryStore
+Estado: v1.0 en construcción.  Fase 0 (contratos) en curso; ver ``roadmap.md``.
+"""
 
-from .agents.llm_tool_agent import LLMToolAgent, LLMToolAgentConfig
-from .agents.simple_agent import SimpleAgent
-from .llm.client import LLMClient, LLMResponse
+from .core import (
+    ALLOW,
+    AUTO,
+    ApprovalStep,
+    Audio,
+    ContentPart,
+    Decision,
+    DelegateStep,
+    Disposition,
+    Document,
+    Durability,
+    Event,
+    FinalStep,
+    Finish,
+    FinishReason,
+    Image,
+    Message,
+    ModelStep,
+    Phase,
+    ReasoningDelta,
+    ReasoningEnd,
+    ReasoningStart,
+    RedactedThinking,
+    Request,
+    Response,
+    ResponseFormat,
+    Risk,
+    Role,
+    StepEvent,
+    StreamEvent,
+    StreamStart,
+    Text,
+    TextDelta,
+    TextEnd,
+    TextStart,
+    Thinking,
+    ToolCall,
+    ToolCallDelta,
+    ToolCallEnd,
+    ToolCallStart,
+    ToolChoice,
+    ToolDefinition,
+    ToolResult,
+    ToolStep,
+    Usage,
+    b64,
+    dumps,
+    idempotency_key,
+    make_step_id,
+    to_jsonable,
+)
+from .core import __all__ as _core_all
 
-from .prompts.template import PromptTemplate
-from .prompts.provider import PromptProvider
-from .prompts.in_memory import InMemoryPromptProvider
-from .prompts.file_provider import FilePromptProvider
-from .prompts.registry import PromptRegistry
-
-from .patterns.router import RouterPattern
-from .patterns.supervisor import SupervisorPattern
-from .patterns.graph import GraphPattern, GraphNode
-
-from .utils.formatting import fmt_dict, fmt_list, fmt_records
-
-__all__ = [
-    "Message",
-    "AgentContext",
-    "AgentState",
-    "Agent",
-    "AgentRuntime",
-    "RuntimeConfig",
-    "InMemoryMessageBus",
-    "ToolRegistry",
-    "InMemoryMemoryStore",
-    "LLMToolAgent",
-    "LLMToolAgentConfig",
-    "SimpleAgent",
-    "LLMClient",
-    "LLMResponse",
-    "PromptTemplate",
-    "PromptProvider",
-    "InMemoryPromptProvider",
-    "FilePromptProvider",
-    "PromptRegistry",
-    "RouterPattern",
-    "SupervisorPattern",
-    "GraphPattern",
-    "GraphNode",
-]
+__version__ = "1.0.0.dev0"
+__all__ = [*_core_all, "__version__"]
