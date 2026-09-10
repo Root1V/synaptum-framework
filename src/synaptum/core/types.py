@@ -272,13 +272,27 @@ class Usage:
     ``estimated`` marca los contadores **derivados** en vez de reportados —
     llama.cpp obliga a deducirlos de los ``timings`` del chunk final.  Sin ese
     bit, FinOps factura sobre una estimación creyéndola exacta.
+
+    ``input`` es **inclusivo**: contiene los tokens servidos desde caché, y
+    ``cache_read`` dice cuántos de ellos lo fueron.  Sin fijarlo, dos
+    implementaciones eligen convenciones distintas y la factura sale mal sin que
+    nada falle.
     """
 
     input: int | None = None
+    """Tokens de entrada, **incluidos los servidos desde caché**.
+
+    Inclusivo y no disjunto, a propósito: es lo que los proveedores reportan
+    tal cual, así que el adaptador **copia en vez de restar**.  Copiar no se
+    puede hacer mal; restar sí, y olvidar la resta contaría dos veces lo
+    cacheado sin producir ningún error.
+    """
     output: int | None = None
     reasoning: int | None = None
     cache_read: int | None = None
+    """Subconjunto de ``input`` servido desde caché."""
     cache_write: int | None = None
+    """Tokens escritos a caché.  **No** forma parte de ``input``."""
     estimated: bool = False
 
     @staticmethod
@@ -299,11 +313,10 @@ class Usage:
 
     @property
     def cache_hit_ratio(self) -> float | None:
-        """Fracción de la entrada servida desde caché, o ``None`` si no se midió."""
+        """Fracción de ``input`` servida desde caché, o ``None`` si no se midió."""
         if self.input is None or self.cache_read is None:
             return None
-        billed = self.input + self.cache_read
-        return self.cache_read / billed if billed else 0.0
+        return self.cache_read / self.input if self.input else 0.0
 
     def __add__(self, other: object) -> "Usage":
         """Suma propagando lo desconocido.

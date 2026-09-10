@@ -60,8 +60,9 @@ def test_usage_total_counts_reasoning_tokens():
     assert Usage(input=10, output=5, reasoning=100).total == 115
 
 
-def test_cache_hit_ratio_is_the_input_served_from_cache():
-    assert Usage(input=25, cache_read=75).cache_hit_ratio == 0.75
+def test_cache_hit_ratio_is_the_share_of_input_served_from_cache():
+    """``input`` es inclusivo: contiene lo cacheado, y ``cache_read`` dice cuánto."""
+    assert Usage(input=100, cache_read=75).cache_hit_ratio == 0.75
     assert Usage(input=10, cache_read=0).cache_hit_ratio == 0.0
 
 

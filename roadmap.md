@@ -37,11 +37,11 @@ Congelar antes de escribir implementación. Es la fase que impide reescrituras p
 | ID | Estado | Feature | Implica |
 |---|---|---|---|
 | SYN-01 | `HECHO` | Vocabulario unificado de modelo | `Message`, `ContentPart` (8 tipos), `Request`, `Response`, `StreamEvent`, `FinishReason`. Contrato compartido versionado, no interno de Synaptum |
-| SYN-02 | `LISTO` | Especificación de normalización entre proveedores · repo `Root1V/agentic-seam-contracts` | Colocación de resultados de tool, extracción del mensaje de sistema, bloques de razonamiento, reconstrucción de tool calls en streaming. Vive en el repo de contratos, no en ninguno de los dos proyectos |
-| SYN-03 | `LISTO` | Corpus de fixtures dorados · desbloqueado, el repo lo crea Aeon | Respuestas nativas grabadas por proveedor con su salida unificada esperada. Es lo único que impide que las implementaciones Go y Python diverjan bajo la opción D |
+| SYN-02 | `HECHO` | Especificación de normalización entre proveedores | En `contratos/normalizacion/spec.md`. Fija la convención **inclusiva** de `input` — ambigüedad que destapó `chat_stream_ok.sse` y que daba cifras distintas sin fallar |
+| SYN-03 | `EN CURSO` | Corpus dorado de normalización | 9 casos sobre los cuerpos de Axonium, sin duplicarlos. Validado —cuerpos existen, proyecciones bien formadas— pero **no ejecutable hasta `SYN-18`**. Aviso heredado: los cuerpos vienen de la guía, no de un despliegue real |
 | SYN-04 | `HECHO` | Taxonomía de errores | Jerarquía con `retryable`. No reintentar 400/401/403/404/422; sí 429/5xx/timeouts |
 | SYN-05 | `HECHO` | Taxonomía de eventos del bucle | `ModelStep`, `ToolStep`, `DelegateStep`, `ApprovalStep`, `FinalStep`. Unión tipada, inmutable y ordenada |
-| SYN-06 | `EN CURSO` | Identidad determinista de paso | Especificación **abierta**, no interna. Cualquier framework que la implemente obtiene durabilidad de Nivel 1. Es también la clave de idempotencia del journal |
+| SYN-06 | `HECHO` | Identidad determinista de paso | Especificación **abierta** en `contratos/identidad-de-paso/`, con 10 casos dorados que corren verdes. Cualquier framework que la implemente obtiene Nivel 1, sin importar nada de Synaptum ni hablar Python |
 | SYN-07 | `HECHO` | Protocolo `Checkpointer` | `append(run_id, event)` / `load(run_id)`. Idempotente por `(run_id, step_id, phase)`; un duplicado es no-op |
 | SYN-08 | `HECHO` | Protocolo de la costura de aplicación | Síncrona, denegable, fuera del proceso del bucle. Separada del `Checkpointer` porque vetar y recordar tienen presupuestos opuestos |
 | SYN-09 | `HECHO` | Disposición de denegación como tipo | Tres valores más código de razón y mensaje legible. Sin esto el bucle no sabe si replanificar o parar |
@@ -118,7 +118,7 @@ Solo después de que un agente único sea sólido. Regla: *single agent first*.
 | ID | Estado | Feature | Implica |
 |---|---|---|---|
 | SYN-46 | `LISTO` | Compromiso de estabilidad de API | Contrapartida a que Aeon congele su DSL de autoría nativo y dependa de Synaptum como capa de autoría |
-| SYN-47 | `LISTO` | Repo de contratos compartido | Solo especificaciones, esquemas y fixtures. **Sin implementación**, o se convierte en el quinto proyecto que descartamos |
+| SYN-47 | `HECHO` | Contratos compartidos en `contratos/` | Carpeta, no repo — decisión de Aeon revisando `A-19`. Solo especificaciones, esquemas y fixtures; sin implementación. El coste aceptado a la vista: sin CI, la regla es convención pura |
 | SYN-48 | `LISTO` | Publicar Axonium en PyPI · Axonium `RM-23` | Deuda heredada: `uv.lock` lo resolvía desde un registro local, así que la instalación desde git nunca funcionó para terceros |
 
 ## Axonium · Puerta única a inferencia local
