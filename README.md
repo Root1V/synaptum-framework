@@ -99,10 +99,17 @@ herramientas con ejecución real, streaming con cancelación, las tres disposici
 taxonomía de errores y el consumo de tres estados.
 
 ```python
-from synaptum.testing import FakeGateway, calls, says
+from synaptum.testing import FakeGateway, ReplayGateway, calls, says
 
+# Guion escrito a mano: directo, y suficiente para la mayoría.
 gateway = FakeGateway(calls("leer", path="/x"), says("dice hola"), tools=[leer])
+
+# Respuestas reales grabadas, normalizadas por el adaptador de verdad.
+gateway = ReplayGateway("fixtures/chat_completion.json", tools=[leer])
 ```
+
+Un guion a mano dice lo que uno espera; una grabación dice lo que el proveedor hizo — y la diferencia
+aparece en los caminos que nadie escribe porque no se le ocurren.
 
 ## Dónde encaja
 
@@ -129,10 +136,14 @@ Tres, en `contratos/`, con casos dorados que cada proyecto ejecuta con su propio
 |---|---|
 | Costura de durabilidad | 8 casos · verdes contra nuestras dos implementaciones |
 | Identidad de paso | 10 casos · verdes |
-| Normalización entre proveedores | 9 casos · validados, **ejecutables cuando exista el primer adaptador** |
+| Normalización entre proveedores | 10 casos · verdes contra el adaptador Python, la mayoría **grabaciones reales** |
 
 Los casos describen **resultados observables** y nunca estructuras internas: dos implementaciones sin
 una línea de código en común tienen que poder reproducirlos.
+
+Que los cuerpos sean grabaciones reales y no ejemplos escritos a mano ya encontró un fallo nuestro:
+un stream que era **solo razonamiento** no emitía ni un evento, porque el cuerpo inventado que
+teníamos antes solo llevaba deltas de texto y ese camino no se recorría nunca.
 
 ## Estabilidad
 
