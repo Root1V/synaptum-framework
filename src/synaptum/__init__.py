@@ -93,6 +93,7 @@ from .run import (
     Replay,
     SqliteCheckpointer,
 )
+from .schema import Schema, schema_for
 from .tools import Tool, json_schema_for, tool
 
 __version__ = "1.0.0.dev0"
@@ -111,5 +112,7 @@ __all__ = [
     "Tool",
     "tool",
     "json_schema_for",
+    "Schema",
+    "schema_for",
     "__version__",
 ]

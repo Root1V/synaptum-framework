@@ -49,6 +49,7 @@
   "RunState",
   "SEAM_VERSION",
   "SUPPORT_WINDOW",
+  "Schema",
   "SeamVersionError",
   "Session",
   "SqliteCheckpointer",
@@ -83,6 +84,7 @@
   "make_step_id",
   "negotiate",
   "retryable_for_status",
+  "schema_for",
   "supported_versions",
   "to_jsonable",
   "tool"

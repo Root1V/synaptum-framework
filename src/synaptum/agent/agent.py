@@ -36,8 +36,9 @@ almacena: se vuelve a derivar de los mismos resultados, en el mismo orden.
 
 from __future__ import annotations
 
+import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Sequence
 
 from ..core.errors import Denied, LimitExceeded, SynaptumError
@@ -51,17 +52,20 @@ from ..core.events import (
     ToolStep,
     make_step_id,
 )
+from ..core.errors import NoObjectGeneratedError
 from ..core.protocols import CallContext, Checkpointer, Gateway
 from ..core.types import (
     Message,
     Request,
     Response,
+    ResponseFormat,
     Risk,
     ToolCall,
     ToolDefinition,
     ToolResult,
     Usage,
 )
+from ..schema.protocol import Schema, schema_for
 from ..run.journal import Journal, MemoryCheckpointer, Replay
 
 __all__ = ["Limits", "Session", "Agent"]
@@ -112,6 +116,7 @@ class Agent:
         model: str,
         instructions: str | None = None,
         tools: Sequence[Any] = (),
+        output: Any = None,
         limits: Limits | None = None,
     ) -> None:
         self.name = name
@@ -123,6 +128,16 @@ class Agent:
             t.definition if hasattr(t, "definition") else t for t in tools
         )
         self.limits = limits or Limits()
+        self.output: Schema | None = schema_for(output) if output is not None else None
+        self._format = (
+            ResponseFormat(
+                kind="json_schema",
+                schema=self.output.json_schema(),
+                name=getattr(self.output, "name", "output"),
+            )
+            if self.output is not None
+            else None
+        )
         self._by_name = {t.name: t for t in self.tools}
 
     # ── Bucle ─────────────────────────────────────────────────────────────────
@@ -140,7 +155,7 @@ class Agent:
         closed = replay.closed
         if closed is not None:
             # Un run que ya terminó devuelve lo que pasó, no lo intenta otra vez.
-            yield closed
+            yield self._rehydrate(closed)
             return
 
         messages: list[Message] = [Message.user(task)]
@@ -162,6 +177,7 @@ class Agent:
                     system=self.instructions,
                     messages=tuple(messages),
                     tools=self.tools,
+                    response_format=self._format,
                 )
 
                 # Una llamada al modelo no tiene efecto externo más allá de su
@@ -270,14 +286,20 @@ class Agent:
 
                 messages.append(Message.tool_results(*results))
 
+            typed = self._final_output(messages[-1].text)
             final = FinalStep(
                 run_id=session.run_id, step_id=make_step_id(seq, "final"), step_seq=seq,
                 phase=Phase.COMPLETED, at=time.time(),
-                output=messages[-1].text, usage=total,
+                output=self.output.dump(typed) if self.output is not None else typed,
+                usage=total,
                 meta={"replayed_steps": replay.replayed} if replay.replayed else {},
             )
+            # El journal guarda la forma serializable; quien itera recibe el objeto.
+            # La salida tipada se **deriva**, no se almacena — lo mismo que el
+            # contexto, y por la misma razón: guardar las dos arriesga que
+            # discrepen.
             await journal.record(final)
-            yield final
+            yield replace(final, output=typed)
         finally:
             # Se vacía también si alguien deja de iterar a mitad: lo diferido no
             # puede quedarse en memoria cuando el run se interrumpe.
@@ -286,9 +308,46 @@ class Agent:
     # ── Efectos, todos a través de la costura ─────────────────────────────────
 
     async def _call_model(self, session: Session, request: Request, step_id: str) -> Response:
-        return await self._with_retries(
-            lambda: session.gateway.invoke_model(request, self._ctx(session, step_id))
-        )
+        async def once() -> Response:
+            response = await session.gateway.invoke_model(
+                request, self._ctx(session, step_id)
+            )
+            # La validación entra **dentro** del reintento a propósito: un objeto
+            # mal formado es reintentable —el muestreo es estocástico— y la
+            # taxonomía de errores ya lo dice, así que basta con levantarlo aquí.
+            if self.output is not None and not response.tool_calls:
+                self._validate(response.message.text)
+            return response
+
+        return await self._with_retries(once)
+
+    # ── Salida estructurada — SYN-16 ──────────────────────────────────────────
+
+    def _validate(self, text: str) -> Any:
+        """Parsea y valida.  Levanta ``NoObjectGeneratedError``, que es reintentable."""
+        assert self.output is not None
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as broken:
+            raise NoObjectGeneratedError(
+                f"Se pidió salida estructurada y no volvió JSON: {broken}", raw=text
+            ) from broken
+        return self.output.validate(data)
+
+    def _final_output(self, text: str) -> Any:
+        """Lo que llega al ``FinalStep``: el objeto tipado, o el texto tal cual."""
+        return self._validate(text) if self.output is not None else text
+
+    def _rehydrate(self, closed: StepEvent) -> StepEvent:
+        """Reconstruye la salida tipada de un run que ya estaba cerrado.
+
+        Sin esto, reanudar devolvería un diccionario donde la primera vuelta
+        devolvió un objeto — la misma llamada dando tipos distintos según
+        hubiera corrido antes o no.
+        """
+        if self.output is None or getattr(closed, "output", None) is None:
+            return closed
+        return replace(closed, output=self.output.validate(closed.output))
 
     async def _call_tool(
         self, session: Session, call: ToolCall, step_id: str, spec: ToolDefinition | None

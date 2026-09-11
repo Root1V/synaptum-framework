@@ -60,7 +60,7 @@ Un agente único, provider-agnóstico, reanudable. Es el mínimo que Aeon puede 
 | ID | Estado | Feature | Implica |
 |---|---|---|---|
 | SYN-15 | `HECHO` | Paquete `core` sin dependencias | Solo stdlib. Verificado: 6 paquetes en el entorno frente a los 108 de la v0.4, y cero módulos de terceros al importar |
-| SYN-16 | `PENDIENTE` | Protocolo `Schema` y adaptadores | `json_schema()` + `validate()`. Hace opcional a Pydantic; soporta también dataclasses y msgspec |
+| SYN-16 | `HECHO` | Protocolo `Schema` y adaptadores | `json_schema()` · `validate()` · `dump()`. Pydantic queda como extra de verdad: dataclasses de stdlib dan lo mismo. Un JSON Schema a mano se acepta y **no se valida**, dicho en voz alta |
 | SYN-17 | `PENDIENTE` | Registro de proveedores por entry points | Resolución de `"provider:modelo"` vía `importlib.metadata`. Sin conocimiento previo de los plugins |
 | SYN-18 | `PENDIENTE` | Adaptadores Python de proveedor | Subconjunto de desarrollo, **no paridad** con el gateway. Solo los presentes en ambos lados necesitan fixtures de SYN-03 |
 | SYN-19 | `HECHO` | Bucle del agente como stream de eventos | `async for step in agent.run(...)`. El motor es `await`, no una cola. Cada `yield` es frontera de checkpoint |
