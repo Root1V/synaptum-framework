@@ -272,13 +272,9 @@ NORMALIZATION_CASES = _load_normalization_cases()
 
 def _chunks_of(body: Path) -> list[dict]:
     """Separa los fragmentos de un SSE.  El transporte no es normalización."""
-    return [
-        json.loads(payload)
-        for line in body.read_text().splitlines()
-        if line.startswith("data: ")
-        for payload in [line.removeprefix("data: ").strip()]
-        if payload != "[DONE]"
-    ]
+    from synaptum.testing import split_sse
+
+    return split_sse(body.read_text())
 
 
 @pytest.mark.parametrize(
