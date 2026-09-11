@@ -117,7 +117,7 @@ Solo después de que un agente único sea sólido. Regla: *single agent first*.
 
 | ID | Estado | Feature | Implica |
 |---|---|---|---|
-| SYN-46 | `LISTO` | Compromiso de estabilidad de API | Contrapartida a que Aeon congele su DSL de autoría nativo y dependa de Synaptum como capa de autoría |
+| SYN-46 | `HECHO` | Compromiso de estabilidad de API | `API.md`: qué es superficie pública, qué queda fuera, versionado, ventana de deprecación de dos menores. **Fijado por un test**, no recordado — la superficie vive en un fichero y cualquier cambio rompe la suite |
 | SYN-47 | `HECHO` | Contratos compartidos en `contratos/` | Carpeta, no repo — decisión de Aeon revisando `A-19`. Solo especificaciones, esquemas y fixtures; sin implementación. El coste aceptado a la vista: sin CI, la regla es convención pura |
 | SYN-48 | `LISTO` | Publicar Axonium en PyPI · Axonium `RM-23` | Deuda heredada: `uv.lock` lo resolvía desde un registro local, así que la instalación desde git nunca funcionó para terceros |
 
