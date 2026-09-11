@@ -62,7 +62,7 @@ Un agente único, provider-agnóstico, reanudable. Es el mínimo que Aeon puede 
 | SYN-15 | `HECHO` | Paquete `core` sin dependencias | Solo stdlib. Verificado: 6 paquetes en el entorno frente a los 108 de la v0.4, y cero módulos de terceros al importar |
 | SYN-16 | `HECHO` | Protocolo `Schema` y adaptadores | `json_schema()` · `validate()` · `dump()`. Pydantic queda como extra de verdad: dataclasses de stdlib dan lo mismo. Un JSON Schema a mano se acepta y **no se valida**, dicho en voz alta |
 | SYN-17 | `HECHO` | Registro de proveedores por entry points | Resolución de `"proveedor:modelo"` vía `importlib.metadata`, perezosa y cacheada. Un adaptador roto falla **al usarse**, no al instalarse: no puede tumbar a los demás |
-| SYN-18 | `EN CURSO` | Adaptadores Python de proveedor | `openai-compatible` hecho y pasando el corpus. Subconjunto de desarrollo, **no paridad** con el gateway. **Normalización pura, sin transporte**: por eso el corpus se ejecuta sin un servidor delante |
+| SYN-18 | `HECHO` | Adaptadores Python de proveedor | `openai-compatible` pasando los 10 casos del corpus, la mayoría **grabaciones reales** tras `AXO-47`. Subconjunto de desarrollo, no paridad. Normalización pura, sin transporte |
 | SYN-19 | `HECHO` | Bucle del agente como stream de eventos | `async for step in agent.run(...)`. El motor es `await`, no una cola. Cada `yield` es frontera de checkpoint |
 | SYN-20 | `HECHO` | Decorador `@tool` | JSON Schema derivado de la firma tipada. Un tipo intraducible **falla al decorar**, no al invocar. Resuelve tipos declarados dentro de una función capturando el ámbito de la decoración |
 | SYN-21 | `HECHO` | Niveles de riesgo de tool | `read / soft_write / hard_write / destructive`. Synaptum **declara**; Aeon **decide** |
@@ -119,7 +119,7 @@ Solo después de que un agente único sea sólido. Regla: *single agent first*.
 |---|---|---|---|
 | SYN-46 | `HECHO` | Compromiso de estabilidad de API | `API.md`: qué es superficie pública, qué queda fuera, versionado, ventana de deprecación de dos menores. **Fijado por un test**, no recordado — la superficie vive en un fichero y cualquier cambio rompe la suite |
 | SYN-47 | `HECHO` | Contratos compartidos en `contratos/` | Carpeta, no repo — decisión de Aeon revisando `A-19`. Solo especificaciones, esquemas y fixtures; sin implementación. El coste aceptado a la vista: sin CI, la regla es convención pura |
-| SYN-48 | `LISTO` | Publicar Axonium en PyPI · Axonium `RM-23` | Deuda heredada: `uv.lock` lo resolvía desde un registro local, así que la instalación desde git nunca funcionó para terceros |
+| SYN-48 | `HECHO` | Extra `[axonium]` devuelto · Axonium `AXO-23` | `axonium 1.0.0rc1` está en PyPI. Fijado al rc a propósito: sin versión estable, un `>=1` no resuelve |
 
 ## Axonium · Puerta única a inferencia local
 
@@ -156,7 +156,7 @@ Nadie reimplementa la normalización de otro. Cada proveedor tiene exactamente u
 | SYN-50 | `EXTERNO` | **Axonium-Go — camino crítico** · Axonium `RM-27` | Contrato definido (catálogo de errores, corpus de fixtures, Python como referencia con 452 tests) pero **no construido**. El camino gobernado de Aeon hacia modelos de Prometheus depende de él. Prioridad por encima de Rust y de publicar en PyPI: es el único que alguien más está esperando |
 | SYN-51 | `EXTERNO` | Streaming con cancelación en los tres sabores | **Dependencia dura de H2**: sin stream cancelable no hay corte de presupuesto en caliente para ningún modelo de Prometheus. `context.Context` en Go, cancelación de asyncio en Python. Debe entrar en SYN-50 desde v0.1, no como añadido posterior |
 | SYN-64 | `EXTERNO` | Equivalencia entre sabores de Axonium | El corpus de fixtures y los 452 tests de Python ya existen: **son el criterio de aceptación de SYN-50**, no trabajo adicional. Go se construye contra ellos |
-| SYN-52 | `PENDIENTE` | Adaptador Synaptum → Axonium-Python | Entry point `synaptum.providers`, extra `synaptum[axonium]`. Synaptum **no** escribe adaptador de Prometheus: usa Axonium |
+| SYN-52 | `HECHO` | Puente Synaptum → Axonium-Python | **No es un `Provider`**: Axonium ya normaliza, así que esto traduce entre dos vocabularios normalizados. Pasarlo por el lector de cable perdería `cache_read` y `estimated` en silencio. Encaja como modelo de `LocalGateway` |
 | SYN-53 | `EXTERNO` | Gateway Go → Axonium-Go | Sustituye al adaptador `prometheus_inference` nativo. Y decidir qué pasa con `openai_compatible`: si servía endpoints locales, pasa a Prometheus; si servía cloud compatible, se queda |
 | SYN-54 | `EXTERNO` | Propagación de cancelación extremo a extremo | Camino gobernado: Synaptum → costura → gateway con Axonium en proceso → Prometheus. **Tres saltos, no cuatro** — el SDK en proceso ahorra uno |
 

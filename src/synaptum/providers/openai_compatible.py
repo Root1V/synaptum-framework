@@ -20,6 +20,9 @@ from ..core.types import (
     Finish,
     FinishReason,
     Message,
+    ReasoningDelta,
+    ReasoningEnd,
+    ReasoningStart,
     Request,
     Response,
     Role,
@@ -124,6 +127,7 @@ class OpenAICompatible:
         model = ""
         usage_source: Mapping[str, Any] = {}
         open_text = False
+        open_reasoning = False
 
         for chunk in chunks:
             if "error" in chunk:
@@ -140,9 +144,23 @@ class OpenAICompatible:
                 delta = choice.get("delta") or {}
 
                 if delta.get("reasoning_content"):
-                    reasoning.append(str(delta["reasoning_content"]))
+                    # El razonamiento tiene su propio ciclo, igual que el texto.
+                    # Acumularlo sin emitirlo dejaría a quien consume sin nada
+                    # que ver durante toda la fase — y hay respuestas que son
+                    # solo razonamiento.
+                    if not open_reasoning:
+                        yield ReasoningStart()
+                        open_reasoning = True
+                    piece = str(delta["reasoning_content"])
+                    reasoning.append(piece)
+                    yield ReasoningDelta(text=piece)
 
                 if delta.get("content"):
+                    if open_reasoning:
+                        # El razonamiento llega entero antes del primer token de
+                        # respuesta: al abrirse el texto, aquella fase terminó.
+                        yield ReasoningEnd()
+                        open_reasoning = False
                     if not open_text:
                         yield TextStart()
                         open_text = True
@@ -167,6 +185,8 @@ class OpenAICompatible:
                 if choice.get("finish_reason"):
                     finish = _FINISH.get(choice["finish_reason"], FinishReason.STOP)
 
+        if open_reasoning:
+            yield ReasoningEnd()
         if open_text:
             yield TextEnd()
         for index in sorted(calls):

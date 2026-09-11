@@ -16,12 +16,11 @@ anthropic = ["anthropic>=1"]
 openai    = ["openai>=2"]
 mcp       = ["mcp>=1"]
 otel      = ["opentelemetry-sdk>=1.30"]
-# El extra 'axonium' se añade cuando el SDK esté publicado (RM-48) junto con el
-# adaptador que lo consume (RM-52).  Declararlo antes rompe `uv lock`: la
-# resolución cubre todos los extras, así que uno inalcanzable bloquea el
-# bloqueo entero del proyecto, no solo su instalación.
+# Fijado al rc a propósito: hoy no hay versión estable de axonium, y un
+# '>=1' sin permitir prelanzamientos no resuelve. Se relaja cuando salga 1.0.0.
+axonium   = ["axonium>=1.0.0rc1"]
 
-# RM-17 — los proveedores se descubren por entry point, sin que el núcleo los conozca.
+# SYN-17 — los proveedores se descubren por entry point, sin que el núcleo los conozca.
 [project.entry-points."synaptum.providers"]
 
 [project.entry-points."synaptum.checkpointers"]

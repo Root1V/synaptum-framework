@@ -34,12 +34,38 @@ def drain(agent: Agent, task: str, session: Session) -> list:
 
 
 def test_a_recorded_body_reaches_the_loop_exactly_as_production_would():
-    gateway = ReplayGateway(_BODIES / "chat_completion.json")
-    events = drain(Agent("a", model="openai-compatible:llama3-8b-q4"), "hola",
+    gateway = ReplayGateway(_BODIES / "chat_completion_finished.json")
+    events = drain(Agent("a", model="openai-compatible:qwen3"), "di hola",
                    Session("run-1", gateway))
 
-    assert events[-1].output == "Hello! How can I help?"
-    assert events[-1].usage.input == 5, "el consumo es el que reportó el proveedor"
+    assert events[-1].output == "hello", "el razonamiento no se cuela en la respuesta"
+    assert events[-1].usage.input == 13, "el consumo es el que reportó el proveedor"
+    assert events[-1].usage.cache_read == 3
+
+
+def test_a_real_recording_exposes_the_answer_that_is_only_reasoning():
+    """Grabación real: el modelo nunca sale de la fase de razonamiento.
+
+    `content` vacío, `finish_reason` `length`, y consumo que pagar. Un guion
+    escrito a mano no produce este caso porque nadie lo escribe — y un cliente
+    que solo mire el texto ve una respuesta vacía sin explicación.
+    """
+    from synaptum import Thinking
+
+    gateway = ReplayGateway(_BODIES / "chat_completion.json")
+    events = drain(Agent("a", model="openai-compatible:qwen3"), "di hola",
+                   Session("run-1", gateway))
+
+    assert events[-1].output == "", "no hubo texto"
+    assert events[-1].usage.output == 24, "pero sí hubo 24 tokens que pagar"
+
+    from synaptum import ModelStep, Phase
+
+    respuesta = next(
+        e for e in events if isinstance(e, ModelStep) and e.phase is Phase.COMPLETED
+    ).response
+    assert isinstance(respuesta.message.content[0], Thinking), "el razonamiento se conserva"
+    assert respuesta.finish_reason.value == "length"
 
 
 def test_a_recorded_tool_call_exercises_a_path_nobody_writes_by_hand():
@@ -50,7 +76,7 @@ def test_a_recorded_tool_call_exercises_a_path_nobody_writes_by_hand():
     """
     gateway = ReplayGateway(
         _BODIES / "chat_completion_tool_calls.json",
-        _BODIES / "chat_completion.json",
+        _BODIES / "chat_completion_finished.json",
         tools=[get_weather],
     )
     agent = Agent("a", model="openai-compatible:llama3-8b-q4", tools=[get_weather])
@@ -72,15 +98,15 @@ def test_a_derived_usage_keeps_its_estimated_flag_through_the_loop():
                    Session("run-1", gateway))
 
     consumo = events[-1].usage
-    assert consumo.input == 15, "prompt_n + cache_n, convención inclusiva"
-    assert consumo.cache_read == 2
+    assert consumo.input == 15, "prompt_n=1 + cache_n=14, convención inclusiva"
+    assert consumo.cache_read == 14
     assert consumo.cache_write is None, "llama.cpp no lo reporta: sin medir, no cero"
     assert consumo.estimated is True
 
 
 def test_a_stream_body_can_be_served_as_a_full_response():
     gateway = ReplayGateway(_BODIES / "chat_stream_usage.sse")
-    events = drain(Agent("a", model="openai-compatible:llama3-8b-q4"), "hola",
+    events = drain(Agent("a", model="openai-compatible:m"), "hola",
                    Session("run-1", gateway))
     assert events[-1].output == "Hi"
 
@@ -96,7 +122,11 @@ def test_streaming_yields_the_unified_cycle():
 
     events = asyncio.run(go())
     assert events[0].kind == "stream_start" and events[-1].kind == "finish"
-    assert "".join(e.text for e in events if e.kind == "text_delta") == "Hello, world!"
+    # La grabación real es de un modelo de razonamiento que no llega a responder:
+    # todo lo que emite va por el ciclo de razonamiento, no por el de texto.
+    assert [e.kind for e in events[1:3]] == ["reasoning_start", "reasoning_delta"]
+    assert events[-2].kind == "reasoning_end"
+    assert "".join(e.text for e in events if e.kind == "reasoning_delta").startswith("Okay")
 
 
 def test_a_missing_body_fails_at_construction():
@@ -112,12 +142,12 @@ def test_running_out_of_bodies_says_so_clearly():
 
 
 def test_rewind_allows_replaying_the_same_run_twice():
-    gateway = ReplayGateway(_BODIES / "chat_completion.json")
-    agent = Agent("a", model="openai-compatible:llama3-8b-q4")
+    gateway = ReplayGateway(_BODIES / "chat_completion_finished.json")
+    agent = Agent("a", model="openai-compatible:qwen3")
     drain(agent, "hola", Session("run-1", gateway))
     gateway.rewind()
     events = drain(agent, "hola", Session("run-2", gateway))
-    assert events[-1].output == "Hello! How can I help?"
+    assert events[-1].output == "hello"
 
 
 def test_the_sse_splitter_drops_the_terminator():
