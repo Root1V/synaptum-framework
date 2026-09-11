@@ -270,6 +270,74 @@ def _load_normalization_cases() -> list[tuple[str, dict, Path]]:
 NORMALIZATION_CASES = _load_normalization_cases()
 
 
+def _chunks_of(body: Path) -> list[dict]:
+    """Separa los fragmentos de un SSE.  El transporte no es normalización."""
+    return [
+        json.loads(payload)
+        for line in body.read_text().splitlines()
+        if line.startswith("data: ")
+        for payload in [line.removeprefix("data: ").strip()]
+        if payload != "[DONE]"
+    ]
+
+
+@pytest.mark.parametrize(
+    "name,case,root",
+    NORMALIZATION_CASES,
+    ids=[name for name, _, _ in NORMALIZATION_CASES],
+)
+def test_the_normalization_corpus_runs_against_the_python_adapter(
+    name: str, case: dict, root: Path
+):
+    """SYN-18 · La otra mitad de la equivalencia de `H1 = D`.
+
+    El gateway implementa la misma especificación en Go. Lo que impide que
+    diverjan no es la confianza: es que ambas ejecutan esto contra los mismos
+    cuerpos.
+    """
+    from synaptum import ProviderError, providers
+
+    adapter = providers.get(case.get("dialect", "openai-compatible"))
+    body = root / case["body_file"]
+    expected = case["expect"]
+
+    if case.get("stream"):
+        events: list = []
+        try:
+            for event in adapter.stream_from_wire(_chunks_of(body)):
+                events.append(event)
+        except ProviderError:
+            assert case.get("expect_error"), f"{case['name']}: error no esperado"
+            partial = "".join(e.text for e in events if e.kind == "text_delta")
+            assert partial == expected["partial_text"], f"{case['name']}: parcial"
+            return
+
+        assert not case.get("expect_error"), f"{case['name']}: se esperaba un error"
+        response = events[-1].response
+        if "event_kinds" in expected:
+            assert [e.kind for e in events] == expected["event_kinds"], f"{case['name']}: eventos"
+    else:
+        response = adapter.from_wire(json.loads(body.read_text()))
+
+    if "text" in expected:
+        assert response.text == expected["text"], f"{case['name']}: texto"
+    if "model" in expected:
+        assert response.model == expected["model"], f"{case['name']}: modelo"
+    if "finish_reason" in expected:
+        assert response.finish_reason.value == expected["finish_reason"], f"{case['name']}: motivo"
+    if "content_kinds" in expected:
+        assert [p.kind for p in response.message.content] == expected["content_kinds"], (
+            f"{case['name']}: partes de contenido"
+        )
+    if "tool_calls" in expected:
+        assert [
+            {"id": c.id, "name": c.name, "arguments": dict(c.arguments)}
+            for c in response.tool_calls
+        ] == expected["tool_calls"], f"{case['name']}: tool calls"
+    for counter, value in expected.get("usage", {}).items():
+        assert getattr(response.usage, counter) == value, f"{case['name']}: usage.{counter}"
+
+
 @pytest.mark.parametrize(
     "name,case,root",
     NORMALIZATION_CASES,

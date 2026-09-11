@@ -34,6 +34,7 @@
   "NetworkError",
   "NoObjectGeneratedError",
   "Phase",
+  "Provider",
   "ProviderError",
   "ReasoningDelta",
   "ReasoningEnd",

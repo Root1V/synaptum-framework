@@ -38,7 +38,7 @@ Congelar antes de escribir implementación. Es la fase que impide reescrituras p
 |---|---|---|---|
 | SYN-01 | `HECHO` | Vocabulario unificado de modelo | `Message`, `ContentPart` (8 tipos), `Request`, `Response`, `StreamEvent`, `FinishReason`. Contrato compartido versionado, no interno de Synaptum |
 | SYN-02 | `HECHO` | Especificación de normalización entre proveedores | En `contratos/normalizacion/spec.md`. Fija la convención **inclusiva** de `input` — ambigüedad que destapó `chat_stream_ok.sse` y que daba cifras distintas sin fallar |
-| SYN-03 | `EN CURSO` | Corpus dorado de normalización | 9 casos sobre los cuerpos de Axonium, sin duplicarlos. Validado —cuerpos existen, proyecciones bien formadas— pero **no ejecutable hasta `SYN-18`**. Aviso heredado: los cuerpos vienen de la guía, no de un despliegue real |
+| SYN-03 | `HECHO` | Corpus dorado de normalización | 9 casos sobre los cuerpos de Axonium, sin duplicarlos, **ejecutándose verdes** contra el adaptador Python. Aviso heredado: los cuerpos vienen de la guía, no de un despliegue real, así que fijan las implementaciones entre sí y no al gateway |
 | SYN-04 | `HECHO` | Taxonomía de errores | Jerarquía con `retryable`. No reintentar 400/401/403/404/422; sí 429/5xx/timeouts |
 | SYN-05 | `HECHO` | Taxonomía de eventos del bucle | `ModelStep`, `ToolStep`, `DelegateStep`, `ApprovalStep`, `FinalStep`. Unión tipada, inmutable y ordenada |
 | SYN-06 | `HECHO` | Identidad determinista de paso | Especificación **abierta** en `contratos/identidad-de-paso/`, con 10 casos dorados que corren verdes. Cualquier framework que la implemente obtiene Nivel 1, sin importar nada de Synaptum ni hablar Python |
@@ -61,8 +61,8 @@ Un agente único, provider-agnóstico, reanudable. Es el mínimo que Aeon puede 
 |---|---|---|---|
 | SYN-15 | `HECHO` | Paquete `core` sin dependencias | Solo stdlib. Verificado: 6 paquetes en el entorno frente a los 108 de la v0.4, y cero módulos de terceros al importar |
 | SYN-16 | `HECHO` | Protocolo `Schema` y adaptadores | `json_schema()` · `validate()` · `dump()`. Pydantic queda como extra de verdad: dataclasses de stdlib dan lo mismo. Un JSON Schema a mano se acepta y **no se valida**, dicho en voz alta |
-| SYN-17 | `PENDIENTE` | Registro de proveedores por entry points | Resolución de `"provider:modelo"` vía `importlib.metadata`. Sin conocimiento previo de los plugins |
-| SYN-18 | `PENDIENTE` | Adaptadores Python de proveedor | Subconjunto de desarrollo, **no paridad** con el gateway. Solo los presentes en ambos lados necesitan fixtures de SYN-03 |
+| SYN-17 | `HECHO` | Registro de proveedores por entry points | Resolución de `"proveedor:modelo"` vía `importlib.metadata`, perezosa y cacheada. Un adaptador roto falla **al usarse**, no al instalarse: no puede tumbar a los demás |
+| SYN-18 | `EN CURSO` | Adaptadores Python de proveedor | `openai-compatible` hecho y pasando el corpus. Subconjunto de desarrollo, **no paridad** con el gateway. **Normalización pura, sin transporte**: por eso el corpus se ejecuta sin un servidor delante |
 | SYN-19 | `HECHO` | Bucle del agente como stream de eventos | `async for step in agent.run(...)`. El motor es `await`, no una cola. Cada `yield` es frontera de checkpoint |
 | SYN-20 | `HECHO` | Decorador `@tool` | JSON Schema derivado de la firma tipada. Un tipo intraducible **falla al decorar**, no al invocar. Resuelve tipos declarados dentro de una función capturando el ámbito de la decoración |
 | SYN-21 | `HECHO` | Niveles de riesgo de tool | `read / soft_write / hard_write / destructive`. Synaptum **declara**; Aeon **decide** |
