@@ -93,6 +93,16 @@ from .run import (
     Replay,
     SqliteCheckpointer,
 )
+from .prompts import (
+    FilePrompts,
+    InMemoryPrompts,
+    PromptProvider,
+    PromptRegistry,
+    PromptTemplate,
+    fmt_dict,
+    fmt_list,
+    fmt_records,
+)
 from .providers import Provider
 from .schema import Schema, schema_for
 from .tools import Tool, json_schema_for, tool
@@ -114,6 +124,14 @@ __all__ = [
     "tool",
     "json_schema_for",
     "Provider",
+    "PromptTemplate",
+    "PromptProvider",
+    "InMemoryPrompts",
+    "FilePrompts",
+    "PromptRegistry",
+    "fmt_dict",
+    "fmt_list",
+    "fmt_records",
     "Schema",
     "schema_for",
     "__version__",

@@ -143,8 +143,8 @@ y comprobado por un test, no recordado. Ver [`API.md`](API.md).
 
 | Fase | |
 |---|---|
-| **0 · Contratos** | 13 de 14 · falta ejecutar el corpus de normalización |
-| **1 · Núcleo durable** | 14 de 19 |
+| **0 · Contratos** | completa |
+| **1 · Núcleo durable** | completa |
 | **2 · Contexto y observabilidad** | sin empezar |
 | **3 · Multi-agente** | sin empezar |
 

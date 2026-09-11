@@ -114,14 +114,18 @@ class Agent:
         name: str,
         *,
         model: str,
-        instructions: str | None = None,
+        instructions: Any = None,
         tools: Sequence[Any] = (),
         output: Any = None,
         limits: Limits | None = None,
     ) -> None:
         self.name = name
         self.model = model
-        self.instructions = instructions
+        # Acepta una cadena o cualquier cosa con `render()` — una plantilla
+        # versionada, sin que el bucle tenga que importar el sistema de prompts.
+        self.instructions: str | None = (
+            instructions.render() if hasattr(instructions, "render") else instructions
+        )
         # Acepta ToolDefinition o cualquier objeto que la exponga — un `@tool`,
         # sin que el bucle tenga que importar el decorador.
         self.tools: tuple[ToolDefinition, ...] = tuple(
