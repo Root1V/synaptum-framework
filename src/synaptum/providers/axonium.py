@@ -35,6 +35,9 @@ from ..core.types import (
     Finish,
     FinishReason,
     Message,
+    ReasoningDelta,
+    ReasoningEnd,
+    ReasoningStart,
     Request,
     Response,
     Role,
@@ -119,6 +122,7 @@ class AxoniumModel:
         finish = FinishReason.STOP
         usage = Usage()
         open_text = False
+        open_reasoning = False
 
         try:
             stream = self._client.chat.completions.stream(
@@ -135,9 +139,22 @@ class AxoniumModel:
                             continue
 
                         if getattr(delta, "reasoning_content", None):
-                            reasoning.append(str(delta.reasoning_content))
+                            # El razonamiento tiene su propio ciclo.  Acumularlo
+                            # sin emitirlo deja a quien consume sin nada que ver
+                            # durante toda la fase — y con un modelo de
+                            # razonamiento esa fase puede ser la respuesta
+                            # entera.
+                            if not open_reasoning:
+                                yield ReasoningStart()
+                                open_reasoning = True
+                            piece = str(delta.reasoning_content)
+                            reasoning.append(piece)
+                            yield ReasoningDelta(text=piece)
 
                         if getattr(delta, "content", None):
+                            if open_reasoning:
+                                yield ReasoningEnd()
+                                open_reasoning = False
                             if not open_text:
                                 yield TextStart()
                                 open_text = True
@@ -146,6 +163,13 @@ class AxoniumModel:
                             yield TextDelta(text=piece)
 
                         for raw in _field(delta, "tool_calls") or ():
+                            # La fase de razonamiento termina cuando empieza
+                            # cualquier otra cosa, no solo el texto: un modelo
+                            # que razona y llama a una herramienta no emite ni
+                            # un token de respuesta.
+                            if open_reasoning:
+                                yield ReasoningEnd()
+                                open_reasoning = False
                             index = int(_field(raw, "index", 0) or 0)
                             function = _field(raw, "function")
                             if index not in calls:
@@ -172,6 +196,8 @@ class AxoniumModel:
             # Los deltas ya emitidos no se retiran: se generaron y se pagaron.
             raise _translate(failure) from failure
 
+        if open_reasoning:
+            yield ReasoningEnd()
         if open_text:
             yield TextEnd()
         for index in sorted(calls):

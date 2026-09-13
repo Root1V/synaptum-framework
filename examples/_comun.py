@@ -12,18 +12,58 @@ from synaptum import HttpModel, LocalGateway
 from synaptum.testing import FakeGateway
 
 
-def hay_modelo_real() -> bool:
+def por_sdk() -> bool:
+    """Hay un SDK de plataforma configurado, y entonces manda él.
+
+    Cuando existe un SDK que es la **única puerta** a la inferencia de una
+    plataforma, ir al endpoint por detrás no es una alternativa: se salta las
+    credenciales, el catálogo, la taxonomía de errores y la facturación. Por eso
+    tiene prioridad sobre el transporte directo.
+    """
+    return bool(os.environ.get("AXONIUM_GATEWAY_BASE_URL"))
+
+
+def por_http() -> bool:
     return bool(os.environ.get("SYNAPTUM_BASE_URL"))
 
 
+def hay_modelo_real() -> bool:
+    return por_sdk() or por_http()
+
+
 def nombre_del_modelo() -> str:
-    if hay_modelo_real():
+    """El agente nombra su modelo igual sea cual sea la puerta.
+
+    Con el SDK va a secas —él conoce su catálogo—; por HTTP lleva el prefijo del
+    adaptador que tiene que normalizar el cable.
+    """
+    if por_sdk():
+        return os.environ.get("SYNAPTUM_MODEL", "gpt-oss-20b-mxfp4")
+    if por_http():
         return f"openai-compatible:{os.environ.get('SYNAPTUM_MODEL', 'qwen3-0.6b')}"
     return "openai-compatible:doble"
 
 
 def gateway_real(tools=(), policy=None):
-    """`LocalGateway` sobre transporte HTTP.  Solo si hay endpoint configurado."""
+    """`LocalGateway` sobre la puerta que haya configurada.
+
+    Las dos encajan en la misma ranura y el agente no nota la diferencia: una
+    habla el cable y la otra habla un SDK que ya normaliza. Eso **es** la
+    propiedad — el bucle no sabe quién hay al otro lado de la costura.
+    """
+    if por_sdk():
+        # Import perezoso: el extra es opcional y no puede hacer falta para
+        # correr los ejemplos sin él.
+        from synaptum.providers.axonium import AxoniumModel
+
+        puente = AxoniumModel()
+        return _Contado(
+            LocalGateway(
+                model=puente.complete, stream=puente.stream,
+                tools=tools, policy=policy, warn=False,
+            )
+        )
+
     modelo = HttpModel(
         os.environ["SYNAPTUM_BASE_URL"],
         api_key=os.environ.get("SYNAPTUM_API_KEY"),
@@ -81,8 +121,10 @@ def gateway(guion, tools=(), *, policy=None, deny_tools=None):
 def encabezado(titulo: str) -> None:
     print(f"\n{titulo}")
     print("─" * len(titulo))
-    if hay_modelo_real():
-        print(f"modelo real · {os.environ['SYNAPTUM_BASE_URL']}\n")
+    if por_sdk():
+        print(f"vía SDK de plataforma · {nombre_del_modelo()}\n")
+    elif por_http():
+        print(f"HTTP directo · {os.environ['SYNAPTUM_BASE_URL']}\n")
     else:
         print("sin inferencia · respuestas guionizadas "
               "(exporta SYNAPTUM_BASE_URL para usar un modelo real)\n")

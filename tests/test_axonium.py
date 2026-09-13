@@ -157,3 +157,107 @@ def test_a_missing_sdk_says_where_to_get_it():
             AxoniumModel()
     finally:
         puente._build_client = original
+
+
+# ── Streaming del puente ──────────────────────────────────────────────────────
+#
+# El puente tiene su PROPIA implementación de streaming: no reutiliza la del
+# adaptador de cable, porque Axonium ya entrega objetos normalizados.  Eso
+# significa que un arreglo en el adaptador no lo alcanza — y no lo alcanzó.
+
+class _StreamFalso:
+    """Cliente falso que entrega los fragmentos como los entrega el SDK."""
+
+    def __init__(self, chunks):
+        self.chunks = chunks
+        self.chat = self
+        self.completions = self
+
+    def stream(self, **_):
+        chunks = self.chunks
+
+        class _Ctx:
+            async def __aenter__(self):
+                async def gen():
+                    for c in chunks:
+                        yield c
+
+                return gen()
+
+            async def __aexit__(self, *_):
+                return False
+
+        return _Ctx()
+
+
+def _delta(**campos):
+    from types import SimpleNamespace
+
+    completos = {"content": None, "reasoning_content": None, "tool_calls": None}
+    completos.update(campos)
+    return SimpleNamespace(
+        choices=[SimpleNamespace(delta=SimpleNamespace(**completos), finish_reason=None)],
+        usage=None,
+    )
+
+
+def _cierre(motivo="stop"):
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        choices=[SimpleNamespace(delta=None, finish_reason=motivo)], usage=None
+    )
+
+
+def _eventos(chunks):
+    modelo = AxoniumModel(client=_StreamFalso(chunks))
+
+    async def go():
+        return [e async for e in modelo.stream(Request(model="axonium:m"))]
+
+    return asyncio.run(go())
+
+
+def test_the_bridge_emits_the_reasoning_cycle():
+    """Acumularlo sin emitirlo deja a quien consume sin nada que ver.
+
+    Encontrado ejecutando el puente contra la plataforma por primera vez: el
+    adaptador de cable ya lo hacía bien —lo fijó el corpus dorado— y el puente
+    no, porque el corpus prueba normalización de cuerpos y esto no pasa por
+    ningún cuerpo. Un arreglo en un sitio no alcanza al otro.
+    """
+    eventos = _eventos([
+        _delta(reasoning_content="pien"),
+        _delta(reasoning_content="so"),
+        _delta(content="hola"),
+        _cierre(),
+    ])
+    tipos = [e.kind for e in eventos]
+
+    assert tipos == [
+        "stream_start",
+        "reasoning_start", "reasoning_delta", "reasoning_delta", "reasoning_end",
+        "text_start", "text_delta", "text_end",
+        "finish",
+    ]
+    assert "".join(e.text for e in eventos if e.kind == "reasoning_delta") == "pienso"
+    assert eventos[-1].response.text == "hola", "el razonamiento no se cuela en la respuesta"
+
+
+def test_the_bridge_closes_the_reasoning_cycle_when_a_tool_call_starts():
+    """La fase termina al empezar cualquier otra cosa, no solo el texto.
+
+    Con un modelo de razonamiento que llama a una herramienta no llega ni un
+    token de respuesta, así que cerrar solo con `content` deja el bloque de
+    pensamiento abierto mientras los argumentos ya están llegando.
+    """
+    eventos = _eventos([
+        _delta(reasoning_content="pienso"),
+        _delta(tool_calls=[{"index": 0, "id": "c1",
+                            "function": {"name": "f", "arguments": '{"a":1}'}}]),
+        _cierre("tool_calls"),
+    ])
+    tipos = [e.kind for e in eventos]
+
+    assert tipos.index("reasoning_end") < tipos.index("tool_call_start")
+    assert eventos[-1].response.tool_calls[0].arguments == {"a": 1}

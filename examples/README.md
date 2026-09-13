@@ -7,7 +7,21 @@ guionizadas, que en modo autónomo es la vía principal de desarrollo y no una u
 uv run python examples/01_agente.py
 ```
 
-Para apuntar a un modelo de verdad, dos variables y **el mismo fichero sin tocar**:
+Para apuntar a un modelo de verdad, **el mismo fichero sin tocar**. Hay dos puertas y el agente no
+nota la diferencia — que es justamente la propiedad.
+
+**Por un SDK de plataforma**, cuando la inferencia está gobernada y ese SDK es la única puerta
+legítima (credenciales, catálogo, cuotas y facturación viven ahí). Tiene prioridad: ir al endpoint
+por detrás se salta todo eso.
+
+```bash
+export AXONIUM_AUTH_BASE_URL=…  AXONIUM_GATEWAY_BASE_URL=…
+export AXONIUM_CLIENT_ID=…      AXONIUM_CLIENT_SECRET=…
+export SYNAPTUM_MODEL=gpt-oss-20b-mxfp4
+uv run python examples/01_agente.py
+```
+
+**Por HTTP directo**, contra cualquier endpoint OpenAI-compatible:
 
 ```bash
 export SYNAPTUM_BASE_URL=http://localhost:8080/v1     # cualquier endpoint OpenAI-compatible
