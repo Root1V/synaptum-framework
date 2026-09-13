@@ -216,3 +216,19 @@ El **primer run gobernado extremo a extremo de un agente Synaptum contra un mode
 ---
 
 *Última actualización: cuarta iteración de la frontera del runtime, más la regla de puerta única a Prometheus vía Axonium. Documentos de referencia: «Dónde vive el runtime» · «Frontera del runtime» (Aeon) · «Acta de convergencia» · «Cierre de Fase 0» (Aeon).*
+
+---
+
+## Fase 4 · Que otros lo usen
+
+Nada de lo anterior sirve si un equipo no puede instalarlo y empezar. Esta fase no añade capacidad
+al framework: quita fricción a quien lo adopta. Se separa porque compite por el tiempo con la Fase 2
+y la decisión de qué va antes depende de cuántos proyectos estén esperando.
+
+| ID | Estado | Feature | Implica |
+|---|---|---|---|
+| SYN-73 | `HECHO` | Metadatos de distribución y `py.typed` | Sin el marcador, un consumidor con mypy no ve **ni un tipo** — en un framework construido sobre `Protocol`, uniones etiquetadas y `match`, eso es la mitad del valor. Comprobado instalando en un proyecto limpio: antes dos errores de import, ahora limpio |
+| SYN-74 | `PENDIENTE` | **Publicar en un índice** | Hoy la única vía es una ruta local o una URL de git. Es lo primero que bloquea a otro equipo, y no estaba en este roadmap. Decide también si el índice es público o interno |
+| SYN-75 | `PENDIENTE` | Plantilla de proyecto de agente | Los ejemplos demuestran **propiedades**, no son un punto de partida. Un `agente.py` mínimo con herramienta, salida tipada, journal y test — lo que alguien copia el primer día |
+| SYN-76 | `PENDIENTE` | Guía de adopción | Qué gateway usar en cada caso, cómo se prueba sin inferencia, y **qué no hace el framework**. Media página, no un manual |
+| SYN-77 | `PENDIENTE` | CI pública | Los 289 tests corren en mi máquina. Quien adopte esto debe poder ver que corren en la suya, y que un PR no los rompe |

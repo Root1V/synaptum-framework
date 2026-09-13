@@ -2,6 +2,17 @@
 name = "synaptum"
 version = "1.0.0.dev0"
 description = "Provider-agnostic agent framework and durable runtime. Owns execution semantics; the harness owns the substrate."
+keywords = ["agents", "llm", "durable-execution", "agent-framework", "provider-agnostic"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+]
+
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
@@ -43,3 +54,8 @@ packages = ["src/synaptum"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+[project.urls]
+Homepage = "https://github.com/Root1V/synaptum-framework"
+Repository = "https://github.com/Root1V/synaptum-framework"
+Changelog = "https://github.com/Root1V/synaptum-framework/blob/main/CHANGELOG.md"
+Issues = "https://github.com/Root1V/synaptum-framework/issues"
