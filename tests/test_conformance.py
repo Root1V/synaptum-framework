@@ -35,17 +35,16 @@ from synaptum import (
     make_step_id,
 )
 
-_CONTRACTS = Path(
-    "/Users/emericespiritusantiago/Documents/Victor/coordinacion_project/contratos"
-)
-_FIXTURES = _CONTRACTS / "costura-durabilidad" / "fixtures"
+from contratos import SIN_CONTRATOS, corpus
 
-pytestmark = pytest.mark.skipif(
-    not _FIXTURES.exists(), reason="carpeta de contratos compartidos no disponible"
-)
+_FIXTURES = corpus("costura-durabilidad", "fixtures")
+
+pytestmark = pytest.mark.skipif(_FIXTURES is None, reason=SIN_CONTRATOS)
 
 
 def _load_cases() -> list[tuple[str, dict]]:
+    if _FIXTURES is None:
+        return []
     cases: list[tuple[str, dict]] = []
     for path in sorted(_FIXTURES.glob("*.json")):
         document = json.loads(path.read_text())
@@ -144,11 +143,11 @@ def test_the_shared_cases_are_actually_being_read():
 
 # ── Contrato: identidad determinista de paso ──────────────────────────────────
 
-_IDENTITY = _CONTRACTS / "identidad-de-paso" / "fixtures"
+_IDENTITY = corpus("identidad-de-paso", "fixtures")
 
 
 def _load_identity_cases() -> list[tuple[str, dict]]:
-    if not _IDENTITY.exists():
+    if _IDENTITY is None:
         return []
     cases: list[tuple[str, dict]] = []
     for path in sorted(_IDENTITY.glob("*.json")):
@@ -241,7 +240,7 @@ def test_the_identity_cases_are_actually_being_read():
 # Un corpus que nadie puede ejecutar y que además no se valida es peor que no
 # tenerlo: da la impresión de cobertura sin ninguna.
 
-_NORMALIZATION = _CONTRACTS / "normalizacion" / "fixtures"
+_NORMALIZATION = corpus("normalizacion", "fixtures")
 
 _UNIFIED_COUNTERS = {"input", "output", "reasoning", "cache_read", "cache_write"}
 _CONTENT_KINDS = {
@@ -263,7 +262,7 @@ def _load_normalization_cases() -> list[tuple[str, dict, Path]]:
     no se puede grabar contra el despliegue. Cada uno lo declara en el propio
     fichero, así que un verde nunca deja dudas sobre de qué es evidencia.
     """
-    if not _NORMALIZATION.exists():
+    if _NORMALIZATION is None:
         return []
     cases: list[tuple[str, dict, Path]] = []
     for path in sorted(_NORMALIZATION.glob("*.json")):
@@ -519,11 +518,15 @@ def test_the_inclusive_input_convention_holds_in_the_recorded_bodies():
     que ser exactamente ``prompt_n + cache_n``.  Si una regrabación futura
     cambia de convención, salta aquí en vez de cuadrar mal en la factura.
     """
-    if not _NORMALIZATION.exists():
-        pytest.skip("contratos compartidos no disponibles")
+    if _NORMALIZATION is None:
+        pytest.skip(SIN_CONTRATOS)
 
     comprobados = 0
-    for cuerpo in sorted((_CONTRACTS / "gateway-prometheus" / "fixtures").glob("chat_completion*.json")):
+    grabaciones = corpus("gateway-prometheus", "fixtures")
+    if grabaciones is None:
+        pytest.skip(SIN_CONTRATOS)
+
+    for cuerpo in sorted(grabaciones.glob("chat_completion*.json")):
         body = json.loads(cuerpo.read_text())
         reported, timings = body.get("usage") or {}, body.get("timings") or {}
         if not reported or not timings:

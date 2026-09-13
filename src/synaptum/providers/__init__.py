@@ -3,7 +3,7 @@
 from .base import ENTRY_POINT_GROUP, Provider, available, get, register, resolve
 from .openai_compatible import OpenAICompatible
 
-# El dialecto que habla Prometheus y casi todo lo demás viene registrado: es el
+# El dialecto OpenAI-compatible viene registrado, que es el que habla casi todo: es el
 # caso base, no un plugin que haya que instalar aparte.
 register(OpenAICompatible())
 

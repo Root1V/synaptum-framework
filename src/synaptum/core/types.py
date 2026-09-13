@@ -1,10 +1,15 @@
 """
 RM-01 · Vocabulario unificado de modelo.
 
-Contrato compartido y versionado entre Synaptum, Aeon y Axonium — no un detalle
-interno de este paquete.  Es la forma que viaja por la costura de aplicación y
-la que cada implementación de la especificación de normalización (RM-02) debe
-producir a partir de la respuesta nativa de su proveedor.
+**Contrato versionado, no un detalle interno de este paquete.**  Es la forma que
+viaja por la costura de aplicación, y la que cada implementación de la
+especificación de normalización (RM-02) debe producir a partir de la respuesta
+nativa de su proveedor.
+
+Que sea un contrato y no una estructura interna es lo que permite que quien
+implemente la costura no tenga que usar Synaptum, ni hablar Python.  Aquí hay un
+arnés y un SDK concretos que lo hacen, pero el vocabulario no les pertenece:
+está especificado aparte y se puede implementar sin ninguno de los dos.
 
 Reglas de normalización que el tipo hace cumplir por construcción
 -----------------------------------------------------------------
@@ -265,7 +270,7 @@ class Usage:
     lo reporta, el bucle concluye que escribir en caché es gratis y decide mal
     en cada compactación.  Ese fallo no salta — solo cuadra mal.
 
-    No es hipotético.  Prometheus con backend llama.cpp solo puede alimentar
+    No es hipotético.  Un backend llama.cpp, por ejemplo, solo puede alimentar
     ``input``, ``output`` y ``cache_read``; ``reasoning`` y ``cache_write`` no
     existen en la fuente.
 

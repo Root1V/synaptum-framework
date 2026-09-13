@@ -1,10 +1,13 @@
 """
 SYN-18 · Adaptador del dialecto OpenAI-compatible.
 
-Implementa `contratos/normalizacion/spec.md` para el dialecto que habla
-Prometheus y casi todo lo demás. Es la **implementación en Python** de una
-especificación que el gateway implementa en Go; lo que impide que diverjan es el
-corpus dorado compartido, que ambas ejecutan contra los mismos cuerpos.
+Implementa `contratos/normalizacion/spec.md` para el dialecto OpenAI-compatible,
+que es el que habla casi todo: OpenAI, los servidores locales
+(llama.cpp, vLLM, Ollama, LM Studio) y la mayoría de los gateways.
+
+Cuando existe una segunda implementación de la misma especificación en otro
+lenguaje, lo que impide que diverjan no es la confianza: es un corpus dorado que
+ambas ejecutan contra los mismos cuerpos.
 
 Puro por construcción: no abre conexiones ni lee credenciales. El transporte va
 aparte, y en el camino gobernado ni siquiera ocurre en este proceso.

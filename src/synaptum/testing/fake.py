@@ -1,10 +1,11 @@
 """
 SYN-65 · ``FakeGateway`` — la vía principal de desarrollo, no una utilidad de test.
 
-Un desarrollador no tiene acceso a una instancia de Prometheus, y la única
-puerta a inferencia local es el SDK de Axonium.  De ahí sale una consecuencia
-que hay que asumir de frente: **en modo autónomo Synaptum no tiene inferencia
-local.**  O proveedores cloud de pago, o modelos simulados.
+Construir un agente no debería costar dinero ni depender de tener acceso a un
+modelo.  En muchos entornos —CI, una máquina sin GPU, un despliegue cuya única
+puerta de inferencia está gobernada y no se alcanza desde el portátil— **la
+alternativa real no es «modelo local o modelo cloud»: es modelo simulado o
+nada.**
 
 Eso convierte esto en infraestructura, no en un stub de veinte líneas.  Tiene
 que poder ejercitar todo lo que el bucle sabe hacer — tool calls, streaming con
@@ -64,7 +65,7 @@ DEFAULT_USAGE = Usage(input=100, output=20, reasoning=0, cache_read=0, cache_wri
 """Consumo por defecto: **medido y en cero** donde corresponde, no ``None``.
 
 Un fake que devolviera ``None`` en todo haría creer que la economía de contexto
-no funciona.  Para simular una fuente que no reporta —Prometheus con llama.cpp,
+no funciona.  Para simular una fuente que no reporta —un backend llama.cpp,
 que no expone ``reasoning`` ni ``cache_write``— pásalo explícitamente.
 """
 

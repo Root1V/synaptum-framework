@@ -47,12 +47,12 @@ def split_sse(text: str) -> list[dict[str, Any]]:
     cable no es normalización**: es transporte, y esa separación es lo que
     permite ejercitar la normalización con un fichero.
 
-    El centinela **termina** el cuerpo; no se salta. Hasta el manifest v8 el
-    gateway de Prometheus mandaba dos —uno del backend y otro suyo—, y la
-    diferencia entre saltarlos y parar en el primero no era cosmética: todo lo
-    que registraba la petición vivía pasado ese punto, así que el cliente
-    correcto era justo el que no se facturaba. Ya viene uno solo, y por eso
-    mismo conviene que esto no dependa de cuántos vengan.
+    El centinela **termina** el cuerpo; no se salta. Un gateway real llegó a
+    mandar dos —reenviaba el del backend y añadía el suyo—, y la diferencia
+    entre saltarlos y parar en el primero no era cosmética: todo lo que
+    registraba la petición vivía pasado ese punto, así que el cliente correcto
+    era justo el que no se facturaba. Se arregló allí, y por eso mismo conviene
+    que esto no dependa de cuántos vengan.
     """
     chunks: list[dict[str, Any]] = []
     for line in text.splitlines():
@@ -73,7 +73,7 @@ class ReplayGateway:
         bodies: rutas a cuerpos grabados.  ``.sse`` se sirve como stream;
             cualquier otra extensión, como respuesta completa.
         provider: adaptador con el que normalizar.  Por defecto, el dialecto
-            que habla Prometheus.
+            OpenAI-compatible, que es el que habla casi todo.
         tools: herramientas decoradas, que se ejecutan de verdad.
         deny_tools: denegaciones simuladas por nombre de herramienta.
     """

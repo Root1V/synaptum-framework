@@ -8,15 +8,8 @@ doble a modelo real no toca una línea del agente.
 from __future__ import annotations
 
 import os
-from pathlib import Path
-
 from synaptum import HttpModel, LocalGateway
 from synaptum.testing import FakeGateway
-
-CORPUS = Path(
-    "/Users/emericespiritusantiago/Documents/Victor/coordinacion_project/"
-    "contratos/gateway-prometheus/fixtures"
-)
 
 
 def hay_modelo_real() -> bool:

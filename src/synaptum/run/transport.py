@@ -224,9 +224,9 @@ class HttpModel:
 def _chunks(respuesta, parar: threading.Event) -> Iterator[dict[str, Any]]:
     """Lee un cuerpo SSE línea a línea y para en el primer centinela.
 
-    Parar en el primero no es un detalle: hasta el manifest v8 el gateway de
-    Prometheus mandaba dos, y todo lo que registraba la petición vivía pasado
-    ese punto — así que el cliente correcto era justo el que no se facturaba.
+    Parar en el primero no es un detalle: un gateway real llegó a mandar dos, y
+    todo lo que registraba la petición vivía pasado ese punto — así que el
+    cliente correcto era justo el que no se facturaba.
     """
     for linea in respuesta:
         if parar.is_set():

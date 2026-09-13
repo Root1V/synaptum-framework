@@ -57,9 +57,9 @@ async for step in agent.run("lee /x", session=Session("run-1", otro_gateway, sto
 La ventana de contexto no se almacena: se **vuelve a derivar** de los mismos resultados en el mismo
 orden. Guardarla sería guardar dos veces lo mismo y arriesgarse a que discrepen.
 
-Esto se apoya en una sola pieza: la [identidad determinista de paso](../coordinacion_project/contratos/identidad-de-paso/spec.md),
-publicada como **especificación abierta**. Quien la implemente obtiene la misma propiedad sin
-importar nada de Synaptum ni hablar Python.
+Esto se apoya en una sola pieza: la **identidad determinista de paso**, publicada como
+especificación abierta. Quien la implemente obtiene la misma propiedad sin importar nada de Synaptum
+ni hablar Python.
 
 ## Herramientas
 
@@ -133,24 +133,44 @@ aparece en los caminos que nadie escribe porque no se le ocurren.
 
 ## Dónde encaja
 
+Synaptum se sostiene solo. Habla con dos piezas por **protocolo**, y trae una implementación de
+referencia completa de cada una:
+
 ```
-Aeon         arnés · política, aprobaciones, secretos, retención, escalado
-  │          dos costuras: una aplica, otra recuerda
-Synaptum     framework + runtime · semántica de ejecución      ← esto
-  │
-Axonium      SDK en tres sabores · única puerta a inferencia local
-  │
-Prometheus   plataforma de inferencia
+arnés          política, aprobaciones, secretos, retención, escalado
+  │            Gateway — decide y ejecuta          · por defecto: LocalGateway
+Synaptum       semántica de ejecución              ← esto
+  │            Checkpointer — persiste, no decide  · por defecto: SqliteCheckpointer
+almacén
+                                    ─────
+proveedor      cualquier endpoint OpenAI-compatible · por defecto: HttpModel
 ```
 
-Synaptum funciona sin nada de lo de arriba ni lo de abajo: `LocalGateway` y `MemoryCheckpointer` son
-implementaciones de referencia completas. `LocalGateway` **avisa de que no aplica política** y marca
-cada comprobación con `enforced=False` — una comprobación dentro del proceso gobernado es advisoria,
-y que un run pase por ahí sin denegaciones no dice nada sobre si pasaría por el gateway real.
+**Las dos costuras son protocolos estructurales (`typing.Protocol`), no clases base.** Quien las
+implemente no hereda ni importa nada nuestro, y puede estar escrito en otro lenguaje al otro lado de
+un socket. No hay ningún arnés, SDK ni plataforma de inferencia concretos en el árbol de
+dependencias: `pip install synaptum` trae **cero** paquetes.
+
+En el despliegue donde nació, esas dos ranuras las ocupan un arnés llamado Aeon y un SDK llamado
+Axonium sobre una plataforma de inferencia local. Nada de eso es un requisito, y el paquete no los
+nombra: son **un** relleno posible de un protocolo abierto. El extra `[axonium]` existe para quien
+tenga esa combinación, y es opcional como el de Anthropic o el de OpenAI.
+
+`LocalGateway` **avisa de que no aplica política** y marca cada comprobación con `enforced=False` —
+una comprobación dentro del proceso gobernado es advisoria, y que un run pase por ahí sin
+denegaciones no dice nada sobre si pasaría por un gateway real.
 
 ## Contratos compartidos
 
-Tres, en `contratos/`, con casos dorados que cada proyecto ejecuta con su propio runner:
+Tres especificaciones con casos dorados, ejecutables por cualquier implementación con su propio
+runner. **Viven fuera de este repositorio** porque son artefactos conjuntos de varios proyectos, y
+copiarlos aquí los convertiría en una copia que se desincroniza. Synaptum no depende de ellos: son
+evidencia adicional, y sin ellos la suite pasa igual (209 de 277; el resto se salta).
+
+```bash
+export SYNAPTUM_CONTRACTS=/ruta/a/contratos    # opcional
+```
+
 
 | Contrato | Estado |
 |---|---|
@@ -174,8 +194,9 @@ relacionan entre sí.
 
 ## Estabilidad
 
-Aeon congeló su DSL de autoría apoyándose en nuestro compromiso de estabilidad, así que está escrito
-y comprobado por un test, no recordado. Ver [`API.md`](API.md).
+Qué se garantiza, durante cuánto y qué no: está **escrito y comprobado por un test**, no recordado.
+Un arnés retiró su DSL de autoría apoyándose en ese compromiso, que es por qué existe por escrito.
+Ver [`API.md`](API.md).
 
 ## Estado
 

@@ -1,8 +1,11 @@
 # Política de estabilidad de API
 
-`SYN-46`. Existe porque **Aeon congeló su DSL de autoría nativo** apoyándose en que Synaptum sería
-la capa de autoría. Esa decisión es difícil de revertir, así que la contrapartida no puede quedarse
-en una frase del acuerdo tripartito: tiene que decir qué está garantizado, durante cuánto, y qué no.
+`SYN-46`. Esta política vale para cualquiera que construya sobre Synaptum, y no depende de quién sea.
+
+Nació de un caso concreto: un arnés retiró su DSL de autoría nativo apoyándose en que Synaptum sería
+esa capa. Una decisión así es difícil de revertir, y la contrapartida no podía quedarse en una frase
+de un acuerdo: tiene que decir qué está garantizado, durante cuánto y qué no. Lo que sigue aplica
+igual a quien llegue mañana sin haber estado en aquella conversación.
 
 ## Qué es superficie pública
 
@@ -48,7 +51,7 @@ especificados en `contratos/` y versionados aparte, con una ventana de **dos ver
 vivas**. Esa garantía es más fuerte que la de esta política y no depende de ella: alguien puede
 implementar la costura sin usar Synaptum.
 
-### La API de autoría — lo que Aeon congeló su DSL para usar
+### La API de autoría — sobre la que se escriben agentes
 
 ```python
 Agent · tool · Tool · Session · Limits · Risk
@@ -79,6 +82,6 @@ que poder actuar sin abrir un issue.
 
 ## Qué hacer si esto se rompe
 
-Si un cambio nuestro rompe a Aeon o a Axonium **fuera de lo que esta política permite**, es un fallo
-nuestro y se revierte — no se negocia una migración a posteriori. Ese es el sentido de haberlo
-escrito antes.
+Si un cambio nuestro rompe a alguien que construye sobre esto **fuera de lo que esta política
+permite**, es un fallo nuestro y se revierte — no se negocia una migración a posteriori. Ese es el
+sentido de haberlo escrito antes.

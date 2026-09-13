@@ -10,14 +10,11 @@ import pytest
 from synaptum import Agent, CallContext, ConfigurationError, Request, Session, tool
 from synaptum.testing import ReplayGateway, split_sse
 
-_BODIES = Path(
-    "/Users/emericespiritusantiago/Documents/Victor/coordinacion_project"
-    "/contratos/gateway-prometheus/fixtures"
-)
+from contratos import SIN_CONTRATOS, corpus
 
-pytestmark = pytest.mark.skipif(
-    not _BODIES.exists(), reason="cuerpos grabados compartidos no disponibles"
-)
+_BODIES = corpus("gateway-prometheus", "fixtures")
+
+pytestmark = pytest.mark.skipif(_BODIES is None, reason=SIN_CONTRATOS)
 
 
 @tool(idempotent=True)
