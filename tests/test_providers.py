@@ -67,3 +67,72 @@ def test_discovery_is_cached_and_resettable():
     _reset_discovery()
     primero = providers.available()
     assert providers.available() == primero
+
+
+def test_the_reasoning_cycle_closes_when_a_tool_call_starts():
+    """La fase de razonamiento termina al empezar *cualquier* otra cosa.
+
+    Cerrábamos el ciclo solo al llegar ``content``, así que un modelo de
+    razonamiento que llama a una herramienta —75 deltas de pensamiento y ni un
+    token de respuesta, que es la grabación real— dejaba el ``reasoning_end``
+    cayendo en mitad de la llamada: el bloque de pensamiento seguía abierto
+    mientras los argumentos ya estaban llegando.
+
+    Se comprueba aquí además de en el corpus porque el corpus vive fuera del
+    repo, y una propiedad de nuestro adaptador tiene que poder fallar sin él.
+    """
+    from synaptum.providers.openai_compatible import OpenAICompatible
+
+    adapter = OpenAICompatible()
+    chunks = [
+        {"choices": [{"delta": {"reasoning_content": "pienso"}}]},
+        {
+            "choices": [
+                {
+                    "delta": {
+                        "tool_calls": [
+                            {
+                                "index": 0,
+                                "id": "call_1",
+                                "function": {"name": "f", "arguments": '{"a":'},
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        {"choices": [{"delta": {"tool_calls": [{"index": 0, "function": {"arguments": "1}"}}]},
+                      "finish_reason": "tool_calls"}]},
+    ]
+    kinds = [event.kind for event in adapter.stream_from_wire(chunks)]
+
+    assert kinds.index("reasoning_end") < kinds.index("tool_call_start"), (
+        "el razonamiento tiene que cerrarse antes de que empiece la llamada"
+    )
+    assert kinds == [
+        "stream_start",
+        "reasoning_start",
+        "reasoning_delta",
+        "reasoning_end",
+        "tool_call_start",
+        "tool_call_delta",
+        "tool_call_delta",
+        "tool_call_end",
+        "finish",
+    ]
+
+
+def test_a_second_sentinel_cannot_change_the_result():
+    """Parar en el primer centinela, vengan uno o vengan dos.
+
+    Es la conducta que dejó sin facturar todo el streaming de Prometheus hasta
+    el manifest v8: el cliente correcto paraba en el primero, y el registro de
+    la petición vivía pasado ese punto.  Ya viene uno solo — razón de más para
+    que esto no dependa de cuántos vengan.
+    """
+    from synaptum.testing import split_sse
+
+    uno = 'data: {"choices":[{"delta":{"content":"Hi"}}]}\ndata: [DONE]\n'
+    dos = uno + 'data: {"choices":[{"delta":{"content":" BASURA"}}]}\ndata: [DONE]\n'
+
+    assert split_sse(uno) == split_sse(dos)

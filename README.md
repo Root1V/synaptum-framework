@@ -136,14 +136,21 @@ Tres, en `contratos/`, con casos dorados que cada proyecto ejecuta con su propio
 |---|---|
 | Costura de durabilidad | 8 casos · verdes contra nuestras dos implementaciones |
 | Identidad de paso | 10 casos · verdes |
-| Normalización entre proveedores | 10 casos · verdes contra el adaptador Python, la mayoría **grabaciones reales** |
+| Normalización entre proveedores | 14 casos · verdes contra el adaptador Python, todos menos uno **grabaciones reales** |
 
 Los casos describen **resultados observables** y nunca estructuras internas: dos implementaciones sin
 una línea de código en común tienen que poder reproducirlos.
 
-Que los cuerpos sean grabaciones reales y no ejemplos escritos a mano ya encontró un fallo nuestro:
-un stream que era **solo razonamiento** no emitía ni un evento, porque el cuerpo inventado que
-teníamos antes solo llevaba deltas de texto y ese camino no se recorría nunca.
+Que los cuerpos sean grabaciones reales y no ejemplos escritos a mano ya encontró dos fallos
+nuestros. Un stream que era **solo razonamiento** no emitía ni un evento, porque el cuerpo inventado
+que teníamos antes solo llevaba deltas de texto. Y en un stream de razonamiento que termina llamando
+a una herramienta, el cierre del pensamiento caía **en mitad de la llamada**: cerrábamos el ciclo al
+ver texto, y ahí no había texto.
+
+Un caso dorado **no fija cifras**. Una regrabación tiró cinco de los nuestros sin que ninguna
+implementación hubiera cambiado: fijaban tokens y un id de réplica, que pertenecen a una grabación y
+no a la especificación. Lo que se afirma es si un contador está medido o sin medir, y cómo se
+relacionan entre sí.
 
 ## Estabilidad
 

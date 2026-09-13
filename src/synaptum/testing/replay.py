@@ -46,13 +46,22 @@ def split_sse(text: str) -> list[dict[str, Any]]:
     Vive aquí y no en el adaptador porque **cómo llegan los fragmentos por el
     cable no es normalización**: es transporte, y esa separación es lo que
     permite ejercitar la normalización con un fichero.
+
+    El centinela **termina** el cuerpo; no se salta. Hasta el manifest v8 el
+    gateway de Prometheus mandaba dos —uno del backend y otro suyo—, y la
+    diferencia entre saltarlos y parar en el primero no era cosmética: todo lo
+    que registraba la petición vivía pasado ese punto, así que el cliente
+    correcto era justo el que no se facturaba. Ya viene uno solo, y por eso
+    mismo conviene que esto no dependa de cuántos vengan.
     """
     chunks: list[dict[str, Any]] = []
     for line in text.splitlines():
         if not line.startswith("data: "):
             continue
         payload = line.removeprefix("data: ").strip()
-        if payload and payload != "[DONE]":
+        if payload == "[DONE]":
+            break
+        if payload:
             chunks.append(json.loads(payload))
     return chunks
 

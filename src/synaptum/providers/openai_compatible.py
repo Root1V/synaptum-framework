@@ -157,8 +157,6 @@ class OpenAICompatible:
 
                 if delta.get("content"):
                     if open_reasoning:
-                        # El razonamiento llega entero antes del primer token de
-                        # respuesta: al abrirse el texto, aquella fase terminó.
                         yield ReasoningEnd()
                         open_reasoning = False
                     if not open_text:
@@ -169,6 +167,17 @@ class OpenAICompatible:
                     yield TextDelta(text=piece)
 
                 for raw in delta.get("tool_calls") or ():
+                    if open_reasoning:
+                        # La fase de razonamiento termina cuando empieza
+                        # *cualquier* otra cosa, no solo el texto.  Una
+                        # grabación real de un modelo de razonamiento que llama
+                        # a una herramienta son 75 deltas de razonamiento y
+                        # ningún token de respuesta: cerrar solo con `content`
+                        # dejaba el `reasoning_end` cayendo en mitad de la tool
+                        # call, con el bloque de pensamiento abierto mientras
+                        # los argumentos ya estaban llegando.
+                        yield ReasoningEnd()
+                        open_reasoning = False
                     index = int(raw.get("index", 0))
                     if index not in calls:
                         calls[index] = {"id": raw.get("id", ""), "name": "", "args": []}
