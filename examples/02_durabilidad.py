@@ -15,9 +15,9 @@ from pathlib import Path
 from typing import Annotated
 
 from synaptum import Agent, FinalStep, Session, SqliteCheckpointer, tool
-from synaptum.testing import FakeGateway, calls, says
+from synaptum.testing import calls, says
 
-from _comun import encabezado
+from _comun import encabezado, gateway, nombre_del_modelo
 
 LLAMADAS = {"herramienta": 0}
 
@@ -60,7 +60,12 @@ async def main() -> None:
     encabezado("02 · Reanudar sin volver a pagar")
 
     almacen = Path(tempfile.mkdtemp()) / "runs.db"
-    agente = Agent("cajero", model="openai-compatible:doble", tools=[consultar_saldo])
+    agente = Agent(
+        "cajero",
+        model=nombre_del_modelo(),
+        instructions="Consultas saldos con la herramienta. Responde en una frase.",
+        tools=[consultar_saldo],
+    )
     tarea = "¿Cuánto hay en ES91 2100 0418 45?"
 
     # ── Primera vuelta: se corta después de ejecutar la herramienta ────────────
@@ -68,7 +73,7 @@ async def main() -> None:
     # El corte es lo peor que puede pasar: el efecto ya ocurrió y el proceso
     # muere antes de contárselo a nadie.
 
-    puerta = FakeGateway(*guion(), tools=[consultar_saldo])
+    puerta = gateway(guion(), tools=[consultar_saldo])
     checkpointer = SqliteCheckpointer(almacen)
 
     try:
@@ -91,7 +96,7 @@ async def main() -> None:
     # que ya está en el journal.
 
     LLAMADAS["herramienta"] = 0
-    otra_puerta = FakeGateway(*guion(), tools=[consultar_saldo])
+    otra_puerta = gateway(guion(), tools=[consultar_saldo])
     otro_checkpointer = SqliteCheckpointer(almacen)   # otra conexión al mismo fichero
 
     salida = None
@@ -110,7 +115,7 @@ async def main() -> None:
 
     # ── Tercera vuelta: un run cerrado no se reabre ────────────────────────────
 
-    tercera_puerta = FakeGateway(*guion(), tools=[consultar_saldo])
+    tercera_puerta = gateway(guion(), tools=[consultar_saldo])
     pasos = [
         paso
         async for paso in agente.run(

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Annotated
 
 from synaptum import (
+    ALLOW,
     ApprovalStep,
     Decision,
     Disposition,
@@ -25,9 +26,9 @@ from synaptum import (
     ToolStep,
     tool,
 )
-from synaptum.testing import FakeGateway, calls, says
+from synaptum.testing import calls, says
 
-from _comun import encabezado
+from _comun import encabezado, gateway, nombre_del_modelo
 
 HECHAS: list[str] = []
 
@@ -59,7 +60,12 @@ async def main() -> None:
     encabezado("03 · Aprobación humana a mitad de un run")
 
     almacen = Path(tempfile.mkdtemp()) / "runs.db"
-    agente = Agent("tesorero", model="openai-compatible:doble", tools=[transferir])
+    agente = Agent(
+        "tesorero",
+        model=nombre_del_modelo(),
+        instructions="Ordenas transferencias con la herramienta. Confirma en una frase.",
+        tools=[transferir],
+    )
     tarea = "Transfiere 250 € a ES76 0049 1500 05"
 
     # ── 1ª vuelta: el gateway exige aprobación ────────────────────────────────
@@ -69,9 +75,18 @@ async def main() -> None:
         reason_code="destructive_requires_human",
         message="Una transferencia necesita aprobación de una persona.",
     )
-    puerta = FakeGateway(
-        *[responder] * 4,
+    # La misma denegación, dicha de las dos formas: el gateway real la aplica
+    # por política, el doble por nombre de herramienta.  Así el ejemplo corre
+    # igual con modelo y sin él, en vez de decir «modelo real» y usar el doble.
+    def politica(check):
+        if check.kind == "tool" and check.risk is Risk.DESTRUCTIVE:
+            return pendiente
+        return ALLOW
+
+    puerta = gateway(
+        [responder] * 4,
         tools=[transferir],
+        policy=politica,
         deny_tools={"transferir": pendiente},
     )
     checkpointer = SqliteCheckpointer(almacen)
@@ -99,7 +114,7 @@ async def main() -> None:
 
     # ── 2ª vuelta: el gateway ya no deniega ───────────────────────────────────
 
-    otra_puerta = FakeGateway(*[responder] * 4, tools=[transferir])
+    otra_puerta = gateway([responder] * 4, tools=[transferir])
 
     salida = None
     async for paso in agente.run(

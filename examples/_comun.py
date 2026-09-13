@@ -22,24 +22,60 @@ def nombre_del_modelo() -> str:
     return "openai-compatible:doble"
 
 
-def gateway_real(tools=()):
+def gateway_real(tools=(), policy=None):
     """`LocalGateway` sobre transporte HTTP.  Solo si hay endpoint configurado."""
     modelo = HttpModel(
         os.environ["SYNAPTUM_BASE_URL"],
         api_key=os.environ.get("SYNAPTUM_API_KEY"),
     )
-    return LocalGateway(model=modelo, stream=modelo.stream, tools=tools, warn=False)
+    return _Contado(
+        LocalGateway(
+            model=modelo, stream=modelo.stream, tools=tools, policy=policy, warn=False
+        )
+    )
 
 
-def gateway(guion, tools=()):
+class _Contado:
+    """Envuelve un gateway para contar sus llamadas al modelo.
+
+    Existe para que el ejemplo de durabilidad pueda **medir** contra un modelo
+    real lo mismo que mide contra el doble. Una reanudación que no vuelve a
+    pagar es una afirmación comprobable, y comprobarla solo con el doble sería
+    comprobar el doble.
+
+    Delega todo lo demás: el gateway de dentro es el que decide y ejecuta.
+    """
+
+    def __init__(self, interior) -> None:
+        self._interior = interior
+        self.model_calls = 0
+
+    async def invoke_model(self, request, ctx):
+        self.model_calls += 1
+        return await self._interior.invoke_model(request, ctx)
+
+    def stream_model(self, request, ctx):
+        self.model_calls += 1
+        return self._interior.stream_model(request, ctx)
+
+    def __getattr__(self, nombre):
+        return getattr(self._interior, nombre)
+
+
+def gateway(guion, tools=(), *, policy=None, deny_tools=None):
     """El real si está configurado; si no, el doble con el guion que se le pase.
 
     El doble no es un mock: ejecuta las herramientas de verdad, hace streaming
     de verdad y produce `Usage` de verdad.  Lo único que no hace es inferir.
+
+    ``policy`` y ``deny_tools`` expresan la misma denegación de las dos formas
+    que cada gateway entiende. Van juntas a propósito: si un ejemplo solo
+    supiera denegar con el doble, correría sobre el doble mientras la cabecera
+    dice «modelo real», que es peor que no poder correrlo.
     """
     if hay_modelo_real():
-        return gateway_real(tools)
-    return FakeGateway(*guion, tools=tools)
+        return gateway_real(tools, policy=policy)
+    return FakeGateway(*guion, tools=tools, deny_tools=deny_tools or {})
 
 
 def encabezado(titulo: str) -> None:
