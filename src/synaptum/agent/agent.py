@@ -284,7 +284,16 @@ class Agent:
                     await journal.record(result)
                     yield result
 
-                total += response.usage
+                # Una respuesta servida desde una clave de idempotencia **no se
+                # generó ahora**: su consumo describe la generación original, que
+                # ya se contó.  Sumarlo otra vez no falla ni avisa — solo hace
+                # que el total del run sea mayor que lo que costó.
+                #
+                # El paso sí lo registra tal cual: el journal cuenta lo que el
+                # proveedor dijo, y el total cuenta lo que se pagó.  Son cosas
+                # distintas y conviene que no se mezclen.
+                if not response.provider_metadata.get("idempotent_replay"):
+                    total += response.usage
                 messages.append(response.message)
 
                 calls = response.tool_calls

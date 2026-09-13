@@ -16,9 +16,14 @@ anthropic = ["anthropic>=1"]
 openai    = ["openai>=2"]
 mcp       = ["mcp>=1"]
 otel      = ["opentelemetry-sdk>=1.30"]
-# Fijado al rc a propósito: hoy no hay versión estable de axonium, y un
-# '>=1' sin permitir prelanzamientos no resuelve. Se relaja cuando salga 1.0.0.
-axonium   = ["axonium>=1.0.0rc1"]
+# Fijado al rc a propósito: aún no hay versión estable, y un '>=1' sin permitir
+# prelanzamientos no resuelve. Se relaja cuando salga 1.0.0.
+#
+# El mínimo es rc3 y no rc1: desde rc3 el SDK trae sus URLs por defecto, así que
+# el puente no necesita configuración de direcciones. Con rc1 resolvería igual y
+# fallaría al construir el cliente pidiendo dos URLs — un mínimo que resuelve y
+# no funciona es peor que uno que no resuelve.
+axonium   = ["axonium>=1.0.0rc3"]
 
 # SYN-17 — los proveedores se descubren por entry point, sin que el núcleo los conozca.
 [project.entry-points."synaptum.providers"]

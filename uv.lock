@@ -57,16 +57,16 @@ wheels = [
 
 [[package]]
 name = "axonium"
-version = "1.0.0rc1"
+version = "1.0.0rc3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/68/23/03b95c6a8da3c4461143d849a4745ddd7613cbd1b0e3d4520fe0e9a71afe/axonium-1.0.0rc1.tar.gz", hash = "sha256:f91d6abd2c605ac9c576528a1390e01b72b08d1e15da84f6a9b7220daa59a40f", size = 149246, upload-time = "2026-09-11T20:34:17.411Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/e6/25b213fae5ba40c1bed407db343f38f1e3578e1ea2ff25898c06d4f3e1fd/axonium-1.0.0rc3.tar.gz", hash = "sha256:b63032e04f4bb9a84d47228e0bfe6413d480a6b1027d892a2b30aa0cfab5ed7a", size = 157537, upload-time = "2026-09-13T16:55:22.579Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/61/4fa5d5686d97114d63124b767ccf055c479a72dd67e55cd84c2948324383/axonium-1.0.0rc1-py3-none-any.whl", hash = "sha256:c6cd4e36026e87a5959886c39603649c41026ec6ea760fd47caf1a84addfcf60", size = 57154, upload-time = "2026-09-11T20:34:16.045Z" },
+    { url = "https://files.pythonhosted.org/packages/22/ca/4236a31872d5e7590ac53e9bec41bf3ca59ea830bec03bb45409e012310a/axonium-1.0.0rc3-py3-none-any.whl", hash = "sha256:7d9f58b926bde214d5ad90c1537c7f514e9c6c42f07ca31b0648e9bf2d554b71", size = 62098, upload-time = "2026-09-13T16:55:21.372Z" },
 ]
 
 [[package]]
@@ -838,7 +838,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=1" },
-    { name = "axonium", marker = "extra == 'axonium'", specifier = ">=1.0.0rc1" },
+    { name = "axonium", marker = "extra == 'axonium'", specifier = ">=1.0.0rc3" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=2" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.30" },

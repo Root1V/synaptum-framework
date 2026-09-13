@@ -59,8 +59,14 @@ from ..tools.decorator import Tool
 __all__ = ["LocalGateway", "Check", "Policy"]
 
 
-ModelCall = Callable[[Request], Awaitable[Response]]
-ModelStream = Callable[[Request], AsyncIterator[StreamEvent]]
+ModelCall = Callable[..., Awaitable[Response]]
+ModelStream = Callable[..., AsyncIterator[StreamEvent]]
+"""``(Request)`` o ``(Request, CallContext)``.
+
+Lo segundo es opcional y se detecta **una vez, al construir**. Existe porque hay
+proveedores que pueden aprovechar la identidad del paso —una clave de
+idempotencia, una traza— y obligar a todos a aceptar un parámetro que la mayoría
+ignora sería peor que mirar la firma una vez."""
 Policy = Callable[["Check"], Decision]
 """Política simulada.  Permite ver los tres caminos de denegación en local, con
 la advertencia de que aquí no aplican nada."""
@@ -122,6 +128,8 @@ class LocalGateway:
             )
         self._model = model
         self._stream = stream
+        self._model_wants_ctx = _acepta_ctx(model)
+        self._stream_wants_ctx = _acepta_ctx(stream) if stream is not None else False
         self.tools = {t.name: t for t in tools}
         self.policy = policy
         self.checks: list[Check] = []
@@ -137,14 +145,24 @@ class LocalGateway:
 
     async def invoke_model(self, request: Request, ctx: CallContext) -> Response:
         self._check("model", request.model, ctx.step_id, Risk.READ)
+        if self._model_wants_ctx:
+            return await self._model(request, ctx)
         return await self._model(request)
 
     async def stream_model(self, request: Request, ctx: CallContext) -> AsyncIterator[StreamEvent]:
         self._check("model", request.model, ctx.step_id, Risk.READ)
 
         if self._stream is not None:
-            async for event in self._stream(request):
-                yield event
+            fuente = (
+                self._stream(request, ctx) if self._stream_wants_ctx else self._stream(request)
+            )
+            try:
+                async for event in fuente:
+                    yield event
+            finally:
+                cerrar = getattr(fuente, "aclose", None)
+                if cerrar is not None:
+                    await cerrar()
             return
 
         # Sin streaming del proveedor: se sirve igual, y el resultado dice qué
@@ -218,3 +236,24 @@ class LocalGateway:
             *(f"  {check}" for check in self.checks),
         ]
         return "\n".join(lines)
+
+
+def _acepta_ctx(llamable: Any) -> bool:
+    """¿La función quiere el ``CallContext`` además de la petición?
+
+    Se mira una vez, al construir el gateway, y no en cada llamada: inspeccionar
+    una firma en el camino caliente sería pagar por algo que no cambia.
+    """
+    import inspect
+
+    try:
+        firma = inspect.signature(llamable)
+    except (TypeError, ValueError):   # builtins y objetos sin firma legible
+        return False
+    parametros = [
+        p for p in firma.parameters.values()
+        if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+    ]
+    if any(p.kind is p.VAR_POSITIONAL for p in firma.parameters.values()):
+        return False
+    return len(parametros) >= 2

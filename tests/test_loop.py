@@ -7,6 +7,7 @@ Todo lo demás sostiene esa.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 
 import pytest
 
@@ -551,3 +552,34 @@ def test_closing_the_run_closes_the_gateway_stream():
         return vistos
 
     assert asyncio.run(go()) == 2
+
+
+def test_a_replayed_response_is_not_counted_twice():
+    """Un replay no se generó ahora: su consumo ya se pagó una vez.
+
+    Lo avisó Axonium al publicar las claves de idempotencia, y era un fallo
+    latente nuestro: el bucle sumaba todo lo que volviera. No falla ni avisa —
+    solo hace que el total del run sea mayor que lo que costó, que es la clase
+    de error que aparece al cuadrar la factura y no antes.
+    """
+    from synaptum.testing import FakeGateway
+
+    generada = Response(
+        message=Message.assistant("hola"),
+        finish_reason=FinishReason.STOP,
+        usage=Usage(input=100, output=20),
+    )
+    replay = replace(generada, provider_metadata={"idempotent_replay": True})
+
+    normal = run(Agent("a", model="openai-compatible:m"), "t",
+                 Session("r1", FakeGateway(generada)))
+    repetida = run(Agent("a", model="openai-compatible:m"), "t",
+                   Session("r2", FakeGateway(replay)))
+
+    assert normal[-1].usage.input == 100
+    assert repetida[-1].usage.input == 0, "el replay se contó como generación nueva"
+
+    # El paso sigue registrando lo que el proveedor dijo: el journal cuenta lo
+    # que ocurrió, el total cuenta lo que se pagó.
+    paso = [e for e in repetida if e.kind == "model" and e.phase is Phase.COMPLETED][0]
+    assert paso.usage.input == 100

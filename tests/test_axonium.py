@@ -261,3 +261,96 @@ def test_the_bridge_closes_the_reasoning_cycle_when_a_tool_call_starts():
 
     assert tipos.index("reasoning_end") < tipos.index("tool_call_start")
     assert eventos[-1].response.tool_calls[0].arguments == {"a": 1}
+
+
+# ── La identidad del paso como clave de idempotencia ──────────────────────────
+
+def test_the_step_identity_travels_as_an_idempotency_key():
+    """``(run_id, step_id)`` es determinista, así que reanudar da la misma clave.
+
+    Cierra un agujero que el journal solo no puede tapar: si el proceso muere
+    después de mandar la petición y antes de registrar el resultado, el replay
+    reintenta —una llamada al modelo es repetible— y sin clave esa repetición
+    es una segunda generación facturable.
+    """
+    from synaptum import CallContext
+
+    cliente = _ClienteFalso(_completion(content="hola"))
+    modelo = AxoniumModel(client=cliente)
+    ctx = CallContext(run_id="run-7", step_id="000003-model")
+
+    asyncio.run(modelo.complete(Request(model="axonium:m"), ctx))
+    asyncio.run(modelo.complete(Request(model="axonium:m"), ctx))
+
+    claves = [l["idempotency_key"] for l in cliente.llamadas]
+    assert claves == ["run-7/000003-model"] * 2, "reanudar produjo una clave distinta"
+
+
+def test_without_a_context_no_key_is_invented():
+    """Una clave no determinista es peor que ninguna.
+
+    Convertiría cada reintento en una generación nueva llevando la etiqueta de
+    que no lo es — se paga dos veces y además queda mal registrado.
+    """
+    cliente = _ClienteFalso(_completion(content="hola"))
+    asyncio.run(AxoniumModel(client=cliente).complete(Request(model="axonium:m")))
+
+    assert cliente.llamadas[0]["idempotency_key"] is None
+
+
+def _con_meta(**campos):
+    """Respuesta con ``meta``, que en el tipo real es de solo lectura.
+
+    El puente lee todo con ``getattr``, así que un objeto con la misma forma
+    vale — y evita depender de si el SDK deja escribir sus propios campos.
+    """
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        choices=[SimpleNamespace(
+            message=SimpleNamespace(content="hola", reasoning_content=None, tool_calls=None),
+            finish_reason="stop",
+        )],
+        usage=None,
+        model="m",
+        meta=SimpleNamespace(**campos),
+    )
+
+
+def test_platform_metadata_reaches_the_response():
+    """``meta`` se descartaba entero, y dos campos de ahí no son decorativos."""
+    completion = _con_meta(
+        request_id="req-1", trace_id="tr-1", instance="#2",
+        instance_id="inst-abc", idempotent_replay=True,
+    )
+    respuesta = asyncio.run(
+        AxoniumModel(client=_ClienteFalso(completion)).complete(Request(model="axonium:m"))
+    )
+
+    assert respuesta.provider_metadata["idempotent_replay"] is True
+    assert respuesta.provider_metadata["instance_id"] == "inst-abc"
+    assert respuesta.provider_metadata["request_id"] == "req-1"
+
+
+def test_a_replay_served_through_the_gateway_is_not_counted_twice():
+    """De punta a punta: puente → LocalGateway → bucle.
+
+    Las dos mitades se prueban por separado, y esto comprueba que se tocan: el
+    puente tiene que exponer el bit y el bucle tiene que mirarlo. Cualquiera de
+    las dos sola deja el total inflado sin que nada falle.
+    """
+    from synaptum import Agent, LocalGateway, Session
+
+    puente = AxoniumModel(client=_ClienteFalso(_con_meta(idempotent_replay=True)))
+    gateway = LocalGateway(model=puente.complete, warn=False)
+
+    async def go():
+        return [
+            paso
+            async for paso in Agent("a", model="axonium:m").run(
+                "t", session=Session("run-1", gateway)
+            )
+        ]
+
+    pasos = asyncio.run(go())
+    assert pasos[-1].usage.input == 0, "un replay infló el total del run"

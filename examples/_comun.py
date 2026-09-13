@@ -20,7 +20,11 @@ def por_sdk() -> bool:
     credenciales, el catálogo, la taxonomía de errores y la facturación. Por eso
     tiene prioridad sobre el transporte directo.
     """
-    return bool(os.environ.get("AXONIUM_GATEWAY_BASE_URL"))
+    # Se mira la **credencial**, no la URL: desde rc3 el SDK trae sus
+    # direcciones por defecto, así que un despliegue perfectamente configurado
+    # no tiene ninguna URL en el entorno.  Detectarlo por la URL hacía que
+    # cayera al doble en silencio, diciendo que no había SDK cuando sí lo había.
+    return bool(os.environ.get("AXONIUM_CLIENT_ID"))
 
 
 def por_http() -> bool:

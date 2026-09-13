@@ -100,18 +100,20 @@ class AxoniumModel:
 
     # ── Llamada ───────────────────────────────────────────────────────────────
 
-    async def complete(self, request: Request) -> Response:
+    async def complete(self, request: Request, ctx: Any = None) -> Response:
         body = self._wire.to_wire(request)
         body.pop("model", None)
         try:
             completion = await self._client.chat.completions.create(
-                model=_model_name(request.model), **body
+                model=_model_name(request.model),
+                idempotency_key=_clave(ctx),
+                **body,
             )
         except Exception as failure:  # noqa: BLE001
             raise _translate(failure) from failure
         return _response_from(completion)
 
-    async def stream(self, request: Request) -> AsyncIterator[StreamEvent]:
+    async def stream(self, request: Request, ctx: Any = None) -> AsyncIterator[StreamEvent]:
         body = self._wire.to_wire(request)
         body.pop("model", None)
         yield StreamStart(model=request.model)
@@ -121,17 +123,21 @@ class AxoniumModel:
         calls: dict[int, dict[str, Any]] = {}
         finish = FinishReason.STOP
         usage = Usage()
+        meta: dict[str, Any] = {}
         open_text = False
         open_reasoning = False
 
         try:
             stream = self._client.chat.completions.stream(
-                model=_model_name(request.model), **body
+                model=_model_name(request.model),
+                idempotency_key=_clave(ctx),
+                **body,
             )
             async with stream as chunks:
                 async for chunk in chunks:
                     if getattr(chunk, "usage", None):
                         usage = usage_from_axonium(chunk.usage)
+                    meta.update(metadata_from_axonium(chunk))
 
                     for choice in getattr(chunk, "choices", ()) or ():
                         delta = getattr(choice, "delta", None)
@@ -224,6 +230,7 @@ class AxoniumModel:
                 finish_reason=finish,
                 usage=usage,
                 model=request.model,
+                provider_metadata=meta,
             )
         )
 
@@ -287,7 +294,34 @@ def _response_from(completion: Any) -> Response:
         finish_reason=_FINISH.get(reason or "", FinishReason.STOP),
         usage=usage_from_axonium(getattr(completion, "usage", None)),
         model=str(getattr(completion, "model", "") or ""),
+        provider_metadata=metadata_from_axonium(completion),
     )
+
+
+def metadata_from_axonium(source: Any) -> dict[str, Any]:
+    """Lo que la plataforma dice sobre **esta** llamada, más allá del contenido.
+
+    Se descartaba entero, y dos de estos campos no son decorativos:
+
+    * ``idempotent_replay`` — una respuesta servida desde una clave previa no se
+      generó ahora.  Su ``usage`` describe la generación **original**, así que
+      sumarlo a un total acumulado lo falsea: cuenta dos veces algo que se pagó
+      una.  El bucle lo mira antes de acumular.
+    * ``instance_id`` — qué réplica atendió.  Es el valor que hay que citar al
+      reportar una respuesta lenta o rara, y sin él la pregunta «¿cuál
+      respondió?» no tiene respuesta cuando más falta hace.
+
+    Se copian con los nombres del origen: reetiquetarlos obligaría a traducir de
+    vuelta al hablar con quien los emitió.
+    """
+    meta = getattr(source, "meta", None)
+    if meta is None:
+        return {}
+    recogido = {
+        campo: getattr(meta, campo, None)
+        for campo in ("request_id", "trace_id", "instance", "instance_id", "idempotent_replay")
+    }
+    return {campo: valor for campo, valor in recogido.items() if valor is not None}
 
 
 def _arguments(raw: Any, tool: str) -> Mapping[str, Any]:
@@ -332,6 +366,37 @@ def _build_client(**settings: Any) -> Any:
             "instálalo con `pip install synaptum[axonium]`."
         ) from missing
     return AsyncAxonium(**settings)
+
+
+def _clave(ctx: Any) -> str | None:
+    """La identidad del paso **es** una clave de idempotencia.
+
+    ``(run_id, step_id)`` es determinista por construcción — el ordinal del paso
+    dentro del run, nunca un UUID ni un reloj — así que reanudar produce la misma
+    clave sin coordinar nada.  Es exactamente lo que la plataforma necesita para
+    devolver la generación anterior en vez de cobrar otra.
+
+    Cierra un agujero que el journal solo no puede tapar: si el proceso muere
+    **después** de mandar la petición y **antes** de registrar el resultado, al
+    reanudar el replay reintenta —una llamada al modelo es repetible— y sin clave
+    esa repetición es una segunda generación facturable.  El paso está bien; lo
+    que faltaba era decírselo al otro extremo.
+
+    Sin ``ctx`` no se manda clave.  Inventar una aquí sería peor que no mandarla:
+    una clave no determinista convierte cada reintento en una generación nueva
+    con la etiqueta de que no lo es.
+    """
+    if ctx is None:
+        return None
+    run_id = getattr(ctx, "run_id", None)
+    step_id = getattr(ctx, "step_id", None)
+    if not run_id or not step_id:
+        return None
+    clave = f"{run_id}/{step_id}"
+    # La plataforma corta en 255 caracteres.  Un run_id largo no debería
+    # convertir la clave en un rechazo, así que se recorta por delante: lo que
+    # distingue dos pasos está al final.
+    return clave[-255:]
 
 
 def _model_name(spec: str) -> str:
