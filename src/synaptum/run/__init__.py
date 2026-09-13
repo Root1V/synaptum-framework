@@ -3,6 +3,7 @@
 from .journal import Journal, MemoryCheckpointer, Replay
 from .local import Check, LocalGateway, Policy
 from .sqlite import SqliteCheckpointer
+from .transport import HttpModel
 
 __all__ = [
     "Journal",
@@ -12,4 +13,5 @@ __all__ = [
     "LocalGateway",
     "Check",
     "Policy",
+    "HttpModel",
 ]

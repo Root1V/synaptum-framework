@@ -41,7 +41,7 @@ import time
 from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Sequence
 
-from ..core.errors import Denied, LimitExceeded, SynaptumError
+from ..core.errors import Denied, LimitExceeded, ProviderError, SynaptumError
 from ..core.events import (
     ApprovalStep,
     Disposition,
@@ -60,6 +60,7 @@ from ..core.types import (
     Response,
     ResponseFormat,
     Risk,
+    StreamEvent,
     ToolCall,
     ToolDefinition,
     ToolResult,
@@ -146,12 +147,47 @@ class Agent:
 
     # ── Bucle ─────────────────────────────────────────────────────────────────
 
-    async def run(self, task: str, *, session: Session) -> AsyncIterator[StepEvent]:
+    def run(self, task: str, *, session: Session) -> AsyncIterator[StepEvent]:
         """Ejecuta el agente cediendo cada paso.
 
         La cancelación se propaga: cerrar el generador o cancelar la tarea que
         lo consume interrumpe el paso en vuelo y vacía lo pendiente del journal.
+
+        **No es `async def`**, por el mismo motivo que `Gateway.stream_model`:
+        devuelve el iterador del bucle en vez de envolverlo. Un envoltorio que
+        hiciera `async for ... yield` parece inocuo y no lo es — al cerrarse
+        recibe el `GeneratorExit` y deja el generador de dentro abierto, así que
+        la cancelación llega cuando pase el recolector. Sin envoltorio, cerrar
+        esto **es** cerrar el bucle.
         """
+        return self._loop(task, session, stream=False)
+
+    def stream(
+        self, task: str, *, session: Session
+    ) -> AsyncIterator[StepEvent | StreamEvent]:
+        """Lo mismo, entregando además los fragmentos del modelo según llegan.
+
+        Es el mismo bucle y el mismo journal: lo único que cambia es que la
+        llamada al modelo sale por ``stream_model`` y sus eventos se ceden
+        intercalados entre la intención del paso y su resultado.
+
+        Va aparte de ``run`` y no como bandera porque **cambia el tipo de lo que
+        se cede**. Quien consume ``run`` recibe pasos y puede hacer `match` sobre
+        ellos sin una rama para lo que nunca va a llegar.
+
+        Dos cosas que conviene saber antes de usarlo:
+
+        * **Un paso que se reanuda no vuelve a emitir fragmentos.** Ya se pagó, y
+          reproducir sus tokens como si estuvieran ocurriendo sería teatro.
+        * **Un reintento vuelve a abrir el ciclo.** Los fragmentos ya entregados
+          no se retiran —se generaron y se pagaron—, así que un fallo a mitad
+          deja lo parcial y el reintento empieza con otro ``stream_start``.
+        """
+        return self._loop(task, session, stream=True)
+
+    async def _loop(
+        self, task: str, session: Session, *, stream: bool
+    ) -> AsyncIterator[Any]:
         state = await session.checkpointer.load(session.run_id)
         journal = Journal(session.checkpointer, session.run_id)
         replay = Replay(state)
@@ -200,7 +236,33 @@ class Agent:
                     yield intent
 
                     try:
-                        response = await self._call_model(session, request, step_id)
+                        if stream:
+                            # El adaptador ya acumula la respuesta completa en el
+                            # `Finish`: quien consumió los fragmentos no debería
+                            # tener que reconstruirla.
+                            response = None
+                            fragments = self._stream_model(session, request, step_id)
+                            try:
+                                async for fragment in fragments:
+                                    if fragment.kind == "finish":
+                                        response = fragment.response
+                                    yield fragment
+                            finally:
+                                # Cerrar **aquí** y no dejarlo al recolector: si
+                                # quien consume se va a mitad, el iterador de la
+                                # costura tiene que cerrarse ya, porque cerrarlo
+                                # es lo que para la generación arriba.  Fiarlo al
+                                # GC hace que la cancelación llegue tarde, o en
+                                # otro momento cada vez — y el modelo sigue
+                                # generando, y facturando, mientras tanto.
+                                await fragments.aclose()
+                            if response is None:
+                                raise ProviderError(
+                                    "el stream terminó sin evento de cierre",
+                                    retryable=True,
+                                )
+                        else:
+                            response = await self._call_model(session, request, step_id)
                     except Denied as denial:
                         async for event in self._close_denied(
                             denial, session, journal, seq, total,
@@ -324,6 +386,23 @@ class Agent:
             return response
 
         return await self._with_retries(once)
+
+    def _stream_model(
+        self, session: Session, request: Request, step_id: str
+    ) -> AsyncIterator[StreamEvent]:
+        """Lo mismo por la costura de streaming.
+
+        **No es `async def` a propósito**, igual que `Gateway.stream_model`:
+        devuelve el iterador para que cerrarlo *sea* la señal de cancelación. Un
+        canal que se está cerrando no es sitio para mandar el aviso de que se
+        cierra.
+
+        Aquí no hay reintento envolviendo el generador: reintentar por dentro
+        obligaría a decidir qué hacer con los fragmentos ya cedidos, y la única
+        respuesta honesta —no se retiran— hace que el reintento sea visible de
+        todas formas. Que lo decida quien consume.
+        """
+        return session.gateway.stream_model(request, self._ctx(session, step_id))
 
     # ── Salida estructurada — SYN-16 ──────────────────────────────────────────
 

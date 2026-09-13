@@ -87,6 +87,7 @@ from .core import __all__ as _core_all
 from .agent import Agent, Limits, Session
 from .run import (
     Check,
+    HttpModel,
     Journal,
     LocalGateway,
     MemoryCheckpointer,
@@ -109,8 +110,7 @@ from .tools import Tool, json_schema_for, tool
 
 __version__ = "1.0.0.dev0"
 __all__ = [
-    *_core_all,
-    "UncertainEffect",
+    *_core_all,      # ya trae UncertainEffect: repetirlo aquí lo duplicaba
     "Agent",
     "Limits",
     "Session",
@@ -118,6 +118,7 @@ __all__ = [
     "MemoryCheckpointer",
     "Replay",
     "SqliteCheckpointer",
+    "HttpModel",
     "LocalGateway",
     "Check",
     "Tool",

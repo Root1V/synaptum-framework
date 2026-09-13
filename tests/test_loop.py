@@ -29,6 +29,7 @@ from synaptum import (
     Risk,
     Role,
     Session,
+    StepEvent,
     ToolCall,
     ToolDefinition,
     ToolResult,
@@ -396,3 +397,157 @@ def test_the_store_ignores_a_duplicate_write():
 
     state = asyncio.run(go())
     assert state is not None and len(state.events) == 1
+
+
+# ── Streaming del bucle — SYN-68 ──────────────────────────────────────────────
+
+def _stream(agente, tarea, sesion) -> list:
+    async def go():
+        return [e async for e in agente.stream(tarea, session=sesion)]
+
+    return asyncio.run(go())
+
+
+def test_stream_interleaves_fragments_between_intent_and_result():
+    """Los fragmentos van **dentro** del paso, no antes ni después.
+
+    Es lo que permite a quien consume asociar lo que está viendo con el paso que
+    lo produce, sin llevar estado por su cuenta.
+    """
+    from synaptum.testing import FakeGateway, says
+
+    agente = Agent("a", model="openai-compatible:m")
+    eventos = _stream(agente, "hola", Session("run-1", FakeGateway(says("hola"))))
+
+    tipos = [e.kind for e in eventos]
+    primero, ultimo = tipos.index("stream_start"), tipos.index("finish")
+    assert tipos[0] == "model", "la intención del paso va antes de los fragmentos"
+    assert primero < ultimo < tipos.index("final")
+    assert tipos[ultimo + 1] == "model", "el resultado del paso va después"
+    assert "text_delta" in tipos
+
+
+def test_stream_and_run_produce_the_same_steps():
+    """Lo que cambia es qué se ve, no qué pasa.
+
+    Un bucle que se comportara distinto al mirarlo no serviría para depurar el
+    otro, que es media razón de que esto exista.
+    """
+    from synaptum.testing import FakeGateway, says
+
+    agente = Agent("a", model="openai-compatible:m")
+
+    async def con_run():
+        return [
+            e
+            async for e in agente.run("hola", session=Session("r", FakeGateway(says("hola"))))
+        ]
+
+    pasos_run = asyncio.run(con_run())
+    pasos_stream = [
+        e
+        for e in _stream(agente, "hola", Session("r", FakeGateway(says("hola"))))
+        if isinstance(e, StepEvent)
+    ]
+
+    assert [e.step_id for e in pasos_run] == [e.step_id for e in pasos_stream]
+    assert [e.phase for e in pasos_run] == [e.phase for e in pasos_stream]
+    assert pasos_run[-1].output == pasos_stream[-1].output
+
+
+def test_a_replayed_step_emits_no_fragments():
+    """Un paso ya pagado no reproduce sus tokens.
+
+    Reemitirlos como si estuvieran ocurriendo sería teatro: no se generaron
+    ahora y no se están pagando ahora.
+    """
+    from synaptum import tool
+    from synaptum.testing import FakeGateway, calls, says
+
+    @tool
+    async def leer(path: str) -> str:
+        """Lee un fichero."""
+        return f"contenido de {path}"
+
+    store = MemoryCheckpointer()
+    agente = Agent("a", model="openai-compatible:m", tools=[leer])
+
+    class _Corte(Exception):
+        pass
+
+    async def primera():
+        puerta = FakeGateway(calls("leer", path="/x"), says("listo"), tools=[leer])
+        try:
+            async for paso in agente.run("t", session=Session("run-1", puerta, store)):
+                if paso.kind == "tool" and paso.phase is Phase.COMPLETED:
+                    raise _Corte
+        except _Corte:
+            pass
+
+    asyncio.run(primera())
+
+    segunda = FakeGateway(says("listo"), tools=[leer], chunk_size=2)
+    eventos = _stream(agente, "t", Session("run-1", segunda, store))
+
+    reanudados = [e for e in eventos if isinstance(e, StepEvent) and e.phase is Phase.COMPLETED]
+    arranques = [e for e in eventos if e.kind == "stream_start"]
+    assert len(arranques) == 1, (
+        f"{len(arranques)} ciclos de stream: un paso reanudado volvió a emitir fragmentos"
+    )
+    assert len(reanudados) >= 3, "no se reanudaron los pasos ya registrados"
+
+
+def test_the_usage_of_a_streamed_step_reaches_the_journal():
+    """El consumo llega en el evento de cierre, y tiene que acabar en el paso.
+
+    Si se perdiera, el run entero saldría gratis en el journal — y esa cifra es
+    la que alguien va a sumar para pagar.
+    """
+    from synaptum.testing import FakeGateway, says
+
+    store = MemoryCheckpointer()
+    agente = Agent("a", model="openai-compatible:m")
+    _stream(agente, "hola", Session("run-1", FakeGateway(says("hola")), store))
+
+    estado = asyncio.run(store.load("run-1"))
+    pasos = [
+        e for e in estado.events
+        if e.kind == "model" and e.phase is Phase.COMPLETED
+    ]
+    assert pasos and pasos[0].usage.input is not None
+
+
+def test_closing_the_run_closes_the_gateway_stream():
+    """La cancelación tiene que atravesar el bucle, no solo la costura.
+
+    Había un test de esto **un nivel más abajo** —cerrando el iterador del
+    gateway— y por eso no vio nada cuando el bucle empezó a envolver su propio
+    generador: el envoltorio se llevaba el `GeneratorExit` y dejaba abierto el
+    de dentro, así que la señal llegaba cuando pasara el recolector. El tramo
+    que importa es el que consume quien usa el framework.
+    """
+    from synaptum.testing import FakeGateway, says
+
+    puerta = FakeGateway(says("x" * 400), chunk_size=4)
+    agente = Agent("a", model="openai-compatible:m")
+
+    async def go():
+        flujo = agente.stream("t", session=Session("run-1", puerta))
+        vistos = 0
+        async for evento in flujo:
+            if evento.kind == "text_delta":
+                vistos += 1
+                if vistos == 2:
+                    break
+        await flujo.aclose()
+
+        # Se comprueba **aquí dentro**, y no después de `asyncio.run`, porque
+        # al cerrarse el bucle de eventos Python finaliza los generadores
+        # asíncronos que queden vivos.  Comprobarlo fuera daría verde aunque la
+        # cancelación llegara tarde — que en un proceso que no termina es lo
+        # mismo que no llegar.
+        assert puerta.cancelled is True, "cerrar el run no cerró el stream de la costura"
+        assert puerta.chunks_emitted < 400 // 4, "siguió produciendo tras el cierre"
+        return vistos
+
+    assert asyncio.run(go()) == 2

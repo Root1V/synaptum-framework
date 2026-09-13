@@ -166,8 +166,13 @@ class FakeGateway:
                 if isinstance(part, Text):
                     yield TextStart(index=index)
                     for piece in _slice(part.text, self.chunk_size):
-                        yield TextDelta(text=piece, index=index)
+                        # Se cuenta **antes** de ceder: producir ocurre aquí.
+                        # Contarlo después dejaba el último fragmento sin contar
+                        # —el generador queda suspendido en el `yield`—, así que
+                        # el testigo de la cancelación salía uno por debajo de
+                        # lo que el consumidor había recibido.
                         self.chunks_emitted += 1
+                        yield TextDelta(text=piece, index=index)
                         await asyncio.sleep(0)
                     yield TextEnd(index=index)
                 elif isinstance(part, ToolCall):
@@ -175,8 +180,8 @@ class FakeGateway:
                     from ..core.types import dumps
 
                     for piece in _slice(dumps(part.arguments), self.chunk_size):
-                        yield ToolCallDelta(arguments_delta=piece, index=index)
                         self.chunks_emitted += 1
+                        yield ToolCallDelta(arguments_delta=piece, index=index)
                         await asyncio.sleep(0)
                     yield ToolCallEnd(index=index)
 

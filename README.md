@@ -82,6 +82,26 @@ calla obtiene la clase más inocua y la garantía más cara.
 
 Un tipo que no sabemos traducir **falla al decorar**, no al invocar.
 
+## Probarlo
+
+```bash
+uv run python examples/01_agente.py
+```
+
+Corre **sin inferencia**: las respuestas van guionizadas, y el resto es real —las herramientas se
+ejecutan, el journal se escribe, el consumo se mide—. Para apuntar a un modelo de verdad, dos
+variables y **el mismo fichero sin tocar**:
+
+```bash
+export SYNAPTUM_BASE_URL=http://localhost:8080/v1
+export SYNAPTUM_MODEL=qwen3-0.6b
+uv run python examples/01_agente.py
+```
+
+Que el mismo código sirva para las dos cosas no es comodidad: es la propiedad. Ver
+[`examples/`](examples/) — el bucle entero, la reanudación **medida** (no afirmada), una aprobación
+humana a mitad de run, y el streaming con cancelación.
+
 ## Sin dependencias
 
 ```bash
