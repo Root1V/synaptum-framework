@@ -10,7 +10,7 @@ qué retención, bajo qué política— pertenece al arnés que lo opera.
 >
 > **En construcción.** La línea 0.x, con un diseño distinto, está congelada en
 > [v0.4.0](https://github.com/Root1V/synaptum-framework/releases/tag/v0.4.0). El estado real de esta
-> por elemento está en [`roadmap.md`](roadmap.md).
+> por elemento está en [`roadmap.md`](https://github.com/Root1V/synaptum-framework/blob/main/roadmap.md).
 
 ---
 
@@ -99,7 +99,7 @@ uv run python examples/01_agente.py
 ```
 
 Que el mismo código sirva para las dos cosas no es comodidad: es la propiedad. Ver
-[`examples/`](examples/) — el bucle entero, la reanudación **medida** (no afirmada), una aprobación
+[`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) — el bucle entero, la reanudación **medida** (no afirmada), una aprobación
 humana a mitad de run, y el streaming con cancelación.
 
 ## Sin dependencias
@@ -196,7 +196,7 @@ relacionan entre sí.
 
 Qué se garantiza, durante cuánto y qué no: está **escrito y comprobado por un test**, no recordado.
 Un arnés retiró su DSL de autoría apoyándose en ese compromiso, que es por qué existe por escrito.
-Ver [`API.md`](API.md).
+Ver [`API.md`](https://github.com/Root1V/synaptum-framework/blob/main/API.md).
 
 ## Estado
 

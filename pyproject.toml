@@ -1,6 +1,6 @@
 [project]
 name = "synaptum"
-version = "1.0.0.dev0"
+version = "1.0.0rc1"
 description = "Provider-agnostic agent framework and durable runtime. Owns execution semantics; the harness owns the substrate."
 keywords = ["agents", "llm", "durable-execution", "agent-framework", "provider-agnostic"]
 classifiers = [

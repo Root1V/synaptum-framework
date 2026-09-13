@@ -108,7 +108,7 @@ from .providers import Provider
 from .schema import Schema, schema_for
 from .tools import Tool, json_schema_for, tool
 
-__version__ = "1.0.0.dev0"
+__version__ = "1.0.0rc1"
 __all__ = [
     *_core_all,      # ya trae UncertainEffect: repetirlo aquí lo duplicaba
     "Agent",

@@ -70,3 +70,43 @@ def test_the_permissive_defaults_stay_asymmetric():
     default = ToolDefinition(name="cualquiera")
     assert default.risk is Risk.READ, "el riesgo por defecto es el más inocuo"
     assert default.idempotent is False, "quien calla paga durabilidad"
+
+
+def test_the_declared_version_matches_the_packaged_one():
+    """``__version__`` y el `pyproject` tienen que decir lo mismo.
+
+    Son dos sitios y se actualizan a mano, así que divergen en cuanto alguien
+    toca uno. La consecuencia es fea y silenciosa: un paquete publicado como
+    ``1.0.0rc1`` cuyo ``__version__`` dice otra cosa manda a quien depure a la
+    versión equivocada, y no falla nunca.
+    """
+    import tomllib
+
+    raiz = Path(__file__).resolve().parents[1]
+    declarada = tomllib.loads((raiz / "pyproject.toml").read_text())["project"]["version"]
+
+    import synaptum
+
+    assert synaptum.__version__ == declarada, (
+        f"__version__ dice {synaptum.__version__!r} y el pyproject {declarada!r}"
+    )
+
+
+def test_the_changelog_mentions_the_version_about_to_be_published():
+    """Publicar sin entrada de changelog deja a quien actualiza sin saber qué cambió.
+
+    Solo se exige para versiones publicables: mientras se trabaja en una `.devN`
+    la entrada vive bajo «No publicado», que es donde debe estar.
+    """
+    import synaptum
+
+    raiz = Path(__file__).resolve().parents[1]
+    changelog = (raiz / "CHANGELOG.md").read_text()
+
+    if ".dev" in synaptum.__version__:
+        assert "[No publicado]" in changelog
+        return
+
+    assert synaptum.__version__ in changelog, (
+        f"{synaptum.__version__} no aparece en CHANGELOG.md"
+    )

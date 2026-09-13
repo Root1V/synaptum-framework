@@ -3,7 +3,13 @@
 Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado según
 [`API.md`](API.md): SemVer desde `1.0.0`, con ventana de deprecación de dos versiones menores.
 
-## [No publicado]
+## [1.0.0rc1] — 2026-09-13
+
+Primera publicación. **Es un candidato y no una `1.0.0`, a propósito.** La superficie está completa
+contra el contrato de hoy y no va a cambiar por gusto, pero la Fase 2 (economía de contexto) todavía
+puede tocarla, y el compromiso de estabilidad de [`API.md`](API.md) arranca en `1.0.0`. Prometerlo
+antes de tiempo sería peor que esperar.
+
 
 Primera línea `1.0.x`. La `0.x`, con un diseño distinto, quedó congelada en
 [v0.4.0](https://github.com/Root1V/synaptum-framework/releases/tag/v0.4.0) y **no hay ruta de
