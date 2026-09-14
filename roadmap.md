@@ -228,7 +228,7 @@ y la decisión de qué va antes depende de cuántos proyectos estén esperando.
 | ID | Estado | Feature | Implica |
 |---|---|---|---|
 | SYN-73 | `HECHO` | Metadatos de distribución y `py.typed` | Sin el marcador, un consumidor con mypy no ve **ni un tipo** — en un framework construido sobre `Protocol`, uniones etiquetadas y `match`, eso es la mitad del valor. Comprobado instalando en un proyecto limpio: antes dos errores de import, ahora limpio |
-| SYN-74 | `PENDIENTE` | **Publicar en un índice** | Hoy la única vía es una ruta local o una URL de git. Es lo primero que bloquea a otro equipo, y no estaba en este roadmap. Decide también si el índice es público o interno |
+| SYN-74 | `EN CURSO` | **Publicar en un índice** | Automatizado con **Trusted Publishing (OIDC)**: no hay token en ninguna parte, así que el secreto no está mejor guardado — no existe. `1.0.0rc1` a TestPyPI primero. Falta configurar el publisher en el índice, que es lo único que no puedo hacer yo |
 | SYN-75 | `PENDIENTE` | Plantilla de proyecto de agente | Los ejemplos demuestran **propiedades**, no son un punto de partida. Un `agente.py` mínimo con herramienta, salida tipada, journal y test — lo que alguien copia el primer día |
 | SYN-76 | `PENDIENTE` | Guía de adopción | Qué gateway usar en cada caso, cómo se prueba sin inferencia, y **qué no hace el framework**. Media página, no un manual |
-| SYN-77 | `PENDIENTE` | CI pública | Los 289 tests corren en mi máquina. Quien adopte esto debe poder ver que corren en la suya, y que un PR no los rompe |
+| SYN-77 | `HECHO` | CI pública | Los tests corren en cada push y PR, **sin los contratos compartidos** —viven fuera del repositorio y la suite tiene que pasar sin ellos—. Y se prueba el wheel, no el árbol de fuentes: un paquete al que le falte un fichero pasa la suite y falla al instalarse |

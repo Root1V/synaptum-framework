@@ -1,0 +1,46 @@
+# SYN-77 · Los tests corren donde puede verlos cualquiera, no solo en un portátil.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:          # lo reutiliza la publicación: no se publica lo que no pasa
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Sin SYNAPTUM_CONTRACTS a propósito. Los corpus dorados son artefactos
+      # conjuntos de varios proyectos y viven fuera de este repositorio: aquí no
+      # están, y la suite tiene que pasar igual. Si su ausencia la rompiera
+      # serían una dependencia — y una que no se puede instalar.
+      - name: pytest
+        run: uv run --frozen pytest
+
+      # El paquete que se publica es lo que hay que probar, no el árbol de
+      # fuentes. Un wheel al que le falte un fichero pasa la suite y falla al
+      # instalarse, que es exactamente lo que este paso ve y el anterior no.
+      - name: el wheel instala y funciona por sí solo
+        run: |
+          uv build --out-dir dist
+          uvx twine check dist/*
+          uv run --isolated --no-project --with dist/*.whl python -c "
+          import synaptum, pathlib, sys
+          assert (pathlib.Path(synaptum.__file__).parent / 'py.typed').exists(), \
+              'falta py.typed: quien instale esto no ve un solo tipo'
+          ajenos = [m for m in sys.modules
+                    if not m.startswith(('synaptum', '_')) and '.' not in m
+                    and m not in sys.stdlib_module_names]
+          assert not ajenos, f'el núcleo arrastró dependencias: {ajenos}'
+          print('ok', synaptum.__version__)
+          "

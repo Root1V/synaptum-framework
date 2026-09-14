@@ -1,0 +1,120 @@
+# SYN-74 · Publicación por Trusted Publishing (OIDC).
+#
+# No hay token en ninguna parte: GitHub firma una identidad efímera y el índice
+# la verifica. El secreto no está mejor guardado — no existe, así que no se
+# puede filtrar, ni caducar sin avisar, ni acabar en el historial de un chat.
+#
+# Lo que hay que configurar en el índice (una vez, en «Publishing»):
+#
+#     owner       Root1V
+#     repository  synaptum-framework
+#     workflow    release.yml
+#     environment testpypi   (o pypi)
+#
+# El `environment` no es decorativo: es lo que permite exigir una aprobación
+# manual antes de que algo salga, y lo que hace que el publisher no valga para
+# cualquier workflow del repositorio.
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      index:
+        description: Dónde publicar
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+
+permissions:
+  contents: read
+
+jobs:
+  # No se publica lo que no pasa. Reutiliza el workflow de tests en vez de
+  # copiarlo: dos suites que se copian divergen, y la que diverge es siempre la
+  # que guarda la puerta.
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  build:
+    needs: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - run: uv build --out-dir dist
+
+      # Que el artefacto diga la misma versión que el código. Son dos sitios y
+      # se editan a mano; un wheel publicado como una versión y que por dentro
+      # dice otra manda a quien depure al sitio equivocado, y no falla nunca.
+      - name: la versión del artefacto es la del código
+        run: |
+          VERSION=$(uv run python -c "import synaptum; print(synaptum.__version__)")
+          ls dist/synaptum-${VERSION}-py3-none-any.whl dist/synaptum-${VERSION}.tar.gz
+          echo "publicando $VERSION"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.index }}
+    permissions:
+      id-token: write        # lo único que hace falta: acuñar el token OIDC
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: >-
+            ${{ inputs.index == 'pypi'
+                && 'https://upload.pypi.org/legacy/'
+                || 'https://test.pypi.org/legacy/' }}
+
+  # Instalar desde el índice y ejecutar ESA copia. Un tag no es una release
+  # hasta que alguien puede instalarlo: Axonium publicó un rc cuyo CI estaba en
+  # verde y al que le faltaban seis exportaciones, porque sus tests importaban
+  # del submódulo interno y ningún consumidor hace eso.
+  verify:
+    needs: publish
+    runs-on: ubuntu-latest
+    env:
+      # En una sola línea y como variable de entorno: una expresión de GitHub
+      # partida en varias líneas dentro de un `run` es legal y difícil de leer,
+      # y esto se lee en un incidente.
+      INDEX: ${{ inputs.index == 'pypi' && 'https://pypi.org/simple/' || 'https://test.pypi.org/simple/' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - name: leer la versión que se acaba de publicar
+        run: |
+          echo "VERSION=$(python -c "
+          import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])
+          ")" >> "$GITHUB_ENV"
+
+      # Un índice tarda en servir lo que acaba de aceptar, y cuánto es variable.
+      # La espera y la comprobación son **el mismo paso** a propósito: una sonda
+      # aparte puede decir que sí por un motivo que no es el índice —lo hizo, en
+      # local, mirando el entorno en vez del índice— y entonces la verificación
+      # arranca creyendo que hay algo. Si la instalación funciona, está servido.
+      - name: instalar desde el índice y usarlo como un consumidor
+        run: |
+          for intento in $(seq 1 30); do
+            if uv run --isolated --no-project \
+                 --index-url "$INDEX" --extra-index-url https://pypi.org/simple/ \
+                 --with "synaptum==$VERSION" python "$GITHUB_WORKSPACE/.github/humo.py"; then
+              echo "verificado tras ${intento} intento(s)"
+              exit 0
+            fi
+            echo "intento ${intento}: el índice todavía no lo sirve"
+            sleep 10
+          done
+          echo "synaptum==$VERSION no se pudo instalar desde $INDEX cinco minutos después"
+          exit 1
