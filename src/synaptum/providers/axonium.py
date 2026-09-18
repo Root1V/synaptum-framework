@@ -27,6 +27,7 @@ hace el gateway del arnés con Axonium-Go dentro, porque ahí vive la credencial
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any, AsyncIterator, Mapping
 
@@ -53,6 +54,7 @@ from ..core.types import (
     ToolCallEnd,
     ToolCallStart,
     Usage,
+    dumps,
 )
 from .openai_compatible import OpenAICompatible
 
@@ -106,7 +108,7 @@ class AxoniumModel:
         try:
             completion = await self._client.chat.completions.create(
                 model=_model_name(request.model),
-                idempotency_key=_clave(ctx),
+                idempotency_key=_clave(ctx, body),
                 **body,
             )
         except Exception as failure:  # noqa: BLE001
@@ -130,7 +132,7 @@ class AxoniumModel:
         try:
             stream = self._client.chat.completions.stream(
                 model=_model_name(request.model),
-                idempotency_key=_clave(ctx),
+                idempotency_key=_clave(ctx, body),
                 **body,
             )
             async with stream as chunks:
@@ -366,7 +368,15 @@ def _translate(failure: Exception) -> Exception:
         return failure
 
     status = getattr(failure, "status_code", None) or getattr(failure, "status", None)
-    return ProviderError(str(failure), status=status, provider="axonium")
+    # `Retry-After` viene del otro extremo y sabe algo que nosotros no: cuándo
+    # estará libre.  Perderlo convierte una espera informada en una adivinada.
+    espera = getattr(failure, "retry_after", None)
+    return ProviderError(
+        str(failure),
+        status=status,
+        provider="axonium",
+        retry_after=float(espera) if espera is not None else None,
+    )
 
 
 def _build_client(**settings: Any) -> Any:
@@ -380,8 +390,8 @@ def _build_client(**settings: Any) -> Any:
     return AsyncAxonium(**settings)
 
 
-def _clave(ctx: Any) -> str | None:
-    """La identidad del paso **es** una clave de idempotencia.
+def _clave(ctx: Any, body: Mapping[str, Any]) -> str | None:
+    """La identidad del paso **más la huella de la petición**.
 
     ``(run_id, step_id)`` es determinista por construcción — el ordinal del paso
     dentro del run, nunca un UUID ni un reloj — así que reanudar produce la misma
@@ -391,12 +401,26 @@ def _clave(ctx: Any) -> str | None:
     Cierra un agujero que el journal solo no puede tapar: si el proceso muere
     **después** de mandar la petición y **antes** de registrar el resultado, al
     reanudar el replay reintenta —una llamada al modelo es repetible— y sin clave
-    esa repetición es una segunda generación facturable.  El paso está bien; lo
-    que faltaba era decírselo al otro extremo.
+    esa repetición es una segunda generación facturable.
 
-    Sin ``ctx`` no se manda clave.  Inventar una aquí sería peor que no mandarla:
-    una clave no determinista convierte cada reintento en una generación nueva
-    con la etiqueta de que no lo es.
+    **La huella del cuerpo no es prudencia: corrige la clave.** Una clave
+    identifica *una* petición, y reutilizarla para otra distinta es un rechazo,
+    no un replay.  Sin la huella, dos runs con el mismo ``run_id`` y distinta
+    tarea chocaban — y también un mismo run tras cambiar las instrucciones del
+    agente, que es lo que pasa mientras se desarrolla.  El síntoma era un error
+    del proveedor durante 24 h y ninguna pista de por qué.
+
+    Con ella, la propiedad que importa se mantiene intacta: al reanudar, el
+    contexto se **vuelve a derivar** de los mismos resultados en el mismo orden,
+    así que el cuerpo es idéntico y la huella también.  Y si el cuerpo *no* es
+    idéntico, es otra petición y generar otra vez es lo correcto.
+
+    ``dumps`` basta y no hace falta una canonicalización entre lenguajes: esta
+    clave la produce y la consume el mismo proceso, no la compara nadie más.
+
+    Sin ``ctx`` no se manda clave.  Inventar una sería peor que no mandarla: una
+    clave no determinista convierte cada reintento en una generación nueva con la
+    etiqueta de que no lo es.
     """
     if ctx is None:
         return None
@@ -404,10 +428,11 @@ def _clave(ctx: Any) -> str | None:
     step_id = getattr(ctx, "step_id", None)
     if not run_id or not step_id:
         return None
-    clave = f"{run_id}/{step_id}"
-    # La plataforma corta en 255 caracteres.  Un run_id largo no debería
-    # convertir la clave en un rechazo, así que se recorta por delante: lo que
-    # distingue dos pasos está al final.
+
+    huella = hashlib.sha256(dumps(body).encode()).hexdigest()[:16]
+    clave = f"{run_id}/{step_id}/{huella}"
+    # La plataforma corta en 255 caracteres.  Se recorta por delante: lo que
+    # distingue dos peticiones está al final.
     return clave[-255:]
 
 

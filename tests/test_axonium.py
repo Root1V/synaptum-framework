@@ -283,7 +283,29 @@ def test_the_step_identity_travels_as_an_idempotency_key():
     asyncio.run(modelo.complete(Request(model="axonium:m"), ctx))
 
     claves = [l["idempotency_key"] for l in cliente.llamadas]
-    assert claves == ["run-7/000003-model"] * 2, "reanudar produjo una clave distinta"
+    assert claves[0] == claves[1], "reanudar produjo una clave distinta"
+    assert claves[0].startswith("run-7/000003-model/"), claves[0]
+
+
+def test_a_different_request_gets_a_different_key():
+    """Una clave identifica UNA petición; reutilizarla para otra es un rechazo.
+
+    Sin la huella del cuerpo, dos runs con el mismo `run_id` y distinta tarea
+    chocaban — y también el mismo run tras cambiar las instrucciones del agente,
+    que es lo que pasa mientras se desarrolla. El síntoma era un error del
+    proveedor durante 24 h y ninguna pista de por qué.
+    """
+    from synaptum import CallContext
+
+    cliente = _ClienteFalso(_completion(content="hola"))
+    modelo = AxoniumModel(client=cliente)
+    ctx = CallContext(run_id="run-7", step_id="000003-model")
+
+    asyncio.run(modelo.complete(Request(model="axonium:m", system="sé breve"), ctx))
+    asyncio.run(modelo.complete(Request(model="axonium:m", system="sé prolijo"), ctx))
+
+    primera, segunda = (l["idempotency_key"] for l in cliente.llamadas)
+    assert primera != segunda, "dos peticiones distintas compartieron clave"
 
 
 def test_without_a_context_no_key_is_invented():
@@ -371,3 +393,17 @@ def test_a_replay_served_through_the_gateway_is_not_counted_twice():
 
     pasos = asyncio.run(go())
     assert pasos[-1].usage.input == 0, "un replay infló el total del run"
+
+
+def test_a_retry_after_from_the_sdk_survives_the_translation():
+    """El otro extremo sabe cuándo estará libre; perderlo es adivinar en su lugar."""
+    class _Lenta(Exception):
+        status_code = 429
+        retry_after = 3.0
+
+    from synaptum.providers.axonium import _translate
+
+    traducido = _translate(_Lenta("frena"))
+    assert traducido.status == 429
+    assert traducido.retryable is True
+    assert traducido.retry_after == 3.0

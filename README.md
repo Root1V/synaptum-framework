@@ -99,9 +99,12 @@ export SYNAPTUM_MODEL=qwen3-0.6b
 uv run python examples/01_agente.py
 ```
 
-Que el mismo código sirva para las dos cosas no es comodidad: es la propiedad. Ver
-[`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) — el bucle entero, la reanudación **medida** (no afirmada), una aprobación
-humana a mitad de run, y el streaming con cancelación.
+Que el mismo código sirva para las dos cosas no es comodidad: es la propiedad — el agente no sabe
+quién hay al otro lado de la costura.
+
+[**`examples/`**](https://github.com/Root1V/synaptum-framework/tree/main/examples) tiene dos pistas:
+siete ejemplos que van del agente más simple a tres formas distintas de multi-agente, cada uno sobre
+un dominio real; y cuatro que enseñan qué garantiza el runtime debajo.
 
 ## Sin dependencias
 

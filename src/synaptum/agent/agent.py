@@ -36,10 +36,12 @@ almacena: se vuelve a derivar de los mismos resultados, en el mismo orden.
 
 from __future__ import annotations
 
+import asyncio
 import json
+import random
 import time
 from dataclasses import dataclass, field, replace
-from typing import Any, AsyncIterator, Sequence
+from typing import Any, AsyncIterator, Mapping, Sequence
 
 from ..core.errors import Denied, LimitExceeded, ProviderError, SynaptumError
 from ..core.events import (
@@ -65,6 +67,7 @@ from ..core.types import (
     ToolDefinition,
     ToolResult,
     Usage,
+    dumps,
 )
 from ..schema.protocol import Schema, schema_for
 from ..run.journal import Journal, MemoryCheckpointer, Replay
@@ -85,6 +88,11 @@ class Limits:
 
     max_steps: int = 50
     max_retries: int = 2
+    retry_base: float = 0.5
+    """Espera inicial entre reintentos, en segundos.  Se dobla en cada intento."""
+    max_retry_wait: float = 30.0
+    """Techo de la espera, y también de un ``Retry-After`` desmedido: quien
+    gobierna decide cuánto puede tardar un run, no el otro extremo."""
     reserved_output: float = 0.25
     """Fracción de la ventana reservada para la salida.  Informativa hasta que
     entre el ensamblador de contexto (RM-32)."""
@@ -143,6 +151,20 @@ class Agent:
             if self.output is not None
             else None
         )
+        # El esquema va **también en las instrucciones**, y no solo en
+        # `response_format`.
+        #
+        # No todo proveedor admite el campo.  Hay gateways que lo descartan y
+        # cuyo SDK avisa por warning y sigue — medido contra uno real.  El
+        # resultado era el peor posible — la restricción no viajaba, el modelo contestaba en prosa, y el
+        # error culpaba al JSON («no volvió JSON») en vez de decir que nadie se lo
+        # había pedido.  Un fallo que aparece **después** de pagar la inferencia.
+        #
+        # Decirlo en el prompt cuesta unos cientos de tokens una vez por turno y
+        # funciona en cualquier proveedor.  Donde `response_format` sí se admite,
+        # las dos cosas dicen lo mismo y no estorban.
+        if self.output is not None:
+            self.instructions = _con_esquema(self.instructions, self.output.json_schema())
         self._by_name = {t.name: t for t in self.tools}
 
     # ── Bucle ─────────────────────────────────────────────────────────────────
@@ -421,8 +443,17 @@ class Agent:
         try:
             data = json.loads(text)
         except json.JSONDecodeError as broken:
+            # Qué volvió, no solo que no parseaba.  «Expecting value: line 1
+            # column 1» sobre una cadena vacía no dice nada, y la cadena vacía es
+            # justo el caso frecuente: un modelo de razonamiento que se quedó
+            # pensando y no llegó a responder.
+            detalle = (
+                "no volvió texto — el modelo pudo quedarse en la fase de razonamiento"
+                if not text.strip()
+                else f"volvió: {text.strip()[:200]!r}"
+            )
             raise NoObjectGeneratedError(
-                f"Se pidió salida estructurada y no volvió JSON: {broken}", raw=text
+                f"Se pidió salida estructurada y {detalle} ({broken})", raw=text
             ) from broken
         return self.output.validate(data)
 
@@ -457,10 +488,24 @@ class Agent:
         return await once()
 
     async def _with_retries(self, operation: Any) -> Any:
-        """Reintenta mientras el error se declare reintentable.
+        """Reintenta mientras el error se declare reintentable, **esperando entre medias**.
 
-        La decisión no es del bucle: viaja en el tipo del error, que la trae de
-        quien habló con el proveedor.
+        La decisión de *si* reintentar no es del bucle: viaja en el tipo del
+        error, que la trae de quien habló con el proveedor. Lo que sí es del
+        bucle es *cuándo*.
+
+        Antes reintentaba al instante, y eso no es reintentar: es repetir. Tres
+        intentos en dos milisegundos golpean el mismo estado roto y agotan el
+        presupuesto antes de que nada haya podido cambiar. Se vio contra una
+        plataforma real con un `500` transitorio; el doble no podía enseñarlo
+        porque devuelve sus errores sin tardar.
+
+        * Si el otro extremo dijo cuánto esperar, se espera eso. Un `429` con
+          `Retry-After` sabe cuándo estará libre, y quien reintenta antes
+          empeora la cola en la que está.
+        * Si no, espera creciente con **jitter**. El jitter no es adorno: sin
+          él, N agentes que fallan por la misma caída reintentan todos a la vez
+          y reconstruyen el pico que los tiró.
         """
         attempt = 0
         while True:
@@ -469,7 +514,15 @@ class Agent:
             except SynaptumError as error:
                 if not error.retryable or attempt >= self.limits.max_retries:
                     raise
+                await asyncio.sleep(self._espera(attempt, error.retry_after))
                 attempt += 1
+
+    def _espera(self, intento: int, pedida: float | None) -> float:
+        """Segundos antes del siguiente intento."""
+        if pedida is not None:
+            return max(0.0, min(pedida, self.limits.max_retry_wait))
+        base = min(self.limits.retry_base * (2 ** intento), self.limits.max_retry_wait)
+        return base * (0.5 + random.random() / 2)
 
     def _ctx(self, session: Session, step_id: str) -> CallContext:
         return CallContext(run_id=session.run_id, step_id=step_id)
@@ -522,3 +575,18 @@ class Agent:
         )
         await journal.record(closing)
         yield closing
+
+
+def _con_esquema(instrucciones: str | None, esquema: Mapping[str, Any]) -> str:
+    """Añade el esquema de salida a las instrucciones del sistema.
+
+    Va al final y en un bloque marcado para que el modelo lo lea como una
+    restricción y no como parte de la tarea.
+    """
+    base = (instrucciones or "").rstrip()
+    return (
+        f"{base}\n\n"
+        "Responde ÚNICAMENTE con un objeto JSON que valide contra este esquema. "
+        "Sin texto antes ni después, sin vallas de código.\n\n"
+        f"{dumps(esquema)}"
+    ).lstrip()

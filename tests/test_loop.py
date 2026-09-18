@@ -583,3 +583,117 @@ def test_a_replayed_response_is_not_counted_twice():
     # que ocurrió, el total cuenta lo que se pagó.
     paso = [e for e in repetida if e.kind == "model" and e.phase is Phase.COMPLETED][0]
     assert paso.usage.input == 100
+
+
+# ── Espera entre reintentos ───────────────────────────────────────────────────
+
+def test_retries_wait_instead_of_hammering():
+    """Reintentar al instante no es reintentar: es repetir.
+
+    Tres intentos en dos milisegundos golpean el mismo estado roto y agotan el
+    presupuesto antes de que nada haya podido cambiar. Se vio contra una
+    plataforma real con un 500 transitorio; el doble no podía enseñarlo porque
+    devuelve sus errores sin tardar.
+    """
+    from synaptum.testing import FakeGateway, says
+
+    esperas: list[float] = []
+
+    async def go():
+        import asyncio as aio
+
+        real = aio.sleep
+
+        async def anotando(segundos, *a, **k):
+            esperas.append(segundos)
+            return await real(0)
+
+        aio.sleep = anotando
+        try:
+            gateway = FakeGateway(
+                ProviderError("caída", status=503),
+                ProviderError("caída", status=503),
+                says("por fin"),
+            )
+            return [
+                paso
+                async for paso in Agent("a", model="openai-compatible:m").run(
+                    "t", session=Session("r1", gateway)
+                )
+            ]
+        finally:
+            aio.sleep = real
+
+    pasos = asyncio.run(go())
+
+    assert pasos[-1].output == "por fin"
+    assert len(esperas) == 2, f"reintentó {len(esperas)} veces sin esperar"
+    assert all(e > 0 for e in esperas), "esperó cero: eso es repetir, no reintentar"
+    assert esperas[1] > esperas[0], "la espera no crece entre intentos"
+
+
+def test_a_retry_after_from_the_other_end_is_honoured():
+    """Un `429` sabe cuándo estará libre; quien reintenta antes empeora su cola."""
+    from synaptum.testing import FakeGateway, says
+
+    esperas: list[float] = []
+
+    async def go():
+        import asyncio as aio
+
+        real = aio.sleep
+
+        async def anotando(segundos, *a, **k):
+            esperas.append(segundos)
+            return await real(0)
+
+        aio.sleep = anotando
+        try:
+            gateway = FakeGateway(
+                ProviderError("frena", status=429, retry_after=7.0), says("ya")
+            )
+            return [
+                paso
+                async for paso in Agent("a", model="openai-compatible:m").run(
+                    "t", session=Session("r1", gateway)
+                )
+            ]
+        finally:
+            aio.sleep = real
+
+    asyncio.run(go())
+    assert esperas == [7.0], f"ignoró el Retry-After: esperó {esperas}"
+
+
+def test_an_outlandish_retry_after_is_capped():
+    """Quien gobierna decide cuánto puede tardar un run, no el otro extremo."""
+    from synaptum.testing import FakeGateway, says
+
+    esperas: list[float] = []
+
+    async def go():
+        import asyncio as aio
+
+        real = aio.sleep
+
+        async def anotando(segundos, *a, **k):
+            esperas.append(segundos)
+            return await real(0)
+
+        aio.sleep = anotando
+        try:
+            gateway = FakeGateway(
+                ProviderError("vuelve mañana", status=429, retry_after=86_400.0),
+                says("ya"),
+            )
+            return [
+                paso
+                async for paso in Agent(
+                    "a", model="openai-compatible:m", limits=Limits(max_retry_wait=30.0)
+                ).run("t", session=Session("r1", gateway))
+            ]
+        finally:
+            aio.sleep = real
+
+    asyncio.run(go())
+    assert esperas == [30.0], f"un run se habría quedado un día parado: {esperas}"

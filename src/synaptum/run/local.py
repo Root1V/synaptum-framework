@@ -81,6 +81,14 @@ class Check:
     name: str
     step_id: str
     risk: Risk = Risk.READ
+    arguments: Mapping[str, Any] = field(default_factory=dict)
+    """Con qué se llamó.  Vacío para un paso de modelo.
+
+    Es campo propio y no una clave de ``detail`` porque **es lo que una política
+    decide**: negar «capturar» sin ver el importe no es una política, es un
+    interruptor.  Estaba dentro de ``detail`` y obligaba a un acceso por cadena
+    para llegar a lo único que casi siempre hace falta.
+    """
     decision: Decision | None = None
     enforced: bool = False
     """Siempre ``False``.  Está en el dato, no solo en la documentación,
@@ -210,14 +218,24 @@ class LocalGateway:
 
     # ── Registro de decisiones ────────────────────────────────────────────────
 
-    def _check(self, kind: str, name: str, step_id: str, risk: Risk, **detail: Any) -> None:
-        check = Check(kind=kind, name=name, step_id=step_id, risk=risk, detail=detail)
+    def _check(
+        self,
+        kind: str,
+        name: str,
+        step_id: str,
+        risk: Risk,
+        *,
+        arguments: Mapping[str, Any] | None = None,
+        **detail: Any,
+    ) -> None:
+        comun = {
+            "kind": kind, "name": name, "step_id": step_id, "risk": risk,
+            "arguments": dict(arguments or {}), "detail": detail,
+        }
+        check = Check(**comun)
         decision = self.policy(check) if self.policy else None
         if decision is not None:
-            check = Check(
-                kind=kind, name=name, step_id=step_id, risk=risk,
-                decision=decision, detail=detail,
-            )
+            check = Check(**comun, decision=decision)
         self.checks.append(check)
 
         if decision is not None and decision.disposition is not Disposition.ALLOW:

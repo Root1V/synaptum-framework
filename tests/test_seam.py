@@ -276,3 +276,45 @@ def test_the_handshake_returns_versioned_tool_references():
     )
     assert welcome.version == SEAM_VERSION
     assert welcome.tool_refs["buscar"] == "buscar@1"
+
+
+def test_a_tool_policy_sees_the_arguments_it_decides_on():
+    """Negar «capturar» sin ver el importe no es una política, es un interruptor.
+
+    Los argumentos viajaban dentro de `detail`, así que llegar a lo único que
+    casi siempre hace falta era un acceso por cadena — y escribir
+    `check.arguments` daba AttributeError en vez de un valor.
+    """
+    import asyncio
+
+    from synaptum import ALLOW, CallContext, Decision, Disposition, LocalGateway, Risk, ToolCall
+
+    vistos: list = []
+
+    def politica(check):
+        vistos.append((check.kind, check.name, dict(check.arguments)))
+        if check.kind == "tool" and check.arguments.get("micros", 0) > 500:
+            return Decision(disposition=Disposition.DENY_STEP, reason_code="cap")
+        return ALLOW
+
+    gateway = LocalGateway(model=_sin_modelo, policy=politica, warn=False)
+    ctx = CallContext(run_id="r", step_id="000001-tool")
+
+    async def capturar(micros: int):
+        return await gateway.invoke_tool(
+            ToolCall(id="c1", name="capturar", arguments={"micros": micros}),
+            ctx,
+            risk=Risk.DESTRUCTIVE,
+        )
+
+    # Por debajo del tope: la política lo ve y lo deja pasar.
+    asyncio.run(capturar(400))
+    assert vistos[-1] == ("tool", "capturar", {"micros": 400})
+
+    # Por encima: lo deniega **porque vio el importe**.
+    with pytest.raises(Denied):
+        asyncio.run(capturar(900))
+
+
+async def _sin_modelo(request):  # pragma: no cover - no se llama
+    raise AssertionError("este test no invoca el modelo")

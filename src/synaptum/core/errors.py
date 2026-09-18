@@ -58,7 +58,19 @@ class SynaptumError(Exception):
 
     retryable: bool = False
 
-    def __init__(self, message: str = "", *, retryable: bool | None = None) -> None:
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        retryable: bool | None = None,
+        retry_after: float | None = None,
+    ) -> None:
+        #: Segundos que el otro extremo pidió esperar, si lo dijo.
+        #:
+        #: No es una sugerencia: un ``429`` con ``Retry-After`` sabe cuándo
+        #: estará libre y quien reintenta antes empeora la cola que está
+        #: esperando.  Cuando falta, se usa una espera creciente.
+        self.retry_after = retry_after
         super().__init__(message)
         if retryable is not None:
             self.retryable = retryable
@@ -95,11 +107,12 @@ class ProviderError(SynaptumError):
         status: int | None = None,
         provider: str = "",
         retryable: bool | None = None,
+        retry_after: float | None = None,
     ) -> None:
         self.status = status
         self.provider = provider
         resolved = retryable if retryable is not None else retryable_for_status(status)
-        super().__init__(message, retryable=resolved)
+        super().__init__(message, retryable=resolved, retry_after=retry_after)
 
 
 class RequestTimeoutError(SynaptumError):

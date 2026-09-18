@@ -28,7 +28,12 @@ from synaptum import (
 )
 from synaptum.testing import calls, says
 
-from _comun import encabezado, gateway, nombre_del_modelo
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from comun import encabezado, gateway, nombre_del_modelo
 
 HECHAS: list[str] = []
 
