@@ -270,7 +270,9 @@ def test_it_records_the_risk_a_real_gateway_would_have_seen():
 
     tool_checks = [c for c in gateway.checks if c.kind == "tool"]
     assert [c.risk for c in tool_checks] == [Risk.DESTRUCTIVE]
-    assert tool_checks[0].detail["arguments"] == {"path": "/x"}
+    assert tool_checks[0].arguments == {"path": "/x"}, (
+        "los argumentos son campo propio: son lo que una política decide"
+    )
 
 
 def test_it_runs_the_real_tool():
