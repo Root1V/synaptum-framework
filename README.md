@@ -6,9 +6,10 @@ Synaptum es dueño de la *semántica* de ejecución de un agente: qué es un pas
 qué puede repetirse, y cómo se vuelve a derivar el contexto. El *sustrato* —dónde se persiste, con
 qué retención, bajo qué política— pertenece al arnés que lo opera.
 
-> **Versión:** `1.0.0.dev0` · **Python:** ≥ 3.13 · **Licencia:** MIT
+> **Versión:** [`1.0.0rc1`](https://pypi.org/project/synaptum/) · **Python:** ≥ 3.13 · **Licencia:** MIT
 >
-> **En construcción.** La línea 0.x, con un diseño distinto, está congelada en
+> **Candidato, no estable.** El compromiso de estabilidad de `API.md` arranca en `1.0.0`, y la
+> Fase 2 todavía puede tocar la superficie. La línea 0.x, con un diseño distinto, está congelada en
 > [v0.4.0](https://github.com/Root1V/synaptum-framework/releases/tag/v0.4.0). El estado real de esta
 > por elemento está en [`roadmap.md`](https://github.com/Root1V/synaptum-framework/blob/main/roadmap.md).
 
@@ -107,6 +108,10 @@ humana a mitad de run, y el streaming con cancelación.
 ```bash
 pip install synaptum      # 0 dependencias
 ```
+
+Hoy la única versión publicada es `1.0.0rc1`, así que ese comando la instala sin `--pre`. **Deja de
+hacerlo en cuanto exista una estable**, que es lo correcto: a partir de ahí un candidato se pide por
+su nombre (`pip install synaptum==1.0.0rc2`).
 
 El núcleo es stdlib puro. Pydantic, los proveedores, MCP y OpenTelemetry son extras. Los adaptadores
 se descubren por *entry points*, así que el núcleo no conoce a ninguno.
