@@ -319,7 +319,19 @@ def metadata_from_axonium(source: Any) -> dict[str, Any]:
         return {}
     recogido = {
         campo: getattr(meta, campo, None)
-        for campo in ("request_id", "trace_id", "instance", "instance_id", "idempotent_replay")
+        for campo in (
+            "request_id",
+            "trace_id",
+            "instance",
+            "instance_id",
+            "idempotent_replay",
+            # Un replay trae su propio `request_id`, y ese id **no lleva a
+            # ninguna fila de facturación**: nombra la respuesta que se sirvió,
+            # no la generación que se cobró.  Este campo nombra la que sí, y sin
+            # él una auditoría que parta del request_id de un replay no
+            # encuentra nada y no sabe por qué.
+            "idempotent_replay_of",
+        )
     }
     return {campo: valor for campo, valor in recogido.items() if valor is not None}
 

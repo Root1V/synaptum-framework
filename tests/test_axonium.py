@@ -332,6 +332,23 @@ def test_platform_metadata_reaches_the_response():
     assert respuesta.provider_metadata["request_id"] == "req-1"
 
 
+def test_a_replay_names_the_generation_that_was_actually_billed():
+    """El `request_id` de un replay no lleva a ninguna fila de facturación.
+
+    Nombra la respuesta que se sirvió, no la generación que se cobró. Sin
+    `idempotent_replay_of`, una auditoría que parta de ese id no encuentra nada
+    y no sabe por qué.
+    """
+    respuesta = asyncio.run(
+        AxoniumModel(client=_ClienteFalso(_con_meta(
+            request_id="req-replay", idempotent_replay=True,
+            idempotent_replay_of="req-original",
+        ))).complete(Request(model="axonium:m"))
+    )
+
+    assert respuesta.provider_metadata["idempotent_replay_of"] == "req-original"
+
+
 def test_a_replay_served_through_the_gateway_is_not_counted_twice():
     """De punta a punta: puente → LocalGateway → bucle.
 
