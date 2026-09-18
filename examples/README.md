@@ -24,6 +24,21 @@ portafolio, no sobre un dominio inventado.
 | [`05_cadena_de_agentes.py`](agentes/05_cadena_de_agentes.py) | Dos agentes en cadena, cada uno con su contexto | Pipeline de doblaje |
 | [`06_agentes_en_paralelo.py`](agentes/06_agentes_en_paralelo.py) | Fan-out con `asyncio.gather` y un sintetizador | Argus bajo tormenta |
 | [`07_agente_como_herramienta.py`](agentes/07_agente_como_herramienta.py) | Un supervisor que enruta a especialistas | Mesa de entrada del portafolio |
+| [`08_herramientas_mcp.py`](agentes/08_herramientas_mcp.py) | Herramientas de un **servidor MCP**, y qué cambia cuando no las escribiste tú | Cualquier repo · servidor incluido |
+
+### Sobre MCP
+
+El [`08`](agentes/08_herramientas_mcp.py) trae su propio servidor MCP, así que corre sin instalar
+nada más allá del extra:
+
+```bash
+uv sync --extra mcp
+uv run python examples/agentes/08_herramientas_mcp.py
+```
+
+Conectarse son cuatro líneas. Lo que el ejemplo enseña de verdad es **qué cambia cuando la
+herramienta es ajena**: el riesgo lo insinúa quien no manda, los errores llegan sin explicación, los
+nombres chocan entre servidores, y el esquema puede cambiar debajo sin que tu repositorio se entere.
 
 ### Sobre multi-agente, dicho antes de que lo descubras
 

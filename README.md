@@ -103,8 +103,8 @@ Que el mismo código sirva para las dos cosas no es comodidad: es la propiedad �
 quién hay al otro lado de la costura.
 
 [**`examples/`**](https://github.com/Root1V/synaptum-framework/tree/main/examples) tiene dos pistas:
-siete ejemplos que van del agente más simple a tres formas distintas de multi-agente, cada uno sobre
-un dominio real; y cuatro que enseñan qué garantiza el runtime debajo.
+ocho ejemplos que van del agente más simple a tres formas de multi-agente y a herramientas servidas
+por MCP, cada uno sobre un dominio real; y cuatro que enseñan qué garantiza el runtime debajo.
 
 ## Sin dependencias
 

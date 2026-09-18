@@ -100,7 +100,7 @@ Economía de contexto y visibilidad de producción. Aquí es donde se gana o se 
 | SYN-36 | `PENDIENTE` | Compactación por niveles | Escalonada y **desactivada por defecto**: con caching, conservar todo suele salir más barato que resumir |
 | SYN-37 | `PENDIENTE` | Instrumentación OTel GenAI | Solo estructura del bucle: fronteras de turno, planificación, delegación. `chat` y `execute_tool` los emite Aeon |
 | SYN-38 | `PENDIENTE` | Métricas de economía de contexto | Tasa de acierto de caché, reescrituras de prefijo, frecuencia de compactación. `Usage` llega de vuelta por la costura |
-| SYN-39 | `PENDIENTE` | Cliente MCP | Extra opcional. Vía estándar de herramientas desde su donación a la Linux Foundation |
+| SYN-39 | `HECHO` | Cliente MCP | Extra opcional; el núcleo no lo carga. Las herramientas de un servidor entran con su esquema y el bucle no nota que son remotas. **Las anotaciones son pistas y el servidor no es autoridad sobre el riesgo**: la traducción sigue los defectos de MCP —sin anotar, destructiva— y no los nuestros, porque nuestro `@tool` es permisivo por defecto solo porque el autor está delante para declarar. Probado contra un servidor MCP real arrancado por stdio, no contra un doble del propio cliente |
 | SYN-40 | `PENDIENTE` | Carga diferida de tools | Búsqueda de tools para catálogos grandes, sin inflar el prefijo |
 
 ---
