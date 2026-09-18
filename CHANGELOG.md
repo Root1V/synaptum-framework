@@ -5,6 +5,8 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ## [1.0.0rc1] — 2026-09-13
 
+Publicado en TestPyPI. Instalable con `--index-url https://test.pypi.org/simple/`.
+
 Primera publicación. **Es un candidato y no una `1.0.0`, a propósito.** La superficie está completa
 contra el contrato de hoy y no va a cambiar por gusto, pero la Fase 2 (economía de contexto) todavía
 puede tocarla, y el compromiso de estabilidad de [`API.md`](API.md) arranca en `1.0.0`. Prometerlo
