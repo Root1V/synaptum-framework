@@ -4,7 +4,7 @@ Es la propiedad que justifica toda la arquitectura, y este ejemplo la **mide**
 en vez de afirmarla: cuenta las llamadas al modelo y a la herramienta de cada
 vuelta. La segunda tiene que dar cero.
 
-    uv run python examples/02_durabilidad.py
+    uv run python examples/propiedades/02_durabilidad.py
 """
 
 from __future__ import annotations

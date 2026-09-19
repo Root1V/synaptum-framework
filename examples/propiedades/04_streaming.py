@@ -4,7 +4,7 @@
 lo único que cambia es que los fragmentos del modelo se ceden intercalados entre
 la intención del paso y su resultado.
 
-    uv run python examples/04_streaming.py
+    uv run python examples/propiedades/04_streaming.py
 """
 
 from __future__ import annotations

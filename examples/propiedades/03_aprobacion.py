@@ -3,7 +3,7 @@
 Aquí es donde la durabilidad deja de ser una optimización de coste: **no se le
 pregunta dos veces a una persona porque el proceso se cayó.**
 
-    uv run python examples/03_aprobacion.py
+    uv run python examples/propiedades/03_aprobacion.py
 """
 
 from __future__ import annotations

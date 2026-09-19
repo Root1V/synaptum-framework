@@ -4,12 +4,13 @@ Un agente con dos herramientas que responde una pregunta sobre un repositorio.
 Lo interesante no es la tarea: es que **todo lo que el agente hace pasa por el
 stream de eventos**, así que verlo es hacer `async for`.
 
-    uv run python examples/01_agente.py
+    uv run python examples/propiedades/01_bucle.py
 """
 
 from __future__ import annotations
 
 import asyncio
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -25,14 +26,14 @@ from synaptum import (
 )
 from synaptum.testing import calls, says
 
-import sys
-from pathlib import Path
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from comun import encabezado, gateway, nombre_del_modelo
 
-RAIZ = Path(__file__).resolve().parent.parent
+# La raíz del repositorio: dos niveles por encima de `examples/propiedades/`.
+# Se calcula desde `__file__` y no desde el directorio de trabajo para que el
+# ejemplo dé lo mismo se lance desde donde se lance.
+RAIZ = Path(__file__).resolve().parents[2]
 
 
 @tool
