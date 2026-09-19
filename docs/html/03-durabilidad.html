@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Durabilidad · Synaptum</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --tinta: #1a1c1e; --fondo: #fdfdfc; --tenue: #5b6066; --linea: #e3e4e6;
+  --codigo-fondo: #f5f5f3; --acento: #0b5cad; --aviso: #8a4b00; --aviso-fondo: #fff8ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tinta: #e6e6e4; --fondo: #17181a; --tenue: #9aa0a6; --linea: #2c2e31;
+    --codigo-fondo: #202225; --acento: #74b0f0; --aviso: #e0a458; --aviso-fondo: #241f17;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fondo); color: var(--tinta);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.saltar { position: absolute; left: -9999px; }
+.saltar:focus { left: 1rem; top: 1rem; background: var(--fondo); padding: .5rem 1rem; z-index: 9; }
+.marco { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 3.5rem;
+         max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; }
+nav { position: sticky; top: 2.5rem; align-self: start; font-size: .92rem; }
+.marca { margin: 0; font-weight: 640; letter-spacing: -.01em; font-size: 1.05rem; }
+.marca a { color: var(--tinta); text-decoration: none; }
+.version { margin: .1rem 0 1.4rem; color: var(--tenue); font-size: .82rem; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+nav li { counter-increment: s; margin: .1rem 0; }
+nav a { display: block; padding: .3rem .6rem; margin-left: -.6rem; border-radius: .4rem;
+        color: var(--tenue); text-decoration: none; }
+nav a:hover { background: var(--codigo-fondo); color: var(--tinta); }
+nav a[aria-current] { color: var(--tinta); font-weight: 600; background: var(--codigo-fondo); }
+.fuente { margin-top: 1.6rem; color: var(--tenue); font-size: .82rem; }
+main { min-width: 0; }
+h1 { font-size: 2.1rem; line-height: 1.15; letter-spacing: -.022em; margin: 0 0 1.6rem; }
+h2 { font-size: 1.32rem; letter-spacing: -.012em; margin: 3rem 0 .9rem;
+     padding-top: 1.4rem; border-top: 1px solid var(--linea); }
+h3 { font-size: 1.06rem; margin: 2rem 0 .6rem; }
+p, li { max-width: 40rem; }
+a { color: var(--acento); }
+code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+       font-size: .875em; background: var(--codigo-fondo); padding: .12em .38em;
+       border-radius: .25rem; }
+pre { background: var(--codigo-fondo); padding: 1rem 1.15rem; border-radius: .6rem;
+      overflow-x: auto; border: 1px solid var(--linea); }
+pre code { background: none; padding: 0; font-size: .855rem; line-height: 1.6; }
+blockquote { margin: 1.4rem 0; padding: .85rem 1.1rem; border-left: 3px solid var(--aviso);
+             background: var(--aviso-fondo); border-radius: 0 .4rem .4rem 0; }
+blockquote p { margin: .3rem 0; }
+table { border-collapse: collapse; width: 100%; margin: 1.3rem 0; font-size: .93rem;
+        display: block; overflow-x: auto; }
+th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--linea);
+         vertical-align: top; }
+th { font-weight: 620; }
+hr { border: 0; border-top: 1px solid var(--linea); margin: 2.5rem 0; }
+@media (max-width: 62rem) {
+  .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
+  nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
+  nav ol { columns: 2; }
+}
+</style>
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="marco">
+  <nav aria-label="Secciones">
+    <p class="marca"><a href="index.html">Synaptum</a></p>
+    <p class="version">1.0.0rc1</p>
+    <ol><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html" aria-current="page">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="index.html">Empezar</a></li></ol>
+    <p class="fuente">También en <a href="../03-durabilidad.md">Markdown</a>.</p>
+  </nav>
+  <main id="contenido">
+<h1>Durabilidad</h1>
+<p><strong>Al reanudar un run, una inferencia ya pagada no se paga otra vez.</strong> Es la propiedad que justifica
+toda la arquitectura.</p>
+<pre><code class="language-python">store = SqliteCheckpointer(&quot;runs.db&quot;)
+
+# Primera vuelta: dos llamadas al modelo, una a una herramienta.
+async for paso in agente.run(&quot;lee /x&quot;, session=Session(&quot;run-1&quot;, gateway, store)):
+    ...
+
+# El proceso muere. Otro proceso, otra conexión, mismo run_id.
+async for paso in agente.run(&quot;lee /x&quot;, session=Session(&quot;run-1&quot;, otro_gateway, store)):
+    ...   # cero llamadas al modelo, cero a la herramienta
+</code></pre>
+<p>No es una afirmación: <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/02_durabilidad.py"><code>examples/propiedades/02_durabilidad.py</code></a>
+cuenta las llamadas y lo mide.</p>
+<pre><code>1ª vuelta  modelo ×1 · herramienta ×1   ← el proceso muere aquí
+2ª vuelta  modelo ×1 · herramienta ×0   ← solo ocurre lo que no llegó a ocurrir
+3ª vuelta  modelo ×0                    ← un run cerrado no se reabre
+</code></pre>
+<h2>Cómo funciona</h2>
+<p>El journal guarda <strong>qué pasos ocurrieron</strong>, no la conversación. Al reanudar, el contexto se vuelve a
+derivar de los mismos resultados en el mismo orden.</p>
+<p>La clave de deduplicación es <code>(run_id, step_id, phase)</code>, y en SQLite <strong>es la clave primaria</strong> — no
+una comprobación previa que dos procesos puedan cruzar.</p>
+<h2>Escritura anticipada</h2>
+<p>Antes de ejecutar una herramienta no idempotente, su intención está en disco. Eso permite distinguir
+tres situaciones que de otro modo serían la misma:</p>
+<table>
+<thead>
+<tr>
+<th>En el journal</th>
+<th>Significa</th>
+<th>Qué hace el replay</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Intención <strong>y</strong> resultado</td>
+<td>Ocurrió y se sabe cómo fue</td>
+<td>Salta el paso</td>
+</tr>
+<tr>
+<td>Ni intención ni resultado</td>
+<td>No llegó a intentarse</td>
+<td>Lo ejecuta</td>
+</tr>
+<tr>
+<td>Intención sin resultado, <strong>no idempotente</strong></td>
+<td><strong>No se sabe</strong> si ocurrió</td>
+<td>Levanta <code>UncertainEffect</code></td>
+</tr>
+<tr>
+<td>Intención sin resultado, <strong>idempotente</strong></td>
+<td>Da igual: repetir no cuesta</td>
+<td>Lo ejecuta</td>
+</tr>
+</tbody>
+</table>
+<p><code>UncertainEffect</code> no es un fallo del framework: es el framework negándose a adivinar. Si tu
+herramienta mueve dinero y el proceso murió justo después de mandarla, <strong>nadie sabe si salió</strong>, y
+fingir lo contrario es peor que parar.</p>
+<h2>Denegación y aprobación humana</h2>
+<p>Una denegación previa a la ejecución <strong>no es un silencio</strong>: es un desenlace conocido del paso.</p>
+<pre><code>1ª vuelta → ModelStep · ToolStep(denegado, decision=require_approval) · ApprovalStep
+            ← el run queda suspendido en disco
+
+… una persona aprueba …
+
+2ª vuelta → se reanuda donde estaba, el efecto ocurre exactamente una vez
+</code></pre>
+<p>Sin esto, un <code>require_approval</code> dejaba intención sin resultado, y al reanudar eso parecía el caso
+incierto. Pero <strong>aquí no hay incertidumbre</strong>: se denegó <em>antes</em> de ejecutar. Por eso <code>StepEvent</code>
+lleva <code>decision</code>, y el replay distingue «no se ejecutó porque se denegó» de «no se sabe».</p>
+<p><strong>El bucle no puede escribir esa aprobación</strong>: no estaba corriendo cuando se tomó. La escribe el
+arnés, y eso significa que <code>append</code> no lo llama solo el bucle — el checkpointer es el diario del
+run, no un almacén privado del framework.</p>
+<h2>Idempotencia hacia el proveedor</h2>
+<p>La identidad del paso viaja como clave de idempotencia hacia proveedores que la admitan:
+<code>(run_id, step_id, huella-del-cuerpo)</code>.</p>
+<p>Cierra un agujero que el journal solo no puede tapar: si el proceso muere <strong>después</strong> de mandar la
+petición y <strong>antes</strong> de registrar el resultado, al reanudar el replay reintenta —una llamada al
+modelo es repetible— y sin clave esa repetición es <strong>una segunda generación facturable</strong>.</p>
+<p>La huella del cuerpo no es prudencia: una clave identifica <em>una</em> petición, y reutilizarla para otra
+distinta es un rechazo, no un replay. Sin ella, dos runs con el mismo <code>run_id</code> y distinta tarea
+chocan — y también el mismo run después de cambiar las instrucciones del agente.</p>
+<h2>Un run cerrado no se reabre</h2>
+<p>Si el journal ya tiene un <code>FinalStep</code>, reanudar <strong>devuelve lo que pasó</strong> en vez de recorrerlo otra
+vez. Reemitir la historia como si estuviera ocurriendo sería engañoso; quien quiera la línea
+temporal la tiene en <code>Checkpointer.load</code>.</p>
+
+  </main>
+</div>
+</body>
+</html>

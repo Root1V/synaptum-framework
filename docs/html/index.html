@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Empezar · Synaptum</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --tinta: #1a1c1e; --fondo: #fdfdfc; --tenue: #5b6066; --linea: #e3e4e6;
+  --codigo-fondo: #f5f5f3; --acento: #0b5cad; --aviso: #8a4b00; --aviso-fondo: #fff8ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tinta: #e6e6e4; --fondo: #17181a; --tenue: #9aa0a6; --linea: #2c2e31;
+    --codigo-fondo: #202225; --acento: #74b0f0; --aviso: #e0a458; --aviso-fondo: #241f17;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fondo); color: var(--tinta);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.saltar { position: absolute; left: -9999px; }
+.saltar:focus { left: 1rem; top: 1rem; background: var(--fondo); padding: .5rem 1rem; z-index: 9; }
+.marco { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 3.5rem;
+         max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; }
+nav { position: sticky; top: 2.5rem; align-self: start; font-size: .92rem; }
+.marca { margin: 0; font-weight: 640; letter-spacing: -.01em; font-size: 1.05rem; }
+.marca a { color: var(--tinta); text-decoration: none; }
+.version { margin: .1rem 0 1.4rem; color: var(--tenue); font-size: .82rem; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+nav li { counter-increment: s; margin: .1rem 0; }
+nav a { display: block; padding: .3rem .6rem; margin-left: -.6rem; border-radius: .4rem;
+        color: var(--tenue); text-decoration: none; }
+nav a:hover { background: var(--codigo-fondo); color: var(--tinta); }
+nav a[aria-current] { color: var(--tinta); font-weight: 600; background: var(--codigo-fondo); }
+.fuente { margin-top: 1.6rem; color: var(--tenue); font-size: .82rem; }
+main { min-width: 0; }
+h1 { font-size: 2.1rem; line-height: 1.15; letter-spacing: -.022em; margin: 0 0 1.6rem; }
+h2 { font-size: 1.32rem; letter-spacing: -.012em; margin: 3rem 0 .9rem;
+     padding-top: 1.4rem; border-top: 1px solid var(--linea); }
+h3 { font-size: 1.06rem; margin: 2rem 0 .6rem; }
+p, li { max-width: 40rem; }
+a { color: var(--acento); }
+code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+       font-size: .875em; background: var(--codigo-fondo); padding: .12em .38em;
+       border-radius: .25rem; }
+pre { background: var(--codigo-fondo); padding: 1rem 1.15rem; border-radius: .6rem;
+      overflow-x: auto; border: 1px solid var(--linea); }
+pre code { background: none; padding: 0; font-size: .855rem; line-height: 1.6; }
+blockquote { margin: 1.4rem 0; padding: .85rem 1.1rem; border-left: 3px solid var(--aviso);
+             background: var(--aviso-fondo); border-radius: 0 .4rem .4rem 0; }
+blockquote p { margin: .3rem 0; }
+table { border-collapse: collapse; width: 100%; margin: 1.3rem 0; font-size: .93rem;
+        display: block; overflow-x: auto; }
+th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--linea);
+         vertical-align: top; }
+th { font-weight: 620; }
+hr { border: 0; border-top: 1px solid var(--linea); margin: 2.5rem 0; }
+@media (max-width: 62rem) {
+  .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
+  nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
+  nav ol { columns: 2; }
+}
+</style>
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="marco">
+  <nav aria-label="Secciones">
+    <p class="marca"><a href="index.html">Synaptum</a></p>
+    <p class="version">1.0.0rc1</p>
+    <ol><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="index.html" aria-current="page">Empezar</a></li></ol>
+    <p class="fuente">También en <a href="../index.md">Markdown</a>.</p>
+  </nav>
+  <main id="contenido">
+<h1>Empezar</h1>
+<p>Synaptum es un framework de agentes con un runtime durable. Agnóstico al proveedor, cero
+dependencias, y con una idea central: <strong>el bucle de un agente no es un <code>while</code> escondido, es un
+generador asíncrono que cede el control en cada frontera significativa.</strong></p>
+<pre><code class="language-bash">pip install synaptum
+</code></pre>
+<h2>Un agente completo</h2>
+<pre><code class="language-python">import asyncio
+from typing import Annotated
+from synaptum import Agent, FinalStep, Session, tool
+
+@tool
+async def contar_lineas(fichero: Annotated[str, &quot;Ruta del fichero&quot;]) -&gt; str:
+    &quot;&quot;&quot;Cuenta las líneas de un fichero.&quot;&quot;&quot;
+    return f&quot;{fichero}: {len(open(fichero).read().splitlines())} líneas&quot;
+
+async def main():
+    agente = Agent(
+        &quot;explorador&quot;,
+        model=&quot;openai-compatible:gpt-oss-20b&quot;,
+        instructions=&quot;Respondes usando las herramientas. Sé breve.&quot;,
+        tools=[contar_lineas],
+    )
+    async for paso in agente.run(&quot;¿Cuántas líneas tiene README.md?&quot;, session=sesion):
+        if isinstance(paso, FinalStep):
+            print(paso.output)
+
+asyncio.run(main())
+</code></pre>
+<p>Falta <code>sesion</code>, y es lo primero que hay que entender: <a href="01-conceptos.html"><strong>Conceptos</strong></a>.</p>
+<h2>Las páginas</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="01-conceptos.html">Conceptos</a></td>
+<td><code>Agent</code>, <code>Session</code>, gateway, checkpointer, pasos y fases</td>
+</tr>
+<tr>
+<td><a href="02-herramientas.html">Herramientas</a></td>
+<td><code>@tool</code>, riesgo, idempotencia, errores, MCP</td>
+</tr>
+<tr>
+<td><a href="03-durabilidad.html">Durabilidad</a></td>
+<td>El journal, reanudar sin volver a pagar, aprobaciones</td>
+</tr>
+<tr>
+<td><a href="04-modelos.html">Modelos</a></td>
+<td>Proveedores, transporte, <code>Usage</code> de tres estados, streaming</td>
+</tr>
+<tr>
+<td><a href="05-multiagente.html">Varios agentes</a></td>
+<td>Cadena, paralelo, agente como herramienta</td>
+</tr>
+<tr>
+<td><a href="06-probar.html">Probar</a></td>
+<td>Construir agentes sin gastar en inferencia</td>
+</tr>
+<tr>
+<td><a href="07-limites.html">Qué no hace</a></td>
+<td>Los límites, dichos en voz alta</td>
+</tr>
+</tbody>
+</table>
+<h2>Ejecutar los ejemplos</h2>
+<p>Doce ejemplos ejecutables en <a href="https://github.com/Root1V/synaptum-framework/tree/main/examples"><code>examples/</code></a>.
+Corren <strong>sin configurar nada</strong>: las respuestas van guionizadas y todo lo demás es real.</p>
+<pre><code class="language-bash">uv run python examples/agentes/01_triaje.py
+</code></pre>
+<p>Para apuntar a un modelo de verdad, dos variables y <strong>el mismo fichero sin tocar</strong>. Ver
+<a href="04-modelos.html">Modelos</a>.</p>
+<h2>Esta documentación, en dos formatos</h2>
+<p>El Markdown de <code>docs/</code> es la fuente; el HTML de <code>docs/html/</code> se genera. Un agente lee una página
+<code>.md</code> sin navegación que estorbe; una persona lee el <code>.html</code>, que sí la necesita.</p>
+<pre><code class="language-bash">uv run python scripts/render_docs.py
+</code></pre>
+<p>Un test falla si el HTML deja de corresponder al Markdown. Escribir los dos a mano garantiza que
+diverjan, y el que diverge siempre es el que nadie mira.</p>
+
+  </main>
+</div>
+</body>
+</html>

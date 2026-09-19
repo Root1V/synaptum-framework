@@ -42,7 +42,10 @@ axonium   = ["axonium>=1.0.0rc3"]
 [project.entry-points."synaptum.checkpointers"]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = [
+    "markdown-it-py>=3",
+    "pytest>=8",
+]
 
 [build-system]
 requires = ["hatchling"]

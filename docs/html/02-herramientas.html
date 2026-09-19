@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Herramientas · Synaptum</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --tinta: #1a1c1e; --fondo: #fdfdfc; --tenue: #5b6066; --linea: #e3e4e6;
+  --codigo-fondo: #f5f5f3; --acento: #0b5cad; --aviso: #8a4b00; --aviso-fondo: #fff8ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tinta: #e6e6e4; --fondo: #17181a; --tenue: #9aa0a6; --linea: #2c2e31;
+    --codigo-fondo: #202225; --acento: #74b0f0; --aviso: #e0a458; --aviso-fondo: #241f17;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fondo); color: var(--tinta);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.saltar { position: absolute; left: -9999px; }
+.saltar:focus { left: 1rem; top: 1rem; background: var(--fondo); padding: .5rem 1rem; z-index: 9; }
+.marco { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 3.5rem;
+         max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; }
+nav { position: sticky; top: 2.5rem; align-self: start; font-size: .92rem; }
+.marca { margin: 0; font-weight: 640; letter-spacing: -.01em; font-size: 1.05rem; }
+.marca a { color: var(--tinta); text-decoration: none; }
+.version { margin: .1rem 0 1.4rem; color: var(--tenue); font-size: .82rem; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+nav li { counter-increment: s; margin: .1rem 0; }
+nav a { display: block; padding: .3rem .6rem; margin-left: -.6rem; border-radius: .4rem;
+        color: var(--tenue); text-decoration: none; }
+nav a:hover { background: var(--codigo-fondo); color: var(--tinta); }
+nav a[aria-current] { color: var(--tinta); font-weight: 600; background: var(--codigo-fondo); }
+.fuente { margin-top: 1.6rem; color: var(--tenue); font-size: .82rem; }
+main { min-width: 0; }
+h1 { font-size: 2.1rem; line-height: 1.15; letter-spacing: -.022em; margin: 0 0 1.6rem; }
+h2 { font-size: 1.32rem; letter-spacing: -.012em; margin: 3rem 0 .9rem;
+     padding-top: 1.4rem; border-top: 1px solid var(--linea); }
+h3 { font-size: 1.06rem; margin: 2rem 0 .6rem; }
+p, li { max-width: 40rem; }
+a { color: var(--acento); }
+code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+       font-size: .875em; background: var(--codigo-fondo); padding: .12em .38em;
+       border-radius: .25rem; }
+pre { background: var(--codigo-fondo); padding: 1rem 1.15rem; border-radius: .6rem;
+      overflow-x: auto; border: 1px solid var(--linea); }
+pre code { background: none; padding: 0; font-size: .855rem; line-height: 1.6; }
+blockquote { margin: 1.4rem 0; padding: .85rem 1.1rem; border-left: 3px solid var(--aviso);
+             background: var(--aviso-fondo); border-radius: 0 .4rem .4rem 0; }
+blockquote p { margin: .3rem 0; }
+table { border-collapse: collapse; width: 100%; margin: 1.3rem 0; font-size: .93rem;
+        display: block; overflow-x: auto; }
+th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--linea);
+         vertical-align: top; }
+th { font-weight: 620; }
+hr { border: 0; border-top: 1px solid var(--linea); margin: 2.5rem 0; }
+@media (max-width: 62rem) {
+  .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
+  nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
+  nav ol { columns: 2; }
+}
+</style>
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="marco">
+  <nav aria-label="Secciones">
+    <p class="marca"><a href="index.html">Synaptum</a></p>
+    <p class="version">1.0.0rc1</p>
+    <ol><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html" aria-current="page">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="index.html">Empezar</a></li></ol>
+    <p class="fuente">También en <a href="../02-herramientas.md">Markdown</a>.</p>
+  </nav>
+  <main id="contenido">
+<h1>Herramientas</h1>
+<h2>El esquema sale de la firma</h2>
+<pre><code class="language-python">from typing import Annotated
+from synaptum import tool
+
+@tool
+async def contar_lineas(
+    fichero: Annotated[str, &quot;Ruta relativa a la raíz del proyecto&quot;],
+    maximo: int = 100,
+) -&gt; str:
+    &quot;&quot;&quot;Cuenta las líneas de un fichero del proyecto.&quot;&quot;&quot;
+    ...
+</code></pre>
+<p>De ahí sale el JSON Schema que ve el modelo: los tipos, los obligatorios, las descripciones de
+<code>Annotated</code> y la primera línea del docstring.</p>
+<p><strong>Por qué no se escribe aparte:</strong> un esquema escrito a mano se desincroniza. Y cuando lo hace, el
+modelo manda argumentos que la función no acepta — lejos del cambio que lo causó y con una
+inferencia ya pagada.</p>
+<p>Un tipo que no sabemos traducir <strong>falla al decorar</strong>, no al invocar.</p>
+<h2>Riesgo e idempotencia se declaran</h2>
+<pre><code class="language-python">@tool(risk=Risk.DESTRUCTIVE)
+async def transferir(destino: str, importe: float) -&gt; str:
+    &quot;&quot;&quot;Ordena una transferencia.&quot;&quot;&quot;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Risk.READ</code></td>
+<td>Lee. No cambia nada. <strong>Es el valor por defecto.</strong></td>
+</tr>
+<tr>
+<td><code>Risk.SOFT_WRITE</code></td>
+<td>Escribe algo reversible.</td>
+</tr>
+<tr>
+<td><code>Risk.HARD_WRITE</code></td>
+<td>Escribe algo que cuesta deshacer.</td>
+</tr>
+<tr>
+<td><code>Risk.DESTRUCTIVE</code></td>
+<td>Destruye o mueve dinero.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Ninguna anotación de tipos puede saber que una función que devuelve <code>str</code> mueve dinero.</strong> Por eso
+se declara a mano y no se deduce.</p>
+<p><code>idempotent=True</code> dice que <strong>repetir la llamada no tiene consecuencias</strong>. No es una optimización: es
+lo que permite al runtime reintentar tras una caída sin arriesgarse a duplicar un efecto.</p>
+<h3>Qué pasa si no declaras nada</h3>
+<p>Obtienes <code>risk=READ</code> e <code>idempotent=False</code>. Asimétrico a propósito: <strong>la clase más inocua y la
+garantía más cara.</strong></p>
+<p>La consecuencia práctica, y conviene saberla: una política que deniegue por <code>Risk.DESTRUCTIVE</code> <strong>no
+detendrá tu herramienta</strong>, aunque borre discos. En riesgo, callar es decir «inofensivo». En
+durabilidad, callar es decir «asume lo peor», y por eso su intención sí se escribe antes de
+ejecutar.</p>
+<p>Endurecer un default sería un cambio MAJOR; relajarlo, directamente no se hace.</p>
+<h2>Declarar no es decidir</h2>
+<p><strong>Synaptum declara; quien gobierna decide.</strong> Marcar algo <code>Risk.DESTRUCTIVE</code> no ejecuta ninguna política:
+el riesgo viaja por la costura y el gateway decide. Marcarlo <code>Risk.READ</code> tampoco autoriza nada.</p>
+<pre><code class="language-python">def politica(check):
+    if check.risk is Risk.DESTRUCTIVE and check.arguments.get(&quot;importe&quot;, 0) &gt; 100:
+        return Decision(disposition=Disposition.REQUIRE_APPROVAL, reason_code=&quot;tope&quot;)
+    return ALLOW
+</code></pre>
+<p><code>check.arguments</code> es campo propio y no una clave genérica, porque <strong>es lo que una política decide</strong>:
+negar «capturar» sin ver el importe no es una política, es un interruptor.</p>
+<h2>Los errores vuelven al modelo</h2>
+<p>Un fallo dentro de la función <strong>no rompe el run</strong>: vuelve como <code>ToolResult</code> con <code>is_error=True</code>, y
+el modelo lo ve y suele corregir. Un modelo que no ve el error no puede corregirlo.</p>
+<p>Lo que <strong>sí</strong> se propaga es una llamada mal formada: argumentos que no encajan en la firma no son
+algo que el modelo pueda arreglar leyendo un mensaje, son un desajuste entre el esquema y la
+función.</p>
+<h2>Herramientas de un servidor MCP</h2>
+<pre><code class="language-bash">pip install synaptum[mcp]
+</code></pre>
+<pre><code class="language-python">from synaptum.mcp import MCPTools
+
+async with MCPTools.stdio(&quot;uvx&quot;, &quot;mcp-server-git&quot;, &quot;--repository&quot;, &quot;.&quot;, prefix=&quot;git.&quot;) as git:
+    agente = Agent(&quot;dev&quot;, model=..., tools=list(git))
+</code></pre>
+<p>Entran con su esquema y <strong>el bucle no nota que son remotas</strong>: cumplen el mismo contrato que <code>@tool</code>.</p>
+<p>El <code>async with</code> no es decoración: un servidor por stdio es un proceso hijo, y salir del bloque es lo
+que lo cierra.</p>
+<h3>Qué cambia cuando la herramienta es ajena</h3>
+<p><strong>El riesgo lo insinúa quien no manda.</strong> MCP trae <code>readOnlyHint</code>, <code>destructiveHint</code> e
+<code>idempotentHint</code>, y su propia especificación dice que un cliente <strong>no debe fiarse de ellas</strong> para
+decidir seguridad: un servidor equivocado —o malicioso— puede declarar inocua una herramienta que
+borra.</p>
+<p>Por eso la traducción sigue <strong>los defectos de MCP y no los nuestros</strong>: sin anotar, <code>Risk.DESTRUCTIVE</code>.
+Produce más avisos de los que uno espera, y es lo correcto. Nuestro <code>@tool</code> es permisivo por defecto
+porque el autor está delante y puede declarar; con un servidor ajeno no está.</p>
+<pre><code class="language-python">print([t.name for t in repo.destructivas])   # míralas antes de dárselas a un agente
+</code></pre>
+<p><strong>Los errores llegan sin explicación.</strong> Un servidor MCP no filtra sus internos: llega
+<code>Error executing tool X</code> y nada más. El modelo sabe <em>que</em> falló y casi nunca <em>por qué</em>.</p>
+<p><strong>Los nombres chocan.</strong> Dos servidores que publiquen <code>search</code> no son distinguibles para el modelo, y
+gana el último registrado, en silencio. De ahí el <code>prefix=</code>.</p>
+<p><strong>El esquema es de otro.</strong> Si el servidor cambia el suyo, tu agente empieza a mandar argumentos que
+ya no encajan sin que nada en tu repositorio haya cambiado. Es justo el problema que <code>@tool</code> resuelve
+derivando el esquema de la firma, y con MCP vuelve porque la firma vive en otro sitio.</p>
+
+  </main>
+</div>
+</body>
+</html>

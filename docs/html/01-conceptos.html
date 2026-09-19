@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conceptos · Synaptum</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --tinta: #1a1c1e; --fondo: #fdfdfc; --tenue: #5b6066; --linea: #e3e4e6;
+  --codigo-fondo: #f5f5f3; --acento: #0b5cad; --aviso: #8a4b00; --aviso-fondo: #fff8ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tinta: #e6e6e4; --fondo: #17181a; --tenue: #9aa0a6; --linea: #2c2e31;
+    --codigo-fondo: #202225; --acento: #74b0f0; --aviso: #e0a458; --aviso-fondo: #241f17;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fondo); color: var(--tinta);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.saltar { position: absolute; left: -9999px; }
+.saltar:focus { left: 1rem; top: 1rem; background: var(--fondo); padding: .5rem 1rem; z-index: 9; }
+.marco { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 3.5rem;
+         max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; }
+nav { position: sticky; top: 2.5rem; align-self: start; font-size: .92rem; }
+.marca { margin: 0; font-weight: 640; letter-spacing: -.01em; font-size: 1.05rem; }
+.marca a { color: var(--tinta); text-decoration: none; }
+.version { margin: .1rem 0 1.4rem; color: var(--tenue); font-size: .82rem; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+nav li { counter-increment: s; margin: .1rem 0; }
+nav a { display: block; padding: .3rem .6rem; margin-left: -.6rem; border-radius: .4rem;
+        color: var(--tenue); text-decoration: none; }
+nav a:hover { background: var(--codigo-fondo); color: var(--tinta); }
+nav a[aria-current] { color: var(--tinta); font-weight: 600; background: var(--codigo-fondo); }
+.fuente { margin-top: 1.6rem; color: var(--tenue); font-size: .82rem; }
+main { min-width: 0; }
+h1 { font-size: 2.1rem; line-height: 1.15; letter-spacing: -.022em; margin: 0 0 1.6rem; }
+h2 { font-size: 1.32rem; letter-spacing: -.012em; margin: 3rem 0 .9rem;
+     padding-top: 1.4rem; border-top: 1px solid var(--linea); }
+h3 { font-size: 1.06rem; margin: 2rem 0 .6rem; }
+p, li { max-width: 40rem; }
+a { color: var(--acento); }
+code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+       font-size: .875em; background: var(--codigo-fondo); padding: .12em .38em;
+       border-radius: .25rem; }
+pre { background: var(--codigo-fondo); padding: 1rem 1.15rem; border-radius: .6rem;
+      overflow-x: auto; border: 1px solid var(--linea); }
+pre code { background: none; padding: 0; font-size: .855rem; line-height: 1.6; }
+blockquote { margin: 1.4rem 0; padding: .85rem 1.1rem; border-left: 3px solid var(--aviso);
+             background: var(--aviso-fondo); border-radius: 0 .4rem .4rem 0; }
+blockquote p { margin: .3rem 0; }
+table { border-collapse: collapse; width: 100%; margin: 1.3rem 0; font-size: .93rem;
+        display: block; overflow-x: auto; }
+th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--linea);
+         vertical-align: top; }
+th { font-weight: 620; }
+hr { border: 0; border-top: 1px solid var(--linea); margin: 2.5rem 0; }
+@media (max-width: 62rem) {
+  .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
+  nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
+  nav ol { columns: 2; }
+}
+</style>
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="marco">
+  <nav aria-label="Secciones">
+    <p class="marca"><a href="index.html">Synaptum</a></p>
+    <p class="version">1.0.0rc1</p>
+    <ol><li><a href="01-conceptos.html" aria-current="page">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="index.html">Empezar</a></li></ol>
+    <p class="fuente">También en <a href="../01-conceptos.md">Markdown</a>.</p>
+  </nav>
+  <main id="contenido">
+<h1>Conceptos</h1>
+<p>Seis piezas. No hay más, y ninguna es opcional de entender.</p>
+<h2><code>Agent</code> — la configuración, no el comportamiento</h2>
+<pre><code class="language-python">agente = Agent(
+    &quot;explorador&quot;,                       # nombre, para trazas y registros
+    model=&quot;openai-compatible:qwen3-8b&quot;, # proveedor:modelo
+    instructions=&quot;Sé breve.&quot;,           # el prompt de sistema
+    tools=[contar_lineas],
+    output=Diagnostico,                 # opcional: salida tipada
+    limits=Limits(max_steps=8),         # opcional: topes
+)
+</code></pre>
+<p>Un agente es <strong>composición, no herencia</strong>: no se hereda de él, no hay métodos que sobrescribir. Es
+su configuración más el bucle.</p>
+<p><code>model</code> lleva prefijo porque dice <strong>quién normaliza la respuesta</strong>, no solo qué modelo se quiere. El
+prefijo es nuestro y no viaja por el cable.</p>
+<p><strong>Qué no hace:</strong> no abre conexiones, no guarda estado entre llamadas y no sabe quién ejecuta. Puedes
+reutilizar el mismo <code>Agent</code> para mil runs a la vez.</p>
+<h2><code>Session</code> — dónde ocurre y dónde se recuerda</h2>
+<pre><code class="language-python">Session(run_id, gateway, checkpointer)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_id</code></td>
+<td>La identidad del run. Llamar otra vez con el mismo id <strong>reanuda</strong> en vez de empezar.</td>
+</tr>
+<tr>
+<td><code>gateway</code></td>
+<td>Por dónde salen los efectos: el modelo y las herramientas.</td>
+</tr>
+<tr>
+<td><code>checkpointer</code></td>
+<td>Dónde queda el rastro. Por defecto, memoria.</td>
+</tr>
+</tbody>
+</table>
+<p>Reanudar es construir una <code>Session</code> con el mismo <code>run_id</code> y el mismo <code>checkpointer</code>. No hay nada
+más — ni un método <code>resume()</code>, ni un flag.</p>
+<p><strong>Qué no hace:</strong> no guarda la conversación. La ventana de contexto se <strong>vuelve a derivar</strong> de los
+mismos resultados en el mismo orden. Guardarla sería guardar dos veces lo mismo y arriesgarse a que
+discrepen.</p>
+<h2>El gateway — la única puerta de salida</h2>
+<p>Todo efecto externo sale por aquí, y esa es la razón de que exista: <strong>si hay una sola puerta, alguien
+puede estar en ella.</strong></p>
+<pre><code class="language-python">from synaptum import LocalGateway
+
+gateway = LocalGateway(model=mi_modelo, tools=[...], policy=mi_politica)
+</code></pre>
+<p><code>LocalGateway</code> es la implementación de referencia para modo autónomo. En producción, el gateway es
+un proceso aparte que tiene las credenciales y puede denegar.</p>
+<blockquote>
+<p><strong><code>LocalGateway</code> no aplica nada.</strong> Corre dentro del proceso que gobernaría, así que sus
+comprobaciones son advisorias: las cumple un bucle correcto y se las salta uno con un fallo. Marca
+cada decisión con <code>enforced=False</code> para que nadie confunda su informe con una auditoría.</p>
+</blockquote>
+<p><code>Gateway</code> es un <code>typing.Protocol</code> de cuatro métodos. Quien lo implemente no hereda ni importa nada
+nuestro, y puede estar escrito en otro lenguaje al otro lado de un socket.</p>
+<h2>El checkpointer — el diario del run</h2>
+<pre><code class="language-python">from synaptum import MemoryCheckpointer, SqliteCheckpointer
+
+MemoryCheckpointer()              # por defecto. El run muere con el proceso.
+SqliteCheckpointer(&quot;runs.db&quot;)     # sobrevive. stdlib: sqlite3, json, pathlib.
+</code></pre>
+<p><strong>No es una caché.</strong> Una caché se puede tirar sin cambiar la corrección. Si tiras el journal pierdes
+la capacidad de distinguir <em>«no se ejecutó»</em> de <em>«no se sabe si se ejecutó»</em>, y esa distinción es lo
+único que impide cobrar dos veces una transferencia tras una caída.</p>
+<p><strong>No ata a nada externo.</strong> Las dos implementaciones son stdlib pura, y <code>Checkpointer</code> es un
+<code>Protocol</code> de dos métodos: implementa <code>append</code> y <code>load</code> contra Postgres, Redis o lo que quieras.</p>
+<p>Es el mismo reparto que hace la industria —LangGraph tiene sus <em>checkpoint savers</em>, Temporal guarda
+un historial de eventos y reconstruye reproduciéndolo—. Lo que cambia aquí es que <strong>el sustrato no
+es nuestro a propósito</strong>: el framework es dueño de la semántica, no del almacenamiento.</p>
+<h2>Los pasos — qué cede el bucle</h2>
+<pre><code class="language-python">async for paso in agente.run(tarea, session=sesion):
+    match paso:
+        case ToolStep(phase=Phase.ATTEMPTED, call=llamada):
+            ...
+        case ModelStep(phase=Phase.COMPLETED, usage=consumo):
+            ...
+        case FinalStep(output=salida):
+            ...
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Paso</th>
+<th>Cuándo</th>
+<th>Lleva</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ModelStep</code></td>
+<td>Una llamada al modelo</td>
+<td><code>request</code> / <code>response</code> / <code>usage</code></td>
+</tr>
+<tr>
+<td><code>ToolStep</code></td>
+<td>La ejecución de una herramienta</td>
+<td><code>call</code> / <code>result</code> / <code>risk</code> / <code>idempotent</code></td>
+</tr>
+<tr>
+<td><code>ApprovalStep</code></td>
+<td>El run se detiene a esperar a una persona</td>
+<td><code>subject</code> / <code>decision</code></td>
+</tr>
+<tr>
+<td><code>DelegateStep</code></td>
+<td>Delegación a un subagente <em>(tipo definido, aún sin emisor)</em></td>
+<td><code>agent</code> / <code>brief</code> / <code>result</code></td>
+</tr>
+<tr>
+<td><code>FinalStep</code></td>
+<td>El run terminó</td>
+<td><code>output</code> / <code>usage</code> acumulado</td>
+</tr>
+</tbody>
+</table>
+<h2>Las fases — un paso tiene dos momentos</h2>
+<p><code>Phase.ATTEMPTED</code> y <code>Phase.COMPLETED</code>. <strong>Todos los pasos tienen las dos.</strong> Un paso no es un instante:
+se intenta, y luego se sabe cómo fue.</p>
+<pre><code>000000-model   model   attempted   durabilidad=deferrable
+000000-model   model   completed   durabilidad=durable
+000001-tool    tool    attempted   durabilidad=durable      ← la diferencia
+000001-tool    tool    completed   durabilidad=durable
+</code></pre>
+<p>Lo que cambia entre tipos no son las fases: es <strong>la durabilidad de la intención</strong>.</p>
+<ul>
+<li>La intención de un modelo es <strong>diferible</strong>. Una inferencia cuesta dinero, pero repetirla no rompe
+nada, así que se puede escribir en lote.</li>
+<li>La intención de una herramienta no idempotente es <strong>durable</strong>: tiene que estar en disco <em>antes</em> de
+que el efecto ocurra. Si no, tras una caída no hay forma de saber si la transferencia salió. Es la
+única espera bloqueante que el bucle impone en todo un turno.</li>
+</ul>
+<p>Esto se llama <em>escritura anticipada</em>, y es la razón de que el journal exista. Ver
+<a href="03-durabilidad.html">Durabilidad</a>.</p>
+<h2>El identificador de paso</h2>
+<p><code>000003-model</code>. Ordinal con relleno más tipo, derivado de <strong>la posición del paso en el run</strong> — nunca
+de un UUID ni de un reloj.</p>
+<p>Que sea determinista es lo que permite reanudar: el paso 3 de un run es siempre el paso 3, así que
+el replay puede saltárselo sin coordinar nada con nadie. Está publicado como especificación abierta,
+y cualquiera puede implementarla sin usar Synaptum ni hablar Python.</p>
+
+  </main>
+</div>
+</body>
+</html>

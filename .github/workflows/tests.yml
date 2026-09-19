@@ -27,6 +27,12 @@ jobs:
       - name: pytest
         run: uv run --frozen pytest
 
+      # La documentación en HTML se genera del Markdown. Si alguien edita uno y
+      # no regenera el otro, se separan — y el que diverge siempre es el que
+      # nadie mira.
+      - name: el HTML de docs/ corresponde al Markdown
+        run: uv run --frozen python scripts/render_docs.py --check
+
       # El paquete que se publica es lo que hay que probar, no el árbol de
       # fuentes. Un wheel al que le falte un fichero pasa la suite y falla al
       # instalarse, que es exactamente lo que este paso ve y el anterior no.

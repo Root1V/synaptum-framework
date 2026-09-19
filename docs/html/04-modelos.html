@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modelos · Synaptum</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --tinta: #1a1c1e; --fondo: #fdfdfc; --tenue: #5b6066; --linea: #e3e4e6;
+  --codigo-fondo: #f5f5f3; --acento: #0b5cad; --aviso: #8a4b00; --aviso-fondo: #fff8ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tinta: #e6e6e4; --fondo: #17181a; --tenue: #9aa0a6; --linea: #2c2e31;
+    --codigo-fondo: #202225; --acento: #74b0f0; --aviso: #e0a458; --aviso-fondo: #241f17;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fondo); color: var(--tinta);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.saltar { position: absolute; left: -9999px; }
+.saltar:focus { left: 1rem; top: 1rem; background: var(--fondo); padding: .5rem 1rem; z-index: 9; }
+.marco { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 3.5rem;
+         max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; }
+nav { position: sticky; top: 2.5rem; align-self: start; font-size: .92rem; }
+.marca { margin: 0; font-weight: 640; letter-spacing: -.01em; font-size: 1.05rem; }
+.marca a { color: var(--tinta); text-decoration: none; }
+.version { margin: .1rem 0 1.4rem; color: var(--tenue); font-size: .82rem; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+nav li { counter-increment: s; margin: .1rem 0; }
+nav a { display: block; padding: .3rem .6rem; margin-left: -.6rem; border-radius: .4rem;
+        color: var(--tenue); text-decoration: none; }
+nav a:hover { background: var(--codigo-fondo); color: var(--tinta); }
+nav a[aria-current] { color: var(--tinta); font-weight: 600; background: var(--codigo-fondo); }
+.fuente { margin-top: 1.6rem; color: var(--tenue); font-size: .82rem; }
+main { min-width: 0; }
+h1 { font-size: 2.1rem; line-height: 1.15; letter-spacing: -.022em; margin: 0 0 1.6rem; }
+h2 { font-size: 1.32rem; letter-spacing: -.012em; margin: 3rem 0 .9rem;
+     padding-top: 1.4rem; border-top: 1px solid var(--linea); }
+h3 { font-size: 1.06rem; margin: 2rem 0 .6rem; }
+p, li { max-width: 40rem; }
+a { color: var(--acento); }
+code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+       font-size: .875em; background: var(--codigo-fondo); padding: .12em .38em;
+       border-radius: .25rem; }
+pre { background: var(--codigo-fondo); padding: 1rem 1.15rem; border-radius: .6rem;
+      overflow-x: auto; border: 1px solid var(--linea); }
+pre code { background: none; padding: 0; font-size: .855rem; line-height: 1.6; }
+blockquote { margin: 1.4rem 0; padding: .85rem 1.1rem; border-left: 3px solid var(--aviso);
+             background: var(--aviso-fondo); border-radius: 0 .4rem .4rem 0; }
+blockquote p { margin: .3rem 0; }
+table { border-collapse: collapse; width: 100%; margin: 1.3rem 0; font-size: .93rem;
+        display: block; overflow-x: auto; }
+th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--linea);
+         vertical-align: top; }
+th { font-weight: 620; }
+hr { border: 0; border-top: 1px solid var(--linea); margin: 2.5rem 0; }
+@media (max-width: 62rem) {
+  .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
+  nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
+  nav ol { columns: 2; }
+}
+</style>
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="marco">
+  <nav aria-label="Secciones">
+    <p class="marca"><a href="index.html">Synaptum</a></p>
+    <p class="version">1.0.0rc1</p>
+    <ol><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html" aria-current="page">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="index.html">Empezar</a></li></ol>
+    <p class="fuente">También en <a href="../04-modelos.md">Markdown</a>.</p>
+  </nav>
+  <main id="contenido">
+<h1>Modelos</h1>
+<h2>Nombrar un modelo</h2>
+<pre><code class="language-python">Agent(&quot;a&quot;, model=&quot;openai-compatible:qwen3-8b&quot;)
+</code></pre>
+<p>El prefijo dice <strong>quién normaliza la respuesta</strong>, no solo qué modelo se quiere. Es nuestro y no
+viaja por el cable: al proveedor le llega <code>qwen3-8b</code> a secas.</p>
+<h2>Las tres puertas</h2>
+<p>El agente <strong>no sabe cuál tiene</strong>, y eso es la propiedad, no comodidad.</p>
+<h3>Sin inferencia — el doble</h3>
+<p>Por defecto. Ver <a href="06-probar.html">Probar</a>.</p>
+<h3>Transporte HTTP directo</h3>
+<pre><code class="language-python">from synaptum import HttpModel, LocalGateway
+
+modelo = HttpModel(&quot;http://localhost:8080/v1&quot;, api_key=None)
+gateway = LocalGateway(model=modelo, stream=modelo.stream, tools=[...])
+</code></pre>
+<p>Solo stdlib — <code>urllib</code> en un hilo, porque el núcleo no tiene dependencias y no las va a tener por
+esto. Vale para cualquier endpoint OpenAI-compatible: vLLM, Ollama, LM Studio, llama.cpp o la API de
+OpenAI.</p>
+<blockquote>
+<p><strong>Es transporte de desarrollo.</strong> En el camino gobernado la llamada al modelo <strong>no ocurre en este
+proceso</strong>: sale por la costura hacia quien tiene las credenciales y puede denegar. Un transporte
+dentro del proceso tiene la clave en su memoria y llama a quien le digan.</p>
+</blockquote>
+<h3>Un SDK de plataforma</h3>
+<p>Cuando la inferencia está gobernada y un SDK es la única puerta legítima —credenciales, catálogo,
+cuotas y facturación viven ahí— tiene prioridad. Ir al endpoint por detrás se salta todo eso.</p>
+<pre><code class="language-python">from synaptum.providers.axonium import AxoniumModel   # pip install synaptum[axonium]
+
+puente = AxoniumModel()
+gateway = LocalGateway(model=puente.complete, stream=puente.stream, tools=[...])
+</code></pre>
+<p>Esto <strong>no es un <code>Provider</code></strong>: un <code>Provider</code> normaliza y no transporta, y un SDK así hace las dos
+cosas. Lo que falta es traducir entre dos vocabularios que ya están normalizados.</p>
+<h2>Escribir un adaptador</h2>
+<p><code>Provider</code> es un <code>Protocol</code> de tres funciones <strong>puras</strong>: <code>to_wire</code>, <code>from_wire</code>, <code>stream_from_wire</code>.
+No abren conexiones ni leen credenciales.</p>
+<p>Que la normalización sea separable del transporte es lo que permite ejercitarla <strong>contra un fichero</strong>
+—sin servidor, sin red, sin gastar— y es la razón de que el corpus dorado exista.</p>
+<p>Los adaptadores se descubren por <em>entry points</em>, así que el núcleo no conoce a ninguno.</p>
+<h2><code>Usage</code> tiene tres estados</h2>
+<pre><code class="language-python">Usage(input=100, output=20, cache_read=80, estimated=True)
+#     reasoning=None, cache_write=None   ← nadie los midió
+</code></pre>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>None</code></td>
+<td><strong>Nadie lo midió.</strong></td>
+</tr>
+<tr>
+<td><code>0</code></td>
+<td>Se midió y fue cero.</td>
+</tr>
+<tr>
+<td><code>estimated=True</code></td>
+<td>Derivado, no reportado.</td>
+</tr>
+</tbody>
+</table>
+<p>Confundir <code>None</code> con <code>0</code> es lo que hace creer que escribir en caché es gratis, y el bucle decide mal
+en cada compactación. Lo desconocido se propaga al sumar: si un tramo no midió un contador, el total
+de ese contador es <code>None</code> — sumar solo lo conocido daría una cota inferior con aspecto de cifra
+exacta.</p>
+<p><strong><code>input</code> es inclusivo</strong>: contiene los tokens servidos desde caché, y <code>cache_read</code> dice cuántos.
+Confirmado contra grabaciones reales, donde <code>prompt_tokens == prompt_n + cache_n</code>.</p>
+<h2>Streaming</h2>
+<pre><code class="language-python">async for evento in agente.stream(tarea, session=sesion):
+    if evento.kind == &quot;text_delta&quot;:
+        print(evento.text, end=&quot;&quot;, flush=True)
+</code></pre>
+<p>Es el mismo bucle y el mismo journal que <code>run()</code>; lo único que cambia es que los fragmentos del
+modelo se ceden intercalados entre la intención del paso y su resultado.</p>
+<p>Va aparte de <code>run()</code> porque <strong>cambia el tipo de lo que se cede</strong>: quien consume <code>run()</code> hace <code>match</code>
+sobre pasos sin una rama para lo que nunca va a llegar.</p>
+<ul>
+<li><strong>Un paso reanudado no vuelve a emitir fragmentos.</strong> Ya se pagó; reproducir sus tokens como si
+estuvieran ocurriendo sería teatro.</li>
+<li><strong>Un reintento vuelve a abrir el ciclo.</strong> Los fragmentos ya entregados no se retiran: se generaron
+y se pagaron.</li>
+</ul>
+<h3>Cancelar es dejar de iterar</h3>
+<p>No hay evento de cancelación, y no lo habrá: <strong>un canal que se está cerrando no es sitio para mandar
+el aviso de que se cierra.</strong> Cerrar el iterador cierra el cuerpo de la respuesta, y eso es lo que
+para la generación arriba.</p>
+<pre><code class="language-python">flujo = agente.stream(tarea, session=sesion)
+async for evento in flujo:
+    if suficiente(evento):
+        break
+await flujo.aclose()          # esto es la señal
+</code></pre>
+<h2>Reintentos</h2>
+<p>Un error trae en su <strong>tipo</strong> si es reintentable — la decisión no es del bucle, la sabe quien habló
+con el proveedor. Cualquier 4xx salvo 429 no lo es; 429, 5xx, timeouts y fallos de red sí.</p>
+<p>El bucle espera entre intentos, con espera creciente y <em>jitter</em>, y respeta el <code>Retry-After</code> del otro
+extremo con un techo. Reintentar al instante no es reintentar: es repetir contra el mismo estado
+roto. Y sin jitter, N agentes que caen por la misma razón reintentan a la vez y reconstruyen el pico
+que los tiró.</p>
+<pre><code class="language-python">Limits(max_retries=2, retry_base=0.5, max_retry_wait=30.0)
+</code></pre>
+<h2>Salida estructurada</h2>
+<pre><code class="language-python">@dataclass
+class Diagnostico:
+    causa: str
+    confianza: float
+
+Agent(&quot;a&quot;, model=..., output=Diagnostico)
+</code></pre>
+<p>Una <code>dataclass</code> de stdlib basta; Pydantic es un extra para quien ya lo use.</p>
+<p>El esquema viaja por dos caminos a la vez: en <code>response_format</code> <strong>y</strong> en las instrucciones. No todo
+gateway admite el campo —algunos lo descartan avisando por warning— y entonces la restricción no
+viaja, el modelo contesta en prosa y el error culpa al JSON. Decirlo también en el prompt cuesta
+unos cientos de tokens y funciona con cualquier proveedor.</p>
+<p>La validación ocurre <strong>dentro del reintento</strong>: un objeto mal formado no es un fallo del run, es una
+muestra mala, y el muestreo es estocástico.</p>
+
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qué no hace · Synaptum</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --tinta: #1a1c1e; --fondo: #fdfdfc; --tenue: #5b6066; --linea: #e3e4e6;
+  --codigo-fondo: #f5f5f3; --acento: #0b5cad; --aviso: #8a4b00; --aviso-fondo: #fff8ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tinta: #e6e6e4; --fondo: #17181a; --tenue: #9aa0a6; --linea: #2c2e31;
+    --codigo-fondo: #202225; --acento: #74b0f0; --aviso: #e0a458; --aviso-fondo: #241f17;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fondo); color: var(--tinta);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.saltar { position: absolute; left: -9999px; }
+.saltar:focus { left: 1rem; top: 1rem; background: var(--fondo); padding: .5rem 1rem; z-index: 9; }
+.marco { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 3.5rem;
+         max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; }
+nav { position: sticky; top: 2.5rem; align-self: start; font-size: .92rem; }
+.marca { margin: 0; font-weight: 640; letter-spacing: -.01em; font-size: 1.05rem; }
+.marca a { color: var(--tinta); text-decoration: none; }
+.version { margin: .1rem 0 1.4rem; color: var(--tenue); font-size: .82rem; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+nav li { counter-increment: s; margin: .1rem 0; }
+nav a { display: block; padding: .3rem .6rem; margin-left: -.6rem; border-radius: .4rem;
+        color: var(--tenue); text-decoration: none; }
+nav a:hover { background: var(--codigo-fondo); color: var(--tinta); }
+nav a[aria-current] { color: var(--tinta); font-weight: 600; background: var(--codigo-fondo); }
+.fuente { margin-top: 1.6rem; color: var(--tenue); font-size: .82rem; }
+main { min-width: 0; }
+h1 { font-size: 2.1rem; line-height: 1.15; letter-spacing: -.022em; margin: 0 0 1.6rem; }
+h2 { font-size: 1.32rem; letter-spacing: -.012em; margin: 3rem 0 .9rem;
+     padding-top: 1.4rem; border-top: 1px solid var(--linea); }
+h3 { font-size: 1.06rem; margin: 2rem 0 .6rem; }
+p, li { max-width: 40rem; }
+a { color: var(--acento); }
+code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+       font-size: .875em; background: var(--codigo-fondo); padding: .12em .38em;
+       border-radius: .25rem; }
+pre { background: var(--codigo-fondo); padding: 1rem 1.15rem; border-radius: .6rem;
+      overflow-x: auto; border: 1px solid var(--linea); }
+pre code { background: none; padding: 0; font-size: .855rem; line-height: 1.6; }
+blockquote { margin: 1.4rem 0; padding: .85rem 1.1rem; border-left: 3px solid var(--aviso);
+             background: var(--aviso-fondo); border-radius: 0 .4rem .4rem 0; }
+blockquote p { margin: .3rem 0; }
+table { border-collapse: collapse; width: 100%; margin: 1.3rem 0; font-size: .93rem;
+        display: block; overflow-x: auto; }
+th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--linea);
+         vertical-align: top; }
+th { font-weight: 620; }
+hr { border: 0; border-top: 1px solid var(--linea); margin: 2.5rem 0; }
+@media (max-width: 62rem) {
+  .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
+  nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
+  nav ol { columns: 2; }
+}
+</style>
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="marco">
+  <nav aria-label="Secciones">
+    <p class="marca"><a href="index.html">Synaptum</a></p>
+    <p class="version">1.0.0rc1</p>
+    <ol><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html" aria-current="page">Qué no hace</a></li><li><a href="index.html">Empezar</a></li></ol>
+    <p class="fuente">También en <a href="../07-limites.md">Markdown</a>.</p>
+  </nav>
+  <main id="contenido">
+<h1>Qué no hace</h1>
+<p>Dicho en voz alta, porque un framework que no dice dónde acaba deja que le supongan el resto.</p>
+<h2>No aplica política</h2>
+<p><code>LocalGateway</code> <strong>no aplica nada</strong>. Corre dentro del proceso que gobernaría, así que sus
+comprobaciones son advisorias: las cumple un bucle correcto y se las salta uno con un fallo — o uno
+comprometido. Es la misma razón por la que un sandbox no se implementa como una función que el código
+encerrado decide llamar.</p>
+<p>Marca cada decisión con <code>enforced=False</code> y su informe lleva una cabecera diciéndolo, porque un
+informe que no lo dice acaba pegado en un ticket como si fuera una auditoría.</p>
+<p><strong>Que un run pase por aquí sin denegaciones no dice nada</strong> sobre si pasaría por un gateway real.</p>
+<h2>No guarda secretos ni gobierna credenciales</h2>
+<p><code>HttpModel</code> tiene la clave en la memoria del proceso y llama a quien le digan. En el camino gobernado
+la llamada al modelo <strong>no ocurre en este proceso</strong>.</p>
+<h2>No decide cuánto puede gastar un run</h2>
+<p><code>Limits</code> es <strong>corrección, no política</strong>: evita que un bucle mal formado no termine nunca. Los topes
+de gasto pertenecen al arnés y llegan por la costura como una denegación.</p>
+<h2>No elige dónde se persiste</h2>
+<p><code>Checkpointer</code> es un protocolo. Traemos dos implementaciones de referencia —memoria y SQLite— y
+ninguna es para producción a escala. La retención, el cifrado y el borrado son del sustrato, y el
+sustrato no es nuestro.</p>
+<h2>No es un bus de mensajes</h2>
+<p>El motor es <code>await</code>, no una cola. No hay broker, ni suscriptores, ni entrega garantizada entre
+agentes. El stream de eventos es <strong>una sola cosa cediendo control</strong>, no N cosas hablando entre sí.</p>
+<p>Si necesitas agentes en procesos distintos comunicándose de forma asíncrona y persistente, eso es un
+arnés, y está bien que lo sea.</p>
+<h2>No compacta el contexto por ti</h2>
+<p>Todavía no hay ensamblador de contexto ni middleware de recorte (<code>SYN-32</code>, <code>SYN-33</code>). Hoy, si una
+herramienta devuelve 39 000 tokens, entran enteros. Con un modelo de 4 096 de contexto eso es un
+fallo inmediato; con uno de 131 072, es caro.</p>
+<p>Mientras tanto, recorta en la herramienta.</p>
+<h2>No delega con contexto aislado</h2>
+<p><code>delegate()</code> es <code>SYN-41</code>. Se puede componer a mano —y funciona— con las tres consecuencias listadas
+en <a href="05-multiagente.html">Varios agentes</a>.</p>
+<h2>No emite trazas todavía</h2>
+<p><code>SYN-37</code>. Las convenciones GenAI de OpenTelemetry están en el plan; hoy no hay spans.</p>
+<h2>No reintenta lo que no debe</h2>
+<p>Y esto es un «no hace» deliberado, no una carencia: <strong>cualquier 4xx salvo 429 no se reintenta.</strong> La
+familia entera significa «tu petición es el problema»: repetirla sin cambiarla da el mismo resultado
+y cuesta lo mismo.</p>
+<h2>No adivina cuando no sabe</h2>
+<p>Si el proceso muere justo después de lanzar una herramienta no idempotente y antes de registrar el
+resultado, <strong>nadie sabe si el efecto ocurrió</strong>. El replay levanta <code>UncertainEffect</code> en vez de elegir
+por ti. Es el framework negándose a adivinar, y es la conducta correcta aunque sea la incómoda.</p>
+
+  </main>
+</div>
+</body>
+</html>

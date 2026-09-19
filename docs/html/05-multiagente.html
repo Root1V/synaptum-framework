@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Varios agentes · Synaptum</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --tinta: #1a1c1e; --fondo: #fdfdfc; --tenue: #5b6066; --linea: #e3e4e6;
+  --codigo-fondo: #f5f5f3; --acento: #0b5cad; --aviso: #8a4b00; --aviso-fondo: #fff8ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tinta: #e6e6e4; --fondo: #17181a; --tenue: #9aa0a6; --linea: #2c2e31;
+    --codigo-fondo: #202225; --acento: #74b0f0; --aviso: #e0a458; --aviso-fondo: #241f17;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fondo); color: var(--tinta);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.saltar { position: absolute; left: -9999px; }
+.saltar:focus { left: 1rem; top: 1rem; background: var(--fondo); padding: .5rem 1rem; z-index: 9; }
+.marco { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 3.5rem;
+         max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; }
+nav { position: sticky; top: 2.5rem; align-self: start; font-size: .92rem; }
+.marca { margin: 0; font-weight: 640; letter-spacing: -.01em; font-size: 1.05rem; }
+.marca a { color: var(--tinta); text-decoration: none; }
+.version { margin: .1rem 0 1.4rem; color: var(--tenue); font-size: .82rem; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+nav li { counter-increment: s; margin: .1rem 0; }
+nav a { display: block; padding: .3rem .6rem; margin-left: -.6rem; border-radius: .4rem;
+        color: var(--tenue); text-decoration: none; }
+nav a:hover { background: var(--codigo-fondo); color: var(--tinta); }
+nav a[aria-current] { color: var(--tinta); font-weight: 600; background: var(--codigo-fondo); }
+.fuente { margin-top: 1.6rem; color: var(--tenue); font-size: .82rem; }
+main { min-width: 0; }
+h1 { font-size: 2.1rem; line-height: 1.15; letter-spacing: -.022em; margin: 0 0 1.6rem; }
+h2 { font-size: 1.32rem; letter-spacing: -.012em; margin: 3rem 0 .9rem;
+     padding-top: 1.4rem; border-top: 1px solid var(--linea); }
+h3 { font-size: 1.06rem; margin: 2rem 0 .6rem; }
+p, li { max-width: 40rem; }
+a { color: var(--acento); }
+code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+       font-size: .875em; background: var(--codigo-fondo); padding: .12em .38em;
+       border-radius: .25rem; }
+pre { background: var(--codigo-fondo); padding: 1rem 1.15rem; border-radius: .6rem;
+      overflow-x: auto; border: 1px solid var(--linea); }
+pre code { background: none; padding: 0; font-size: .855rem; line-height: 1.6; }
+blockquote { margin: 1.4rem 0; padding: .85rem 1.1rem; border-left: 3px solid var(--aviso);
+             background: var(--aviso-fondo); border-radius: 0 .4rem .4rem 0; }
+blockquote p { margin: .3rem 0; }
+table { border-collapse: collapse; width: 100%; margin: 1.3rem 0; font-size: .93rem;
+        display: block; overflow-x: auto; }
+th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--linea);
+         vertical-align: top; }
+th { font-weight: 620; }
+hr { border: 0; border-top: 1px solid var(--linea); margin: 2.5rem 0; }
+@media (max-width: 62rem) {
+  .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
+  nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
+  nav ol { columns: 2; }
+}
+</style>
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="marco">
+  <nav aria-label="Secciones">
+    <p class="marca"><a href="index.html">Synaptum</a></p>
+    <p class="version">1.0.0rc1</p>
+    <ol><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html" aria-current="page">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="index.html">Empezar</a></li></ol>
+    <p class="fuente">También en <a href="../05-multiagente.md">Markdown</a>.</p>
+  </nav>
+  <main id="contenido">
+<h1>Varios agentes</h1>
+<p><strong><code>delegate()</code> no existe todavía</strong> — es <code>SYN-41</code>. El tipo <code>DelegateStep</code> está escrito y nada lo
+emite.</p>
+<p>Eso <strong>no impide</strong> construir sistemas multi-agente hoy: el bucle de un agente es un generador
+asíncrono de verdad, así que orquestar varios es código asyncio normal. Lo que <code>SYN-41</code> añadirá es
+que la delegación quede <strong>en el journal</strong> como un paso propio, con su consumo atribuido y su punto de
+reanudación.</p>
+<p>La regla que sí se puede seguir desde el primer día:</p>
+<blockquote>
+<p><strong>Entre agentes viaja el resultado, nunca el historial.</strong></p>
+</blockquote>
+<p>Duplicar el contexto de un agente en otro se paga dos veces, y hace que el segundo herede los errores
+del primero sin poder distinguirlos de sus datos.</p>
+<h2>Cadena — uno detrás de otro</h2>
+<p>Cuando cada etapa necesita criterio distinto: traducir y luego revisar que quepa en el hueco.</p>
+<pre><code class="language-python">traduccion = await ejecutar(traductor(), &quot;Traduce el segmento seg-0042.&quot;, &quot;dub-tr&quot;)
+
+# Al revisor le llega el RESULTADO, no la conversación del traductor.
+brief = f&quot;Traducción propuesta: «{traduccion.texto_es}». El original dura 5.5s.&quot;
+revision = await ejecutar(revisor(), brief, &quot;dub-rev&quot;)
+</code></pre>
+<p>Cada agente tiene <strong>su propio <code>run_id</code></strong>: son runs distintos, se reanudan por separado, y el journal
+de uno no contamina el del otro.</p>
+<h2>Paralelo — fan-out y síntesis</h2>
+<p>Cuando varias hipótesis compiten y son independientes.</p>
+<pre><code class="language-python">resultados = await asyncio.gather(
+    *(investigar(nombre, brief, herramienta) for nombre, brief, herramienta in LINEAS)
+)
+</code></pre>
+<p>Aislar contexto es <strong>lo que hace barato paralelizar</strong>: si los investigadores compartieran historial,
+habría que serializarlos. En reloj cuesta una fracción; en tokens, lo mismo que en serie — los
+tokens no saben de concurrencia.</p>
+<p>El sintetizador recibe los hallazgos, no las transcripciones. Es lo que impide que el coste crezca
+con el número de trabajadores.</p>
+<p>Con <code>return_exceptions=True</code> decides qué hacer con la línea que reventó.</p>
+<h2>Un agente como herramienta de otro</h2>
+<p>El patrón más usado en la práctica: un supervisor que enruta.</p>
+<pre><code class="language-python">@tool
+async def especialista_observabilidad(pregunta: Annotated[str, &quot;La pregunta, tal cual&quot;]) -&gt; str:
+    &quot;&quot;&quot;Responde sobre incidentes, latencias y trazas.&quot;&quot;&quot;
+    async for paso in agente_obs.run(pregunta, session=Session(&quot;sup-obs&quot;, puerta)):
+        if isinstance(paso, FinalStep):
+            return str(paso.output)
+</code></pre>
+<p><strong>A favor:</strong> el supervisor no necesita conocer las herramientas de nadie. Sus tres herramientas
+tienen una firma de una línea, mientras cada especialista puede tener quince. Añadir un dominio es
+añadir una función, no reescribir un prompt.</p>
+<p><strong>En contra, y es lo que hay que saber antes de usarlo:</strong></p>
+<ol>
+<li>
+<p><strong>El coste desaparece de la vista.</strong> <code>FinalStep.usage</code> del supervisor mide <em>sus</em> llamadas, no las
+de dentro. Hay que sumarlo a mano; si solo miras la del supervisor, un sistema que gasta cinco
+veces más parece igual de barato. Es exactamente lo que <code>DelegateStep.usage</code> existe para resolver.</p>
+</li>
+<li>
+<p><strong>Un subagente no es un paso durable.</strong> Si el proceso muere a mitad de un especialista, al
+reanudar la herramienta se reejecuta entera — el journal del supervisor la ve como una llamada, no
+como un run con sus propios pasos. Para lectura da igual; para algo que mueva dinero, no.</p>
+</li>
+<li>
+<p><strong>El riesgo no se propaga.</strong> El envoltorio es <code>Risk.READ</code> por defecto aunque por dentro llame a algo
+que escribe. Hay que declararlo a mano; el framework no puede deducirlo, y fingir que sí sería
+peor.</p>
+</li>
+</ol>
+<h2>Cuál elegir</h2>
+<table>
+<thead>
+<tr>
+<th>Situación</th>
+<th>Forma</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Etapas con criterios distintos, una depende de la anterior</td>
+<td>Cadena</td>
+</tr>
+<tr>
+<td>Hipótesis independientes, el reloj importa</td>
+<td>Paralelo + síntesis</td>
+</tr>
+<tr>
+<td>Dominios separados, una entrada única</td>
+<td>Agente como herramienta</td>
+</tr>
+<tr>
+<td>Un solo dominio y muchas herramientas</td>
+<td><strong>Un agente.</strong> Varios no arreglan un prompt malo.</td>
+</tr>
+</tbody>
+</table>
+
+  </main>
+</div>
+</body>
+</html>

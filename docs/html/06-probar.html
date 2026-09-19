@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Probar · Synaptum</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --tinta: #1a1c1e; --fondo: #fdfdfc; --tenue: #5b6066; --linea: #e3e4e6;
+  --codigo-fondo: #f5f5f3; --acento: #0b5cad; --aviso: #8a4b00; --aviso-fondo: #fff8ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tinta: #e6e6e4; --fondo: #17181a; --tenue: #9aa0a6; --linea: #2c2e31;
+    --codigo-fondo: #202225; --acento: #74b0f0; --aviso: #e0a458; --aviso-fondo: #241f17;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fondo); color: var(--tinta);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.saltar { position: absolute; left: -9999px; }
+.saltar:focus { left: 1rem; top: 1rem; background: var(--fondo); padding: .5rem 1rem; z-index: 9; }
+.marco { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 3.5rem;
+         max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; }
+nav { position: sticky; top: 2.5rem; align-self: start; font-size: .92rem; }
+.marca { margin: 0; font-weight: 640; letter-spacing: -.01em; font-size: 1.05rem; }
+.marca a { color: var(--tinta); text-decoration: none; }
+.version { margin: .1rem 0 1.4rem; color: var(--tenue); font-size: .82rem; }
+nav ol { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+nav li { counter-increment: s; margin: .1rem 0; }
+nav a { display: block; padding: .3rem .6rem; margin-left: -.6rem; border-radius: .4rem;
+        color: var(--tenue); text-decoration: none; }
+nav a:hover { background: var(--codigo-fondo); color: var(--tinta); }
+nav a[aria-current] { color: var(--tinta); font-weight: 600; background: var(--codigo-fondo); }
+.fuente { margin-top: 1.6rem; color: var(--tenue); font-size: .82rem; }
+main { min-width: 0; }
+h1 { font-size: 2.1rem; line-height: 1.15; letter-spacing: -.022em; margin: 0 0 1.6rem; }
+h2 { font-size: 1.32rem; letter-spacing: -.012em; margin: 3rem 0 .9rem;
+     padding-top: 1.4rem; border-top: 1px solid var(--linea); }
+h3 { font-size: 1.06rem; margin: 2rem 0 .6rem; }
+p, li { max-width: 40rem; }
+a { color: var(--acento); }
+code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+       font-size: .875em; background: var(--codigo-fondo); padding: .12em .38em;
+       border-radius: .25rem; }
+pre { background: var(--codigo-fondo); padding: 1rem 1.15rem; border-radius: .6rem;
+      overflow-x: auto; border: 1px solid var(--linea); }
+pre code { background: none; padding: 0; font-size: .855rem; line-height: 1.6; }
+blockquote { margin: 1.4rem 0; padding: .85rem 1.1rem; border-left: 3px solid var(--aviso);
+             background: var(--aviso-fondo); border-radius: 0 .4rem .4rem 0; }
+blockquote p { margin: .3rem 0; }
+table { border-collapse: collapse; width: 100%; margin: 1.3rem 0; font-size: .93rem;
+        display: block; overflow-x: auto; }
+th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--linea);
+         vertical-align: top; }
+th { font-weight: 620; }
+hr { border: 0; border-top: 1px solid var(--linea); margin: 2.5rem 0; }
+@media (max-width: 62rem) {
+  .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
+  nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
+  nav ol { columns: 2; }
+}
+</style>
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="marco">
+  <nav aria-label="Secciones">
+    <p class="marca"><a href="index.html">Synaptum</a></p>
+    <p class="version">1.0.0rc1</p>
+    <ol><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html" aria-current="page">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="index.html">Empezar</a></li></ol>
+    <p class="fuente">También en <a href="../06-probar.md">Markdown</a>.</p>
+  </nav>
+  <main id="contenido">
+<h1>Probar</h1>
+<p><strong>Construir un agente no debería costar dinero ni depender de tener acceso a un modelo.</strong> En CI, en
+una máquina sin GPU, o con un despliegue cuya única puerta está gobernada, la alternativa real no es
+«modelo local o modelo cloud»: es modelo simulado o nada.</p>
+<p>Por eso los dobles son infraestructura de primera clase, no una utilidad de test.</p>
+<h2><code>FakeGateway</code> — un guion</h2>
+<pre><code class="language-python">from synaptum.testing import FakeGateway, calls, says
+
+gateway = FakeGateway(
+    calls(&quot;leer&quot;, path=&quot;/x&quot;),      # el modelo pide una herramienta
+    says(&quot;el fichero tiene 12 líneas&quot;),
+    tools=[leer],
+)
+</code></pre>
+<p><strong>No es un mock.</strong> Las herramientas se ejecutan de verdad, el streaming es de verdad, el <code>Usage</code> se
+calcula. Lo único que no hace es inferir.</p>
+<p>El guion se consume en orden y admite más que respuestas:</p>
+<table>
+<thead>
+<tr>
+<th>Elemento</th>
+<th>Qué hace</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>says(&quot;...&quot;)</code> / <code>calls(...)</code></td>
+<td>Respuesta guionizada</td>
+</tr>
+<tr>
+<td><code>str</code></td>
+<td>Atajo de <code>says</code></td>
+</tr>
+<tr>
+<td><code>BaseException</code></td>
+<td>Se lanza — con <code>ProviderError</code> ejercitas los reintentos</td>
+</tr>
+<tr>
+<td><code>Decision</code></td>
+<td>Se lanza como <code>Denied</code>: las tres disposiciones sin montar un motor de políticas</td>
+</tr>
+<tr>
+<td><code>callable(request)</code></td>
+<td>Responde <strong>según lo que el bucle acaba de mandar</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Lo último importa más de lo que parece. Un guion posicional responde lo mismo la segunda vez, así
+que al reanudar vuelve a pedir la herramienta que ya se ejecutó — y el ejemplo de durabilidad
+mediría lo contrario de lo que afirma:</p>
+<pre><code class="language-python">def responder(peticion):
+    ya_consultado = any(m.role is Role.TOOL for m in peticion.messages)
+    return says(&quot;el saldo es 4.200 €&quot;) if ya_consultado else calls(&quot;consultar_saldo&quot;, cuenta=&quot;ES91&quot;)
+</code></pre>
+<h3>Comprobar la cancelación</h3>
+<pre><code class="language-python">gateway.chunks_emitted   # cuántos fragmentos llegó a producir
+gateway.cancelled        # si supo que lo cerraron
+</code></pre>
+<p>Y una advertencia que vale para cualquier medida de cancelación, no solo aquí: <strong>compruébalo dentro
+del bucle de eventos</strong>, justo después de cerrar. Al terminar, Python finaliza los generadores
+asíncronos vivos, así que comprobarlo después da verde aunque la señal llegue tarde — y en un
+proceso que no termina, tarde es igual que nunca.</p>
+<h2><code>ReplayGateway</code> — respuestas grabadas</h2>
+<pre><code class="language-python">from synaptum.testing import ReplayGateway
+
+gateway = ReplayGateway(&quot;fixtures/chat_completion.json&quot;, tools=[leer])
+</code></pre>
+<p>Los cuerpos grabados pasan por <strong>el adaptador real</strong>, no por un atajo: al bucle llega lo que llegaría
+en producción.</p>
+<p><strong>Un guion a mano dice lo que uno espera; una grabación dice lo que el proveedor hizo</strong> — y la
+diferencia aparece en los caminos que nadie escribe porque no se le ocurren. Una grabación real
+encontró que un stream que era <em>solo razonamiento</em> no emitía ni un evento, porque el cuerpo inventado
+que había antes solo llevaba deltas de texto.</p>
+<h2>Lo que un doble no puede enseñarte</h2>
+<p>Esto es lo importante de esta página. Los dobles cubren mucho y hay una clase de fallo que <strong>no</strong>
+pueden mostrar, porque su comportamiento es demasiado limpio:</p>
+<ul>
+<li><strong>Un proveedor que descarta un campo</strong> y sigue. La salida estructurada dejaba de llegar y el error
+culpaba al JSON.</li>
+<li><strong>Un error que tarda.</strong> Un doble devuelve sus errores al instante, así que un bucle que reintenta
+sin esperar parece correcto.</li>
+<li><strong>Un modelo que no sigue instrucciones.</strong> Dos ejemplos afirmaban conductas del modelo creyendo que
+afirmaban propiedades del framework; con el doble pasaban siempre.</li>
+<li><strong>Un servidor que sanea sus mensajes de error.</strong></li>
+</ul>
+<blockquote>
+<p><strong>Un ejemplo que solo se ha ejecutado contra un guion no está ejecutado.</strong> Corre lo que escribas
+contra un modelo real al menos una vez antes de creerte lo que afirma.</p>
+</blockquote>
+<h2>Probar tus propios agentes</h2>
+<pre><code class="language-python">import pytest
+from synaptum import Agent, Session
+from synaptum.testing import FakeGateway, calls, says
+
+@pytest.mark.asyncio
+async def test_pide_el_saldo_antes_de_responder():
+    gateway = FakeGateway(calls(&quot;saldo&quot;, cuenta=&quot;ES91&quot;), says(&quot;4.200 €&quot;), tools=[saldo])
+    pasos = [p async for p in mi_agente.run(&quot;¿cuánto hay?&quot;, session=Session(&quot;t1&quot;, gateway))]
+
+    herramientas = [p.call.name for p in pasos if p.kind == &quot;tool&quot; and p.call]
+    assert herramientas == [&quot;saldo&quot;]
+    assert pasos[-1].output == &quot;4.200 €&quot;
+</code></pre>
+<p>Probar es iterar una lista. No hace falta arrancar nada.</p>
+
+  </main>
+</div>
+</body>
+</html>
