@@ -1,0 +1,60 @@
+# Publica docs/html/ en GitHub Pages.
+#
+# La fuente es el Markdown de `docs/`; el HTML se **genera aquí**, no se sirve
+# el que hay commiteado. Si alguien edita el Markdown y olvida regenerar, el
+# sitio publicado sigue siendo correcto — y el test de `tests.yml` avisa igual
+# de que el HTML del repositorio se quedó atrás.
+name: docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/**
+      - scripts/render_docs.py
+      - .github/workflows/docs.yml
+      - pyproject.toml          # la versión sale en la barra lateral
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false     # una publicación a medias es peor que una vieja
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: generar el HTML desde el Markdown
+        run: uv run --frozen python scripts/render_docs.py
+
+      # La raíz del sitio es la página de inicio: quien entre por la URL a secas
+      # no debería encontrarse un listado de ficheros.
+      - name: preparar el sitio
+        run: |
+          cp docs/html/index.html docs/html/404.html
+          touch docs/html/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/html
+
+  publicar:
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: despliegue
+        uses: actions/deploy-pages@v4

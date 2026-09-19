@@ -5,64 +5,134 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Probar · Synaptum</title>
 <style>
+/* Paleta ───────────────────────────────────────────────────────────────────
+   Los colores hacen un trabajo, no decoran: el acento marca lo navegable, el
+   ámbar marca lo que hay que leer despacio, y el código tiene su propia escala
+   para que la sintaxis se distinga sin gritar. Todo con contraste suficiente
+   en claro y en oscuro — una documentación que solo se ve bien en un tema es
+   una documentación que la mitad de la gente lee peor. */
 :root {
   color-scheme: light dark;
-  --tinta: #1a1c1e; --fondo: #fdfdfc; --tenue: #5b6066; --linea: #e3e4e6;
-  --codigo-fondo: #f5f5f3; --acento: #0b5cad; --aviso: #8a4b00; --aviso-fondo: #fff8ee;
+  --tinta: #16181d; --fondo: #fcfcfb; --papel: #ffffff;
+  --tenue: #5c6672; --linea: #e4e6ea; --linea-suave: #eef0f3;
+  --acento: #0a5ac4; --acento-suave: #eef4fd;
+  --aviso: #9a5b00; --aviso-borde: #e8a33d; --aviso-fondo: #fff8ec;
+  --codigo-fondo: #f7f8fa; --codigo-borde: #e6e9ee; --codigo-tinta: #2a2f3a;
+  --etiqueta: #8b94a0;
+  --sx-clave: #9226a8;   /* def, class, return, async  */
+  --sx-cadena: #0a6b3d;  /* "texto"                    */
+  --sx-func: #1a55c4;    /* nombres de función          */
+  --sx-tipo: #0b6d8c;    /* int, str, builtins          */
+  --sx-num: #a8471a;     /* 42, 0.5                     */
+  --sx-com: #6a7482;     /* # comentarios               */
+  --sx-dec: #a8471a;     /* @tool                       */
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --tinta: #e6e6e4; --fondo: #17181a; --tenue: #9aa0a6; --linea: #2c2e31;
-    --codigo-fondo: #202225; --acento: #74b0f0; --aviso: #e0a458; --aviso-fondo: #241f17;
+    --tinta: #e4e6ea; --fondo: #14161a; --papel: #191c21;
+    --tenue: #98a1ad; --linea: #2a2e35; --linea-suave: #23262c;
+    --acento: #6fa8f5; --acento-suave: #1a2433;
+    --aviso: #e7ab5a; --aviso-borde: #8a6a2f; --aviso-fondo: #221d14;
+    --codigo-fondo: #1b1e24; --codigo-borde: #2a2e35; --codigo-tinta: #d4d8de;
+    --etiqueta: #6e7682;
+    --sx-clave: #d79bec; --sx-cadena: #7ec99b; --sx-func: #7fb0f2;
+    --sx-tipo: #5fc0dd; --sx-num: #e0a07a; --sx-com: #79828f; --sx-dec: #e0a07a;
   }
 }
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--fondo); color: var(--tinta);
-  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
-  -webkit-text-size-adjust: 100%;
+  font: 17px/1.68 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased;
 }
 .saltar { position: absolute; left: -9999px; }
-.saltar:focus { left: 1rem; top: 1rem; background: var(--fondo); padding: .5rem 1rem; z-index: 9; }
-.marco { display: grid; grid-template-columns: 17rem minmax(0, 1fr); gap: 3.5rem;
-         max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; }
+.saltar:focus { left: 1rem; top: 1rem; background: var(--papel); padding: .5rem 1rem;
+                z-index: 9; border-radius: .4rem; border: 1px solid var(--acento); }
+.marco { display: grid; grid-template-columns: 17.5rem minmax(0, 1fr); gap: 3.5rem;
+         max-width: 70rem; margin: 0 auto; padding: 2.5rem 1.5rem 7rem; }
+
+/* Navegación ─────────────────────────────────────────────────────────────── */
 nav { position: sticky; top: 2.5rem; align-self: start; font-size: .92rem; }
-.marca { margin: 0; font-weight: 640; letter-spacing: -.01em; font-size: 1.05rem; }
+.marca { margin: 0; font-weight: 650; letter-spacing: -.015em; font-size: 1.12rem; }
 .marca a { color: var(--tinta); text-decoration: none; }
-.version { margin: .1rem 0 1.4rem; color: var(--tenue); font-size: .82rem; }
-nav ol { list-style: none; margin: 0; padding: 0; counter-reset: s; }
-nav li { counter-increment: s; margin: .1rem 0; }
-nav a { display: block; padding: .3rem .6rem; margin-left: -.6rem; border-radius: .4rem;
-        color: var(--tenue); text-decoration: none; }
-nav a:hover { background: var(--codigo-fondo); color: var(--tinta); }
-nav a[aria-current] { color: var(--tinta); font-weight: 600; background: var(--codigo-fondo); }
-.fuente { margin-top: 1.6rem; color: var(--tenue); font-size: .82rem; }
+.marca a::before {
+  content: ""; display: inline-block; width: .5rem; height: .5rem; margin-right: .5rem;
+  border-radius: 50%; background: var(--acento); vertical-align: .08em;
+}
+.version { margin: .15rem 0 1.5rem 1rem; color: var(--etiqueta); font-size: .78rem;
+           letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+nav ol { list-style: none; margin: 0; padding: 0; }
+nav li { margin: .08rem 0; }
+nav a { display: block; padding: .34rem .7rem; margin-left: -.7rem; border-radius: .45rem;
+        color: var(--tenue); text-decoration: none; border-left: 2px solid transparent;
+        transition: background .12s, color .12s; }
+nav a:hover { background: var(--linea-suave); color: var(--tinta); }
+nav a[aria-current] { color: var(--acento); font-weight: 600; background: var(--acento-suave);
+                      border-left-color: var(--acento); }
+.fuente { margin-top: 1.8rem; padding-top: 1rem; border-top: 1px solid var(--linea);
+          font-size: .82rem; }
+.fuente a { color: var(--tenue); text-decoration: none; }
+.fuente a:hover { color: var(--acento); text-decoration: underline; }
+
+/* Texto ──────────────────────────────────────────────────────────────────── */
 main { min-width: 0; }
-h1 { font-size: 2.1rem; line-height: 1.15; letter-spacing: -.022em; margin: 0 0 1.6rem; }
-h2 { font-size: 1.32rem; letter-spacing: -.012em; margin: 3rem 0 .9rem;
-     padding-top: 1.4rem; border-top: 1px solid var(--linea); }
-h3 { font-size: 1.06rem; margin: 2rem 0 .6rem; }
-p, li { max-width: 40rem; }
-a { color: var(--acento); }
+h1 { font-size: 2.25rem; line-height: 1.12; letter-spacing: -.028em; margin: 0 0 1.7rem;
+     font-weight: 700; }
+h2 { font-size: 1.36rem; letter-spacing: -.016em; margin: 3.2rem 0 1rem; font-weight: 650;
+     padding-top: 1.5rem; border-top: 1px solid var(--linea); }
+h3 { font-size: 1.07rem; margin: 2.1rem 0 .6rem; font-weight: 640; color: var(--tinta); }
+p, li { max-width: 41rem; }
+li { margin: .3rem 0; }
+strong { font-weight: 640; }
+a { color: var(--acento); text-decoration-thickness: 1px; text-underline-offset: .15em; }
+a:hover { text-decoration-thickness: 2px; }
+
+/* Código ─────────────────────────────────────────────────────────────────── */
 code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-       font-size: .875em; background: var(--codigo-fondo); padding: .12em .38em;
-       border-radius: .25rem; }
-pre { background: var(--codigo-fondo); padding: 1rem 1.15rem; border-radius: .6rem;
-      overflow-x: auto; border: 1px solid var(--linea); }
-pre code { background: none; padding: 0; font-size: .855rem; line-height: 1.6; }
-blockquote { margin: 1.4rem 0; padding: .85rem 1.1rem; border-left: 3px solid var(--aviso);
-             background: var(--aviso-fondo); border-radius: 0 .4rem .4rem 0; }
-blockquote p { margin: .3rem 0; }
-table { border-collapse: collapse; width: 100%; margin: 1.3rem 0; font-size: .93rem;
-        display: block; overflow-x: auto; }
-th, td { text-align: left; padding: .55rem .8rem; border-bottom: 1px solid var(--linea);
+       font-size: .87em; background: var(--codigo-fondo); color: var(--codigo-tinta);
+       padding: .13em .4em; border-radius: .3rem; border: 1px solid var(--codigo-borde); }
+pre { position: relative; background: var(--codigo-fondo); color: var(--codigo-tinta);
+      padding: 1.1rem 1.2rem; border-radius: .7rem; overflow-x: auto;
+      border: 1px solid var(--codigo-borde); margin: 1.3rem 0; }
+pre code { background: none; padding: 0; border: 0; font-size: .855rem; line-height: 1.62; }
+pre[data-lenguaje]::after {
+  content: attr(data-lenguaje); position: absolute; top: .55rem; right: .8rem;
+  font: 600 .66rem/1 ui-monospace, monospace; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--etiqueta); pointer-events: none;
+}
+.p-k, .p-kn, .p-kd, .p-kc, .p-ow { color: var(--sx-clave); font-weight: 600; }
+.p-s, .p-s1, .p-s2, .p-sd, .p-se, .p-sa, .p-si { color: var(--sx-cadena); }
+.p-nf, .p-fm { color: var(--sx-func); font-weight: 600; }
+.p-nb, .p-nc, .p-ne, .p-nn { color: var(--sx-tipo); }
+.p-m, .p-mi, .p-mf, .p-kt { color: var(--sx-num); }
+.p-c, .p-c1, .p-cm, .p-ch, .p-cs { color: var(--sx-com); font-style: italic; }
+.p-nd { color: var(--sx-dec); font-weight: 600; }
+.p-err { color: inherit; }
+
+/* Aviso ──────────────────────────────────────────────────────────────────── */
+blockquote { margin: 1.5rem 0; padding: .95rem 1.2rem; border-left: 3px solid var(--aviso-borde);
+             background: var(--aviso-fondo); border-radius: 0 .5rem .5rem 0; color: var(--tinta); }
+blockquote p { margin: .3rem 0; max-width: none; }
+blockquote strong { color: var(--aviso); }
+
+/* Tablas ─────────────────────────────────────────────────────────────────── */
+.tabla { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--linea);
+         border-radius: .6rem; background: var(--papel); }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th, td { text-align: left; padding: .6rem .9rem; border-bottom: 1px solid var(--linea-suave);
          vertical-align: top; }
-th { font-weight: 620; }
-hr { border: 0; border-top: 1px solid var(--linea); margin: 2.5rem 0; }
+thead th { font-weight: 640; background: var(--linea-suave); color: var(--tinta);
+           border-bottom: 1px solid var(--linea); }
+tbody tr:last-child td { border-bottom: 0; }
+td code, th code { background: transparent; border: 0; padding: 0; color: var(--sx-func); }
+
+hr { border: 0; border-top: 1px solid var(--linea); margin: 2.8rem 0; }
+
 @media (max-width: 62rem) {
   .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
   nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
-  nav ol { columns: 2; }
+  nav ol { columns: 2; column-gap: 1.5rem; }
+  h1 { font-size: 1.85rem; }
 }
 </style>
 </head>
@@ -73,7 +143,7 @@ hr { border: 0; border-top: 1px solid var(--linea); margin: 2.5rem 0; }
     <p class="marca"><a href="index.html">Synaptum</a></p>
     <p class="version">1.0.0rc1</p>
     <ol><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html" aria-current="page">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="index.html">Empezar</a></li></ol>
-    <p class="fuente">También en <a href="../06-probar.md">Markdown</a>.</p>
+    <p class="fuente"><a href="../06-probar.md">Leer en Markdown&nbsp;↗</a></p>
   </nav>
   <main id="contenido">
 <h1>Probar</h1>
@@ -82,18 +152,18 @@ una máquina sin GPU, o con un despliegue cuya única puerta está gobernada, la
 «modelo local o modelo cloud»: es modelo simulado o nada.</p>
 <p>Por eso los dobles son infraestructura de primera clase, no una utilidad de test.</p>
 <h2><code>FakeGateway</code> — un guion</h2>
-<pre><code class="language-python">from synaptum.testing import FakeGateway, calls, says
+<pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">synaptum.testing</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">FakeGateway</span><span class="p-p">,</span> <span class="p-n">calls</span><span class="p-p">,</span> <span class="p-n">says</span>
 
-gateway = FakeGateway(
-    calls(&quot;leer&quot;, path=&quot;/x&quot;),      # el modelo pide una herramienta
-    says(&quot;el fichero tiene 12 líneas&quot;),
-    tools=[leer],
-)
+<span class="p-n">gateway</span> <span class="p-o">=</span> <span class="p-n">FakeGateway</span><span class="p-p">(</span>
+    <span class="p-n">calls</span><span class="p-p">(</span><span class="p-s2">"leer"</span><span class="p-p">,</span> <span class="p-n">path</span><span class="p-o">=</span><span class="p-s2">"/x"</span><span class="p-p">),</span>      <span class="p-c1"># el modelo pide una herramienta</span>
+    <span class="p-n">says</span><span class="p-p">(</span><span class="p-s2">"el fichero tiene 12 líneas"</span><span class="p-p">),</span>
+    <span class="p-n">tools</span><span class="p-o">=</span><span class="p-p">[</span><span class="p-n">leer</span><span class="p-p">],</span>
+<span class="p-p">)</span>
 </code></pre>
 <p><strong>No es un mock.</strong> Las herramientas se ejecutan de verdad, el streaming es de verdad, el <code>Usage</code> se
 calcula. Lo único que no hace es inferir.</p>
 <p>El guion se consume en orden y admite más que respuestas:</p>
-<table>
+<div class="tabla"><table>
 <thead>
 <tr>
 <th>Elemento</th>
@@ -122,26 +192,26 @@ calcula. Lo único que no hace es inferir.</p>
 <td>Responde <strong>según lo que el bucle acaba de mandar</strong></td>
 </tr>
 </tbody>
-</table>
+</table></div>
 <p>Lo último importa más de lo que parece. Un guion posicional responde lo mismo la segunda vez, así
 que al reanudar vuelve a pedir la herramienta que ya se ejecutó — y el ejemplo de durabilidad
 mediría lo contrario de lo que afirma:</p>
-<pre><code class="language-python">def responder(peticion):
-    ya_consultado = any(m.role is Role.TOOL for m in peticion.messages)
-    return says(&quot;el saldo es 4.200 €&quot;) if ya_consultado else calls(&quot;consultar_saldo&quot;, cuenta=&quot;ES91&quot;)
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">responder</span><span class="p-p">(</span><span class="p-n">peticion</span><span class="p-p">):</span>
+    <span class="p-n">ya_consultado</span> <span class="p-o">=</span> <span class="p-nb">any</span><span class="p-p">(</span><span class="p-n">m</span><span class="p-o">.</span><span class="p-n">role</span> <span class="p-ow">is</span> <span class="p-n">Role</span><span class="p-o">.</span><span class="p-n">TOOL</span> <span class="p-k">for</span> <span class="p-n">m</span> <span class="p-ow">in</span> <span class="p-n">peticion</span><span class="p-o">.</span><span class="p-n">messages</span><span class="p-p">)</span>
+    <span class="p-k">return</span> <span class="p-n">says</span><span class="p-p">(</span><span class="p-s2">"el saldo es 4.200 €"</span><span class="p-p">)</span> <span class="p-k">if</span> <span class="p-n">ya_consultado</span> <span class="p-k">else</span> <span class="p-n">calls</span><span class="p-p">(</span><span class="p-s2">"consultar_saldo"</span><span class="p-p">,</span> <span class="p-n">cuenta</span><span class="p-o">=</span><span class="p-s2">"ES91"</span><span class="p-p">)</span>
 </code></pre>
 <h3>Comprobar la cancelación</h3>
-<pre><code class="language-python">gateway.chunks_emitted   # cuántos fragmentos llegó a producir
-gateway.cancelled        # si supo que lo cerraron
+<pre data-lenguaje="python"><code><span class="p-n">gateway</span><span class="p-o">.</span><span class="p-n">chunks_emitted</span>   <span class="p-c1"># cuántos fragmentos llegó a producir</span>
+<span class="p-n">gateway</span><span class="p-o">.</span><span class="p-n">cancelled</span>        <span class="p-c1"># si supo que lo cerraron</span>
 </code></pre>
 <p>Y una advertencia que vale para cualquier medida de cancelación, no solo aquí: <strong>compruébalo dentro
 del bucle de eventos</strong>, justo después de cerrar. Al terminar, Python finaliza los generadores
 asíncronos vivos, así que comprobarlo después da verde aunque la señal llegue tarde — y en un
 proceso que no termina, tarde es igual que nunca.</p>
 <h2><code>ReplayGateway</code> — respuestas grabadas</h2>
-<pre><code class="language-python">from synaptum.testing import ReplayGateway
+<pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">synaptum.testing</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">ReplayGateway</span>
 
-gateway = ReplayGateway(&quot;fixtures/chat_completion.json&quot;, tools=[leer])
+<span class="p-n">gateway</span> <span class="p-o">=</span> <span class="p-n">ReplayGateway</span><span class="p-p">(</span><span class="p-s2">"fixtures/chat_completion.json"</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-o">=</span><span class="p-p">[</span><span class="p-n">leer</span><span class="p-p">])</span>
 </code></pre>
 <p>Los cuerpos grabados pasan por <strong>el adaptador real</strong>, no por un atajo: al bucle llega lo que llegaría
 en producción.</p>
@@ -166,18 +236,18 @@ afirmaban propiedades del framework; con el doble pasaban siempre.</li>
 contra un modelo real al menos una vez antes de creerte lo que afirma.</p>
 </blockquote>
 <h2>Probar tus propios agentes</h2>
-<pre><code class="language-python">import pytest
-from synaptum import Agent, Session
-from synaptum.testing import FakeGateway, calls, says
+<pre data-lenguaje="python"><code><span class="p-kn">import</span><span class="p-w"> </span><span class="p-nn">pytest</span>
+<span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">synaptum</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">Agent</span><span class="p-p">,</span> <span class="p-n">Session</span>
+<span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">synaptum.testing</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">FakeGateway</span><span class="p-p">,</span> <span class="p-n">calls</span><span class="p-p">,</span> <span class="p-n">says</span>
 
-@pytest.mark.asyncio
-async def test_pide_el_saldo_antes_de_responder():
-    gateway = FakeGateway(calls(&quot;saldo&quot;, cuenta=&quot;ES91&quot;), says(&quot;4.200 €&quot;), tools=[saldo])
-    pasos = [p async for p in mi_agente.run(&quot;¿cuánto hay?&quot;, session=Session(&quot;t1&quot;, gateway))]
+<span class="p-nd">@pytest</span><span class="p-o">.</span><span class="p-n">mark</span><span class="p-o">.</span><span class="p-n">asyncio</span>
+<span class="p-k">async</span> <span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">test_pide_el_saldo_antes_de_responder</span><span class="p-p">():</span>
+    <span class="p-n">gateway</span> <span class="p-o">=</span> <span class="p-n">FakeGateway</span><span class="p-p">(</span><span class="p-n">calls</span><span class="p-p">(</span><span class="p-s2">"saldo"</span><span class="p-p">,</span> <span class="p-n">cuenta</span><span class="p-o">=</span><span class="p-s2">"ES91"</span><span class="p-p">),</span> <span class="p-n">says</span><span class="p-p">(</span><span class="p-s2">"4.200 €"</span><span class="p-p">),</span> <span class="p-n">tools</span><span class="p-o">=</span><span class="p-p">[</span><span class="p-n">saldo</span><span class="p-p">])</span>
+    <span class="p-n">pasos</span> <span class="p-o">=</span> <span class="p-p">[</span><span class="p-n">p</span> <span class="p-k">async</span> <span class="p-k">for</span> <span class="p-n">p</span> <span class="p-ow">in</span> <span class="p-n">mi_agente</span><span class="p-o">.</span><span class="p-n">run</span><span class="p-p">(</span><span class="p-s2">"¿cuánto hay?"</span><span class="p-p">,</span> <span class="p-n">session</span><span class="p-o">=</span><span class="p-n">Session</span><span class="p-p">(</span><span class="p-s2">"t1"</span><span class="p-p">,</span> <span class="p-n">gateway</span><span class="p-p">))]</span>
 
-    herramientas = [p.call.name for p in pasos if p.kind == &quot;tool&quot; and p.call]
-    assert herramientas == [&quot;saldo&quot;]
-    assert pasos[-1].output == &quot;4.200 €&quot;
+    <span class="p-n">herramientas</span> <span class="p-o">=</span> <span class="p-p">[</span><span class="p-n">p</span><span class="p-o">.</span><span class="p-n">call</span><span class="p-o">.</span><span class="p-n">name</span> <span class="p-k">for</span> <span class="p-n">p</span> <span class="p-ow">in</span> <span class="p-n">pasos</span> <span class="p-k">if</span> <span class="p-n">p</span><span class="p-o">.</span><span class="p-n">kind</span> <span class="p-o">==</span> <span class="p-s2">"tool"</span> <span class="p-ow">and</span> <span class="p-n">p</span><span class="p-o">.</span><span class="p-n">call</span><span class="p-p">]</span>
+    <span class="p-k">assert</span> <span class="p-n">herramientas</span> <span class="p-o">==</span> <span class="p-p">[</span><span class="p-s2">"saldo"</span><span class="p-p">]</span>
+    <span class="p-k">assert</span> <span class="p-n">pasos</span><span class="p-p">[</span><span class="p-o">-</span><span class="p-mi">1</span><span class="p-p">]</span><span class="p-o">.</span><span class="p-n">output</span> <span class="p-o">==</span> <span class="p-s2">"4.200 €"</span>
 </code></pre>
 <p>Probar es iterar una lista. No hace falta arrancar nada.</p>
 

@@ -69,5 +69,6 @@ El Markdown de `docs/` es la fuente; el HTML de `docs/html/` se genera. Un agent
 uv run python scripts/render_docs.py
 ```
 
-Un test falla si el HTML deja de corresponder al Markdown. Escribir los dos a mano garantiza que
+El sitio se publica solo en cada cambio de `docs/`. Un test falla si el HTML del repositorio deja de
+corresponder al Markdown. Escribir los dos a mano garantiza que
 diverjan, y el que diverge siempre es el que nadie mira.

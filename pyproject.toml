@@ -44,6 +44,7 @@ axonium   = ["axonium>=1.0.0rc3"]
 [dependency-groups]
 dev = [
     "markdown-it-py>=3",
+    "pygments>=2.18",
     "pytest>=8",
 ]
 
@@ -58,6 +59,7 @@ packages = ["src/synaptum"]
 testpaths = ["tests"]
 addopts = "-q"
 [project.urls]
+Documentation = "https://root1v.github.io/synaptum-framework/"
 Homepage = "https://github.com/Root1V/synaptum-framework"
 Repository = "https://github.com/Root1V/synaptum-framework"
 Changelog = "https://github.com/Root1V/synaptum-framework/blob/main/CHANGELOG.md"

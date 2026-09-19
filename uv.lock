@@ -854,6 +854,7 @@ pydantic = [
 [package.dev-dependencies]
 dev = [
     { name = "markdown-it-py" },
+    { name = "pygments" },
     { name = "pytest" },
 ]
 
@@ -871,6 +872,7 @@ provides-extras = ["pydantic", "anthropic", "openai", "mcp", "otel", "axonium"]
 [package.metadata.requires-dev]
 dev = [
     { name = "markdown-it-py", specifier = ">=3" },
+    { name = "pygments", specifier = ">=2.18" },
     { name = "pytest", specifier = ">=8" },
 ]
 
