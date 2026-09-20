@@ -58,9 +58,13 @@ jobs:
           import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])
           ")
           echo "comprobando que synaptum==$VERSION instala desde TestPyPI"
+          # Sin `--extra-index-url`: uv mira los índices extra **antes** que el
+          # principal, así que en cuanto synaptum existió en PyPI, pedir una
+          # versión que solo está en TestPyPI fallaba con «no existe» en vez de
+          # buscarla donde se le dijo. Y no hace falta ninguno más: el paquete
+          # no tiene dependencias de ejecución.
           if ! uv run --isolated --no-project \
                 --index-url https://test.pypi.org/simple/ \
-                --extra-index-url https://pypi.org/simple/ \
                 --with "synaptum==$VERSION" python -c "import synaptum" ; then
             echo "::error::synaptum==$VERSION no se puede instalar desde TestPyPI."
             echo "Publica primero ahí: Run workflow → index=testpypi."
@@ -119,6 +123,15 @@ jobs:
   # del submódulo interno y ningún consumidor hace eso.
   verify:
     needs: publish
+    # `always()` por lo mismo que en `publish`, y esto no es cosmético: sin
+    # ello GitHub **salta** este job. La regla propaga el salto de `ensayo`
+    # por toda la cadena, aunque `publish` haya corrido y haya ido bien.
+    #
+    # Es el fallo de siempre: el job que comprueba que la publicación sirve
+    # dejó de ejecutarse el día que se añadió `ensayo`, la publicación siguió
+    # saliendo en verde, y lo único que se perdió es la comprobación. Un
+    # instrumento que no mira nada no da error: da OK.
+    if: always() && needs.publish.result == 'success'
     runs-on: ubuntu-latest
     env:
       # En una sola línea y como variable de entorno: una expresión de GitHub
@@ -143,8 +156,7 @@ jobs:
       - name: instalar desde el índice y usarlo como un consumidor
         run: |
           for intento in $(seq 1 30); do
-            if uv run --isolated --no-project \
-                 --index-url "$INDEX" --extra-index-url https://pypi.org/simple/ \
+            if uv run --isolated --no-project --index-url "$INDEX" \
                  --with "synaptum==$VERSION" python "$GITHUB_WORKSPACE/.github/humo.py"; then
               echo "verificado tras ${intento} intento(s)"
               exit 0
