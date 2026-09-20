@@ -111,6 +111,22 @@ uv run python examples/agentes/02_causa_raiz.py
 Sin ninguna de las dos, el doble responde el guion. **No es un mock**: ejecuta las herramientas de
 verdad, hace streaming de verdad y produce `Usage` de verdad. Lo único que no hace es inferir.
 
+## Los datos son inventados, y tienen que parecerlo
+
+Todo lo que aparece en estos ficheros —nombres, RUC, cuentas, importes, identificadores— está
+compuesto. La regla, que costó aprender: **no basta con que el dato sea falso; tiene que ser
+inequívocamente falso.**
+
+El `03` llevaba un nombre peruano perfectamente verosímil, con dos de los apellidos más comunes del
+país, al lado de un sueldo y una AFP. Nadie lo copió de ningún sitio, y daba igual: es un nombre que
+casi con seguridad lleva alguien, publicado en un repositorio, en un sitio web y dentro de los
+artefactos de PyPI. Que el dato sea inventado no ayuda a quien se llame así.
+
+Así que: nombres que no puedan ser de nadie, identificadores que fallen su propio dígito verificador
+—el RUC del `03` lo hace a propósito—, y cuentas truncadas. No hay un test que lo compruebe, y sería
+peor tenerlo mal: una lista negra de apellidos daría verde con el siguiente nombre que a alguien se
+le ocurra. Esto se mira al escribir el ejemplo.
+
 ## Lo que estos ejemplos no enseñan
 
 `LocalGateway` **no aplica nada**. Corre dentro del proceso que gobernaría, así que sus

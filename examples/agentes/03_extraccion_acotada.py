@@ -43,11 +43,24 @@ class Boleta:
 
 # ── Herramientas: OCR y una validación que el modelo NO hace ──────────────────
 
+# Los datos de una boleta tienen que ser **inequívocamente inventados**, no
+# solo inventados.
+#
+# Aquí había un nombre peruano verosímil, con dos de los apellidos más comunes
+# del país, al lado de un sueldo y una AFP. No salió de ningún sitio —está
+# compuesto— y aun así es un nombre que casi con seguridad lleva alguien, en un
+# repositorio público, en un sitio web y dentro de los artefactos publicados en
+# PyPI. Que el dato sea falso no ayuda a quien se llame así.
+#
+# La regla, para el próximo ejemplo: si un nombre, un RUC o una cuenta pueden
+# ser de alguien, hay que cambiarlos aunque te los hayas inventado. El RUC de
+# abajo **falla el dígito verificador** a propósito, así que no es de ninguna
+# empresa; se comprueba con los pesos 5,4,3,2,7,6,5,4,3,2.
 PAGINA = """
-EMPRESA CONSTRUCTORA DEL SUR S.A.C.
+EMPRESA DE EJEMPLO S.A.C.
 RUC 20481234567
 BOLETA DE PAGO - SETIEMBRE 2026
-Trabajador: ROSA MERCEDES QUISPE HUAMAN
+Trabajador: PERSONA DE EJEMPLO UNO
 Remuneración básica        4,200.00
 Asignación familiar          102.50
 --------------------------------
@@ -74,14 +87,16 @@ async def leer_pagina(
 async def validar_ruc(
     ruc: Annotated[str, "RUC de 11 dígitos"],
 ) -> str:
-    """Comprueba un RUC contra el padrón: dígito verificador y estado.
+    """Comprueba el formato de un RUC y busca su razón social en el padrón.
 
-    Esto **no lo hace el modelo**. Un dígito verificador es aritmética, y
-    pedírsela a un modelo de lenguaje es convertir algo exacto en algo probable.
+    Esto **no lo hace el modelo**, y son dos razones distintas: un padrón es un
+    dato que hay fuera, y un modelo no lo tiene; y el formato es aritmética,
+    que pedírsela a un modelo de lenguaje convierte algo exacto en algo
+    probable.
     """
     if len(ruc) != 11 or not ruc.isdigit():
         return f"RUC {ruc} inválido: deben ser 11 dígitos."
-    return f"RUC {ruc}: ACTIVO · CONSTRUCTORA DEL SUR S.A.C."
+    return f"RUC {ruc}: hallado en el padrón · EMPRESA DE EJEMPLO S.A.C."
 
 
 async def main() -> None:
@@ -109,9 +124,9 @@ async def main() -> None:
         # Primer intento del modelo: JSON mal formado. Pasa, y pasa más de lo que
         # nadie admite. El bucle lo trata como reintentable —el muestreo es
         # estocástico— y vuelve a pedirlo sin que el llamante se entere.
-        says('{"ruc": "20481234567", "trabajador": "ROSA MERCEDES QUISPE HUAMAN",'),
+        says('{"ruc": "20481234567", "trabajador": "PERSONA DE EJEMPLO UNO",'),
         says(
-            '{"ruc": "20481234567", "trabajador": "ROSA MERCEDES QUISPE HUAMAN", '
+            '{"ruc": "20481234567", "trabajador": "PERSONA DE EJEMPLO UNO", '
             '"periodo": "2026-09", "bruto": 4302.50, "descuentos": 548.55, '
             '"neto": 3753.95}'
         ),
