@@ -192,13 +192,39 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   <main id="contenido">
 <h1>16 · Ver los tokens según llegan, y cortar a mitad</h1>
 <blockquote>
-<p><strong>Generada de <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/04_streaming.py"><code>examples/propiedades/04_streaming.py</code></a>.</strong> El fichero corre; esta página lo
-transcribe. Si los dos no coinciden, falla un test.</p>
+<p><strong>Esto es un fichero que se ejecuta:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/04_streaming.py"><code>examples/propiedades/04_streaming.py</code></a> ↗
+Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.</p>
 </blockquote>
 <p><code>agent.stream(...)</code> es el mismo bucle y el mismo journal que <code>agent.run(...)</code>:
 lo único que cambia es que los fragmentos del modelo se ceden intercalados entre
 la intención del paso y su resultado.</p>
+<h2>Cómo correrlo</h2>
 <pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/propiedades/04_streaming.py
+</code></pre>
+<p>No hace falta configurar nada: sin modelo, las respuestas van guionizadas y <strong>todo lo
+demás es real</strong> — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con <code>AXONIUM_CLIENT_ID</code> o <code>SYNAPTUM_BASE_URL</code> en el entorno, <strong>el mismo fichero sin tocar</strong>
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver <a href="04-modelos.html">Modelos</a>.</p>
+<h2>Lo que imprime</h2>
+<pre data-lenguaje="text"><code>04 · Streaming
+──────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  Los fragmentos se ceden dentro del paso que los produce:
+
+
+  · herramienta cotizacion
+  La acción cotiza a 187,34 USD, con una subida del 1,2 % en la sesión. El movimiento no es significativo por sí solo.
+
+  Cortar es dejar de iterar — no hay evento de cancelación:
+
+  recibidos 3 de 16 fragmentos
+  el proveedor produjo 3 y registró el cierre
+
+  Un canal que se está cerrando no es sitio para mandar el aviso de
+  que se cierra. Cerrar el iterador cierra el cuerpo de la respuesta,
+  y eso es lo que de verdad para la generación arriba.
 </code></pre>
 <pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
 
@@ -302,6 +328,9 @@ la intención del paso y su resultado.</p>
 <span class="p-k">if</span> <span class="p-vm">__name__</span> <span class="p-o">==</span> <span class="p-s2">"__main__"</span><span class="p-p">:</span>
     <span class="p-n">asyncio</span><span class="p-o">.</span><span class="p-n">run</span><span class="p-p">(</span><span class="p-n">main</span><span class="p-p">())</span>
 </code></pre>
+<hr />
+<p><strong>El fichero entero, para clonarlo y tocarlo:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/04_streaming.py"><code>examples/propiedades/04_streaming.py</code></a> ↗</p>
+<p>Está en <a href="https://github.com/Root1V/synaptum-framework/tree/main/examples"><code>examples/</code></a> con los otros quince, y todos corren igual.</p>
 
 <nav class="paginado" aria-label="Paginación"><a class="prev" href="ejemplos-15-aprobacion.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">15 · Un paso destructivo se detiene, alguien decide, y el run sigue donde estaba</span></a></nav>
   </main>

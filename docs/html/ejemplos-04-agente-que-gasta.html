@@ -192,8 +192,8 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   <main id="contenido">
 <h1>04 · Un agente que mueve dinero, y el runtime que lo frena</h1>
 <blockquote>
-<p><strong>Generada de <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/04_agente_que_gasta.py"><code>examples/agentes/04_agente_que_gasta.py</code></a>.</strong> El fichero corre; esta página lo
-transcribe. Si los dos no coinciden, falla un test.</p>
+<p><strong>Esto es un fichero que se ejecuta:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/04_agente_que_gasta.py"><code>examples/agentes/04_agente_que_gasta.py</code></a> ↗
+Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.</p>
 </blockquote>
 <p><strong>Dominio: Aerarium + Mercatus</strong> — el tesoro y el mercado. Un agente descubre un
 servicio, paga una décima de céntimo por una llamada, y <strong>hay que poder decirle
@@ -211,7 +211,30 @@ aplica nada</strong>.</li>
 suspende en disco y se reanuda cuando alguien decide — sin repetir lo pagado
 y sin volver a preguntar.</li>
 </ul>
+<h2>Cómo correrlo</h2>
 <pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/agentes/04_agente_que_gasta.py
+</code></pre>
+<p>No hace falta configurar nada: sin modelo, las respuestas van guionizadas y <strong>todo lo
+demás es real</strong> — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con <code>AXONIUM_CLIENT_ID</code> o <code>SYNAPTUM_BASE_URL</code> en el entorno, <strong>el mismo fichero sin tocar</strong>
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver <a href="04-modelos.html">Modelos</a>.</p>
+<h2>Lo que imprime</h2>
+<pre data-lenguaje="text"><code>04 · Un agente que gasta
+────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  ✋ above_delegated_cap: el importe pasa del tope delegado de 500µ.
+  ⏸  run suspendido · herramienta 'capturar'
+     retenciones: 0 · pagos: 0
+     journal: 9 eventos en disco
+
+  … el dueño mira la petición y la aprueba …
+
+  ▶  reanudado · llamadas al modelo: 1
+     Transcripción contratada con whisper-api-x402 por 800µ.
+     pagos: ['capture 800µ → whisper-api-x402']
+     ✓ el pago ocurrió exactamente una vez
 </code></pre>
 <pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
 
@@ -425,6 +448,9 @@ un <code>require_approval</code> deja la herramienta con intención y sin result
 reanudar, eso se parece a «no se sabe si se ejecutó» — pero <strong>aquí sí se
 sabe</strong>: se denegó <em>antes</em> de ejecutar. Por eso la denegación se registra como
 desenlace del paso y no como silencio.</p>
+<hr />
+<p><strong>El fichero entero, para clonarlo y tocarlo:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/04_agente_que_gasta.py"><code>examples/agentes/04_agente_que_gasta.py</code></a> ↗</p>
+<p>Está en <a href="https://github.com/Root1V/synaptum-framework/tree/main/examples"><code>examples/</code></a> con los otros quince, y todos corren igual.</p>
 
 <nav class="paginado" aria-label="Paginación"><a class="prev" href="ejemplos-03-extraccion-acotada.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">03 · Un bucle acotado, y qué pasa cuando el modelo se equivoca</span></a><a class="siguiente" href="ejemplos-05-cadena-de-agentes.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">05 · Varios agentes en cadena, cada uno con su contexto</span></a></nav>
   </main>

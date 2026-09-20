@@ -212,10 +212,21 @@ async def parte_tres() -> None:
         "depurador", model=nombre_del_modelo(), tools=[leer_logs]
     )
 
-    # El mecanismo, sin depender de que el modelo haga nada: dos peticiones
-    # construidas con un instante de diferencia, y sus huellas.
-    antes = Request(model=agente.model, system=agente.instructions, tools=agente.tools)
-    ahora = Request(model=agente.model, system=agente.instructions, tools=agente.tools)
+    # El mecanismo, sin depender de que el modelo haga nada: dos turnos del
+    # mismo agente, y sus huellas.
+    #
+    # Las dos horas van escritas en vez de leer el reloj **para que este ejemplo
+    # imprima siempre lo mismo**. En un run de verdad las pone `datetime.now()`
+    # —como hace `ConLaHoraDentro` unas líneas más abajo— y cambian solas en
+    # cada turno, que es justamente el problema.
+    def turno(hora: str) -> Request:
+        return Request(
+            model=agente.model,
+            system=f"Depuras incidentes de una plataforma de inferencia. Ahora son las {hora}.",
+            tools=agente.tools,
+        )
+
+    antes, ahora = turno("02:14:07.100"), turno("02:14:07.842")
 
     print(f"  huella del prefijo: {prefix_fingerprint(antes)} → {prefix_fingerprint(ahora)}")
     print(f"  qué cambió:         {describe_prefix_change(antes, ahora)}")

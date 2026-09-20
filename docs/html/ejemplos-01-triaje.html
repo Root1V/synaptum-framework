@@ -192,14 +192,31 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   <main id="contenido">
 <h1>01 · Lo mínimo: un agente, una herramienta</h1>
 <blockquote>
-<p><strong>Generada de <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/01_triaje.py"><code>examples/agentes/01_triaje.py</code></a>.</strong> El fichero corre; esta página lo
-transcribe. Si los dos no coinciden, falla un test.</p>
+<p><strong>Esto es un fichero que se ejecuta:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/01_triaje.py"><code>examples/agentes/01_triaje.py</code></a> ↗
+Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.</p>
 </blockquote>
 <p><strong>Dominio: Argus</strong> — la plataforma de observabilidad. Su camino caliente detecta
 un incidente en ~2 s sin tocar la base de datos, y deja una señal. Alguien —o
 algo— tiene que mirarla y decir si merece despertar a una persona.</p>
 <p>Ese &quot;algo&quot; es el agente más simple que se puede escribir con este framework.</p>
+<h2>Cómo correrlo</h2>
 <pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/agentes/01_triaje.py
+</code></pre>
+<p>No hace falta configurar nada: sin modelo, las respuestas van guionizadas y <strong>todo lo
+demás es real</strong> — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con <code>AXONIUM_CLIENT_ID</code> o <code>SYNAPTUM_BASE_URL</code> en el entorno, <strong>el mismo fichero sin tocar</strong>
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver <a href="04-modelos.html">Modelos</a>.</p>
+<h2>Lo que imprime</h2>
+<pre data-lenguaje="text"><code>01 · Triaje de una señal
+────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  → leer_señal({'señal_id': 'sig-4471'})
+
+  Despertar ahora. La latencia del gateway de inferencia se multiplicó por ocho y afecta a tres servicios: todo lo que dependa de un modelo está degradado, no solo lento.
+
+  consumo: entrada=200 salida=40
 </code></pre>
 <pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
 
@@ -293,6 +310,9 @@ Session      dónde se ejecuta (gateway) y dónde se recuerda (checkpointer)
 </code></pre>
 <p>El <code>async for</code> no es decoración: el bucle <strong>cede el control en cada frontera</strong>,
 así que ver lo que hace el agente es iterar, y pararlo es dejar de iterar.</p>
+<hr />
+<p><strong>El fichero entero, para clonarlo y tocarlo:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/01_triaje.py"><code>examples/agentes/01_triaje.py</code></a> ↗</p>
+<p>Está en <a href="https://github.com/Root1V/synaptum-framework/tree/main/examples"><code>examples/</code></a> con los otros quince, y todos corren igual.</p>
 
 <nav class="paginado" aria-label="Paginación"><a class="prev" href="ejemplos.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">Ejemplos</span></a><a class="siguiente" href="ejemplos-02-causa-raiz.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">02 · Varias herramientas y una respuesta tipada</span></a></nav>
   </main>

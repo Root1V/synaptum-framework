@@ -1,14 +1,42 @@
 # 14 · Matar el proceso a mitad y reanudar sin volver a pagar la inferencia
 
-> **Generada de [`examples/propiedades/02_durabilidad.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/02_durabilidad.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/propiedades/02_durabilidad.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/02_durabilidad.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 Es la propiedad que justifica toda la arquitectura, y este ejemplo la **mide**
 en vez de afirmarla: cuenta las llamadas al modelo y a la herramienta de cada
 vuelta. La segunda tiene que dar cero.
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/propiedades/02_durabilidad.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+02 · Reanudar sin volver a pagar
+────────────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  1ª vuelta    herramienta ejecutada · el proceso muere aquí
+               modelo ×1 · herramienta ×1
+               journal: 4 eventos en runs.db
+  2ª vuelta    modelo ×1 · herramienta ×0
+
+  El saldo es de 4.200,00 €.
+  3ª vuelta    modelo ×0 · 1 evento(s): devuelve lo que pasó, no lo recorre otra vez
+
+  La ventana de contexto no se guarda: se vuelve a derivar de los
+  mismos resultados en el mismo orden. Guardarla sería guardar dos
+  veces lo mismo y arriesgarse a que discrepen.
 ```
 
 ```python
@@ -138,3 +166,9 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/propiedades/02_durabilidad.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/02_durabilidad.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

@@ -192,8 +192,8 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   <main id="contenido">
 <h1>12 · Un agente que vive en otro contenedor</h1>
 <blockquote>
-<p><strong>Generada de <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/12_agente_remoto.py"><code>examples/agentes/12_agente_remoto.py</code></a>.</strong> El fichero corre; esta página lo
-transcribe. Si los dos no coinciden, falla un test.</p>
+<p><strong>Esto es un fichero que se ejecuta:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/12_agente_remoto.py"><code>examples/agentes/12_agente_remoto.py</code></a> ↗
+Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.</p>
 </blockquote>
 <p><strong>Dominio: el pipeline de doblaje.</strong> El revisor de sincronía no es tuyo: lo
 mantiene otro equipo, se despliega por su cuenta y se actualiza cuando ellos
@@ -207,7 +207,50 @@ herramientas; A2A conecta un agente con <strong>otro agente</strong>.</p>
 por la misma ranura que uno local.</p>
 <pre><code>coordinador = Agent(&quot;…&quot;, delegates=[local, remoto])
 </code></pre>
+<h2>Cómo correrlo</h2>
 <pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/agentes/12_agente_remoto.py
+</code></pre>
+<p>No hace falta configurar nada: sin modelo, las respuestas van guionizadas y <strong>todo lo
+demás es real</strong> — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con <code>AXONIUM_CLIENT_ID</code> o <code>SYNAPTUM_BASE_URL</code> en el entorno, <strong>el mismo fichero sin tocar</strong>
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver <a href="04-modelos.html">Modelos</a>.</p>
+<h2>Lo que imprime</h2>
+<pre data-lenguaje="text"><code>12 · Un agente en otro contenedor
+─────────────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  su tarjeta dice: revisor-de-doblaje — Revisa sincronía y calidad de una pista doblada.
+  habilidades:     ['Revisar doblaje']
+
+  Lo que **no** dice es qué riesgo tiene, porque A2A no tiene ese
+  campo: una tarjeta declara habilidades. Por eso `risk` es obligatorio
+  al conectarlo y no tiene valor por defecto — un defecto conservador
+  sería correcto y silencioso, y la decisión la tomaría un valor en vez
+  de una persona.
+
+  el catálogo del coordinador:
+    transcriptor   riesgo=read
+    revisor        riesgo=read
+
+  → delega en transcriptor
+    ← transcriptor · entrada=200 salida=40
+  → delega en revisor
+    ← revisor · entrada=2140 salida=96
+
+  El episodio 12 tiene tres intervenciones fuera de tolerancia (04:12, 09:38 y 17:55), dos de ellas en el tramo denso del guion. Con retocar esas tres queda listo.
+
+  total del run: entrada=2640 salida=196
+
+  mensajes que recibió el agente remoto: 1
+  contextId que usó el cliente: 'doblaje-ep12/000003-delegate'
+  — es el `run_id` del sub-run, `{run_id del padre}/{step_id}`. Un
+  identificador, dos sistemas: para nosotros es la identidad del paso;
+  para A2A, la conversación.
+
+  reanudando con el mismo contextId:
+    mensajes enviados: 1 → 1
+    y aun así devuelve el resultado: Doblaje es-419 del episodio 12: 47 intervencione…
 </code></pre>
 <pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
 
@@ -397,6 +440,9 @@ es lo mismo que cero. Un agente remoto siempre cuesta algo.</p>
 apunta al proxy del arnés</strong>, no al agente. Un control en el framework es una
 petición; una frontera en el camino es una frontera. El código no cambia — solo
 a dónde apunta.</p>
+<hr />
+<p><strong>El fichero entero, para clonarlo y tocarlo:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/12_agente_remoto.py"><code>examples/agentes/12_agente_remoto.py</code></a> ↗</p>
+<p>Está en <a href="https://github.com/Root1V/synaptum-framework/tree/main/examples"><code>examples/</code></a> con los otros quince, y todos corren igual.</p>
 
 <nav class="paginado" aria-label="Paginación"><a class="prev" href="ejemplos-11-catalogo-diferido.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">11 · Un catálogo grande sin pagarlo en cada turno</span></a><a class="siguiente" href="ejemplos-13-bucle.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">13 · El bucle entero, en un fichero</span></a></nav>
   </main>

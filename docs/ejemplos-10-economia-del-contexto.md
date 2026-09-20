@@ -1,7 +1,7 @@
 # 10 · Lo que el modelo ve en cada turno, y lo que cuesta
 
-> **Generada de [`examples/agentes/10_economia_del_contexto.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/10_economia_del_contexto.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/agentes/10_economia_del_contexto.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/10_economia_del_contexto.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 **Dominio: Argus** — depurar un incidente mirando logs. La herramienta devuelve
 lo que devuelve: 150.000 caracteres de una ventana de cinco minutos. El modelo
@@ -17,8 +17,77 @@ Tres piezas que son la misma idea vista desde tres sitios:
 Ninguna de las tres inventa nada: si nadie midió la caché, el informe lo dice en
 vez de escribir un cero.
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/agentes/10_economia_del_contexto.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+10 · Economía del contexto
+──────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  la herramienta devolvió      45.472 caracteres
+  al modelo le llegan          16.000 caracteres
+
+  y el recorte lo dice, en vez de terminar en mitad de una línea:
+
+    [… recortado: 29.472 de 45.472 caracteres. Pide un rango concreto si necesitas lo que falta …]
+
+  Cabeza **y** cola, no los primeros 16.000 caracteres: en un volcado
+  de logs el final es donde está el fallo, y cortar por delante lo tira.
+  El journal guarda el resultado entero pase lo que pase — esto solo
+  decide qué se le **reenvía** al modelo en cada turno posterior.
+
+  ── el mismo run, con el tope y sin él ──
+
+    turno 1: sin tope       188  ·  con tope       188
+    turno 2: sin tope    45.660  ·  con tope    16.188
+
+  El turno 1 es idéntico: el volcado todavía no ha vuelto. La
+  diferencia aparece en el 2 — y se pagaría **otra vez** en el 3, en el
+  4 y en todos los demás, porque el historial se reenvía entero.
+
+  ── el informe del run ──
+
+Run con-tope · 2 turnos
+  caché      0% de la entrada servida de caché
+  crecimiento +0 tokens de entrada por turno
+  prefijo    estable durante todo el run
+  total      entrada=200 salida=40 caché=0
+
+  Con el doble los números son los del guion —declara `cache_read=0`,
+  un cero **medido**— así que lo que enseña el informe es su forma. Un
+  proveedor que no reporte caché saldría «sin medir», que es distinto de
+  cero y el informe no los confunde. Contra la plataforma real estas
+  cifras son reales: exporta las credenciales y vuelve a correrlo.
+
+  ── y el mismo agente, con la hora en las instrucciones ──
+
+  huella del prefijo: 507a5687c0def2fb → 43f597f9f1e535b5
+  qué cambió:         instrucciones de sistema: cambiaron
+
+  Eso no dice «la huella no coincide», que no sirve para nada: dice
+  qué arreglar. Y así es como sale en el informe de un run:
+
+Run con-reloj · 2 turnos
+  caché      0% de la entrada servida de caché
+  crecimiento +0 tokens de entrada por turno
+  ⚠ prefijo  reescrito 1 vez/veces — cada una tira toda la caché posterior
+      · 000002-model: instrucciones de sistema: cambiaron
+  total      entrada=200 salida=40 caché=0
+
+  Nadie escribió un error y nada falló. Lo único que pasó es que la
+  factura es más alta de lo que debería, y eso no se nota mirando un run.
 ```
 
 ```python
@@ -215,10 +284,21 @@ async def parte_tres() -> None:
         "depurador", model=nombre_del_modelo(), tools=[leer_logs]
     )
 
-    # El mecanismo, sin depender de que el modelo haga nada: dos peticiones
-    # construidas con un instante de diferencia, y sus huellas.
-    antes = Request(model=agente.model, system=agente.instructions, tools=agente.tools)
-    ahora = Request(model=agente.model, system=agente.instructions, tools=agente.tools)
+    # El mecanismo, sin depender de que el modelo haga nada: dos turnos del
+    # mismo agente, y sus huellas.
+    #
+    # Las dos horas van escritas en vez de leer el reloj **para que este ejemplo
+    # imprima siempre lo mismo**. En un run de verdad las pone `datetime.now()`
+    # —como hace `ConLaHoraDentro` unas líneas más abajo— y cambian solas en
+    # cada turno, que es justamente el problema.
+    def turno(hora: str) -> Request:
+        return Request(
+            model=agente.model,
+            system=f"Depuras incidentes de una plataforma de inferencia. Ahora son las {hora}.",
+            tools=agente.tools,
+        )
+
+    antes, ahora = turno("02:14:07.100"), turno("02:14:07.842")
 
     print(f"  huella del prefijo: {prefix_fingerprint(antes)} → {prefix_fingerprint(ahora)}")
     print(f"  qué cambió:         {describe_prefix_change(antes, ahora)}")
@@ -303,3 +383,9 @@ Y la medida: **`cache_read` es lo que hace correcta la decisión de compactar.**
 Sin saber cuánto se está sirviendo de caché, conservar el historial parece caro
 cuando a menudo es casi gratis, y resumirlo parece barato cuando cuesta una
 inferencia y pierde información.
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/agentes/10_economia_del_contexto.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/10_economia_del_contexto.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

@@ -1,7 +1,7 @@
 # 02 · Varias herramientas y una respuesta tipada
 
-> **Generada de [`examples/agentes/02_causa_raiz.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/02_causa_raiz.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/agentes/02_causa_raiz.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/02_causa_raiz.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 **Dominio: Argus** — AIOps agéntico. El triaje decidió que hay que mirarlo; ahora
 hay que averiguar **por qué**. El agente encadena consultas hasta tener una
@@ -15,8 +15,37 @@ Lo que este ejemplo añade sobre el 01:
   sale de aquí va a un incidente, a una notificación y a un panel — tres
   consumidores que no pueden parsear prosa.
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/agentes/02_causa_raiz.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+02 · Causa raíz con salida tipada
+─────────────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  → spans_lentos
+  → despliegues_recientes
+  → metrica
+
+  causa      El despliegue 2.7.0 subió el límite de modelos residentes de 3 a 5, y la RAM solo da para 3: cada petición desaloja un modelo y lo recarga
+  culpable   prometheus-gateway
+  confianza  85%
+  acción     revertir a 2.6.x o bajar el límite a 3
+  evidencia:
+    · model.load es 5.9s de los 6.4s del p95
+    · despliegue 2.7.0 a las 02:09, cinco minutos antes del síntoma
+    · modelos_cargados pasó de 2 a 5 con un límite de RAM de 3
 ```
 
 ```python
@@ -155,3 +184,9 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/agentes/02_causa_raiz.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/02_causa_raiz.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

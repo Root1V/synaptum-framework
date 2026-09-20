@@ -1,7 +1,7 @@
 # 03 · Un bucle acotado, y qué pasa cuando el modelo se equivoca
 
-> **Generada de [`examples/agentes/03_extraccion_acotada.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/03_extraccion_acotada.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/agentes/03_extraccion_acotada.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/03_extraccion_acotada.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 **Dominio: la plataforma de inteligencia documental** — extracción agéntica
 *acotada* sobre boletas de pago, con validación determinista detrás. Su README lo
@@ -15,8 +15,33 @@ dice en esas palabras, y las dos importan:
 Lo que este ejemplo añade sobre el 02: **el camino de error**. Un agente que solo
 se prueba cuando acierta no está probado.
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/agentes/03_extraccion_acotada.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+03 · Extracción acotada, con el camino de error
+───────────────────────────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  → leer_pagina
+  → validar_ruc
+
+  ROSA MERCEDES QUISPE HUAMAN · 2026-09
+  bruto 4,302.50 − descuentos 548.55 = neto 3,753.95
+  ✓ el neto cuadra con bruto − descuentos
+
+  llamadas al modelo: 3 (una se perdió en un JSON truncado y se reintentó sola)
 ```
 
 ```python
@@ -150,3 +175,9 @@ Lo que hay que llevarse: **la validación estructurada vive dentro del
 reintento**. Un objeto mal formado no es un fallo del run, es una muestra
 mala — y el bucle lo sabe porque la taxonomía de errores lo dice, no porque
 alguien escribiera un `try` aquí.
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/agentes/03_extraccion_acotada.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/03_extraccion_acotada.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

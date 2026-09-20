@@ -1,7 +1,7 @@
 # 12 · Un agente que vive en otro contenedor
 
-> **Generada de [`examples/agentes/12_agente_remoto.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/12_agente_remoto.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/agentes/12_agente_remoto.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/12_agente_remoto.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 **Dominio: el pipeline de doblaje.** El revisor de sincronía no es tuyo: lo
 mantiene otro equipo, se despliega por su cuenta y se actualiza cuando ellos
@@ -18,8 +18,56 @@ por la misma ranura que uno local.
 
     coordinador = Agent("…", delegates=[local, remoto])
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/agentes/12_agente_remoto.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+12 · Un agente en otro contenedor
+─────────────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  su tarjeta dice: revisor-de-doblaje — Revisa sincronía y calidad de una pista doblada.
+  habilidades:     ['Revisar doblaje']
+
+  Lo que **no** dice es qué riesgo tiene, porque A2A no tiene ese
+  campo: una tarjeta declara habilidades. Por eso `risk` es obligatorio
+  al conectarlo y no tiene valor por defecto — un defecto conservador
+  sería correcto y silencioso, y la decisión la tomaría un valor en vez
+  de una persona.
+
+  el catálogo del coordinador:
+    transcriptor   riesgo=read
+    revisor        riesgo=read
+
+  → delega en transcriptor
+    ← transcriptor · entrada=200 salida=40
+  → delega en revisor
+    ← revisor · entrada=2140 salida=96
+
+  El episodio 12 tiene tres intervenciones fuera de tolerancia (04:12, 09:38 y 17:55), dos de ellas en el tramo denso del guion. Con retocar esas tres queda listo.
+
+  total del run: entrada=2640 salida=196
+
+  mensajes que recibió el agente remoto: 1
+  contextId que usó el cliente: 'doblaje-ep12/000003-delegate'
+  — es el `run_id` del sub-run, `{run_id del padre}/{step_id}`. Un
+  identificador, dos sistemas: para nosotros es la identidad del paso;
+  para A2A, la conversación.
+
+  reanudando con el mismo contextId:
+    mensajes enviados: 1 → 1
+    y aun así devuelve el resultado: Doblaje es-419 del episodio 12: 47 intervencione…
 ```
 
 ```python
@@ -226,3 +274,9 @@ Y una advertencia sobre dónde poner la `url`: **en un despliegue gobernado
 apunta al proxy del arnés**, no al agente. Un control en el framework es una
 petición; una frontera en el camino es una frontera. El código no cambia — solo
 a dónde apunta.
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/agentes/12_agente_remoto.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/12_agente_remoto.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

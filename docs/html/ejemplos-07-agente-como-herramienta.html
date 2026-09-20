@@ -192,8 +192,8 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   <main id="contenido">
 <h1>07 · Un agente como herramienta de otro, y un supervisor que enruta</h1>
 <blockquote>
-<p><strong>Generada de <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/07_agente_como_herramienta.py"><code>examples/agentes/07_agente_como_herramienta.py</code></a>.</strong> El fichero corre; esta página lo
-transcribe. Si los dos no coinciden, falla un test.</p>
+<p><strong>Esto es un fichero que se ejecuta:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/07_agente_como_herramienta.py"><code>examples/agentes/07_agente_como_herramienta.py</code></a> ↗
+Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.</p>
 </blockquote>
 <p><strong>Dominio: la mesa de entrada de tu portafolio.</strong> Llega una petición en lenguaje
 natural y puede ser de tres sitios distintos: un incidente de Argus, un documento
@@ -203,7 +203,29 @@ especialista, sus herramientas y su riesgo.</p>
 framework para esto — un <code>@tool</code> es una función asíncrona, y un agente se
 ejecuta con <code>async for</code>. Pero tiene consecuencias que conviene entender antes de
 usarlo, y están al final del fichero.</p>
+<h2>Cómo correrlo</h2>
 <pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/agentes/07_agente_como_herramienta.py
+</code></pre>
+<p>No hace falta configurar nada: sin modelo, las respuestas van guionizadas y <strong>todo lo
+demás es real</strong> — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con <code>AXONIUM_CLIENT_ID</code> o <code>SYNAPTUM_BASE_URL</code> en el entorno, <strong>el mismo fichero sin tocar</strong>
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver <a href="04-modelos.html">Modelos</a>.</p>
+<h2>Lo que imprime</h2>
+<pre data-lenguaje="text"><code>07 · Un agente como herramienta
+───────────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  petición   ¿Por qué va lento el gateway de inferencia y cuánto saldo le queda al agente agt-7741?
+
+  ↳ delega a observabilidad
+  ↳ delega a tesoreria
+
+  El gateway recarga el modelo en cada petición —5.9s de los 6.4s del p95—, y agt-7741 tiene 4.812.400µ disponibles con 150.000µ retenidos.
+
+  coste supervisor   entrada=300
+  coste especialistas entrada=400
+  coste real         entrada=700
 </code></pre>
 <pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
 
@@ -397,6 +419,9 @@ sus herramientas.
 <a href="ejemplos-09-delegar.html"><code>09</code></a>. Este patrón sigue siendo el correcto cuando lo de
 dentro <strong>no es un <code>Agent</code></strong>: una API ajena, un servicio heredado, cualquier
 cosa que no tenga un bucle que ceder.</p>
+<hr />
+<p><strong>El fichero entero, para clonarlo y tocarlo:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/07_agente_como_herramienta.py"><code>examples/agentes/07_agente_como_herramienta.py</code></a> ↗</p>
+<p>Está en <a href="https://github.com/Root1V/synaptum-framework/tree/main/examples"><code>examples/</code></a> con los otros quince, y todos corren igual.</p>
 
 <nav class="paginado" aria-label="Paginación"><a class="prev" href="ejemplos-06-agentes-en-paralelo.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">06 · Varios agentes a la vez, y uno que decide</span></a><a class="siguiente" href="ejemplos-08-herramientas-mcp.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">08 · Herramientas que no escribiste tú</span></a></nav>
   </main>

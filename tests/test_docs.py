@@ -199,6 +199,14 @@ def test_the_example_pages_match_the_examples():
     separado, y el que envejece es el que nadie ejecuta. Aquí la fuente es el
     fichero que corre.
 
+    **Y aquí es donde los dieciséis ejemplos se ejecutan de verdad**, porque el
+    generador captura su salida corriéndolos. Hasta ahora nada del CI los
+    ejecutaba: un ejemplo roto pasaba la suite entera y solo lo descubría quien
+    lo copiara de la documentación. Tarda unos cuatro segundos y vale cada uno.
+
+    El `08` necesita el extra `mcp`; donde no está, no se ejecuta y se conserva
+    su salida, igual que se saltan sus tests.
+
     Si falla: `uv run python scripts/render_examples.py`
     """
     resultado = subprocess.run(

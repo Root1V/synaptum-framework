@@ -1,14 +1,45 @@
 # 16 · Ver los tokens según llegan, y cortar a mitad
 
-> **Generada de [`examples/propiedades/04_streaming.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/04_streaming.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/propiedades/04_streaming.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/04_streaming.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 `agent.stream(...)` es el mismo bucle y el mismo journal que `agent.run(...)`:
 lo único que cambia es que los fragmentos del modelo se ceden intercalados entre
 la intención del paso y su resultado.
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/propiedades/04_streaming.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+04 · Streaming
+──────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  Los fragmentos se ceden dentro del paso que los produce:
+
+
+  · herramienta cotizacion
+  La acción cotiza a 187,34 USD, con una subida del 1,2 % en la sesión. El movimiento no es significativo por sí solo.
+
+  Cortar es dejar de iterar — no hay evento de cancelación:
+
+  recibidos 3 de 16 fragmentos
+  el proveedor produjo 3 y registró el cierre
+
+  Un canal que se está cerrando no es sitio para mandar el aviso de
+  que se cierra. Cerrar el iterador cierra el cuerpo de la respuesta,
+  y eso es lo que de verdad para la generación arriba.
 ```
 
 ```python
@@ -114,3 +145,9 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/propiedades/04_streaming.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/04_streaming.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

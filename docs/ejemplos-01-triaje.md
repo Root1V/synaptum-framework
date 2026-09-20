@@ -1,7 +1,7 @@
 # 01 · Lo mínimo: un agente, una herramienta
 
-> **Generada de [`examples/agentes/01_triaje.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/01_triaje.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/agentes/01_triaje.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/01_triaje.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 **Dominio: Argus** — la plataforma de observabilidad. Su camino caliente detecta
 un incidente en ~2 s sin tocar la base de datos, y deja una señal. Alguien —o
@@ -9,8 +9,30 @@ algo— tiene que mirarla y decir si merece despertar a una persona.
 
 Ese "algo" es el agente más simple que se puede escribir con este framework.
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/agentes/01_triaje.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+01 · Triaje de una señal
+────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  → leer_señal({'señal_id': 'sig-4471'})
+
+  Despertar ahora. La latencia del gateway de inferencia se multiplicó por ocho y afecta a tres servicios: todo lo que dependa de un modelo está degradado, no solo lento.
+
+  consumo: entrada=200 salida=40
 ```
 
 ```python
@@ -121,3 +143,9 @@ Session      dónde se ejecuta (gateway) y dónde se recuerda (checkpointer)
 
 El `async for` no es decoración: el bucle **cede el control en cada frontera**,
 así que ver lo que hace el agente es iterar, y pararlo es dejar de iterar.
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/agentes/01_triaje.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/01_triaje.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

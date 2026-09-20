@@ -1,7 +1,7 @@
 # 04 · Un agente que mueve dinero, y el runtime que lo frena
 
-> **Generada de [`examples/agentes/04_agente_que_gasta.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/04_agente_que_gasta.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/agentes/04_agente_que_gasta.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/04_agente_que_gasta.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 **Dominio: Aerarium + Mercatus** — el tesoro y el mercado. Un agente descubre un
 servicio, paga una décima de céntimo por una llamada, y **hay que poder decirle
@@ -20,8 +20,36 @@ Aquí es donde un framework de agentes deja de ser un bucle bonito. Tres piezas:
   suspende en disco y se reanuda cuando alguien decide — sin repetir lo pagado
   y sin volver a preguntar.
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/agentes/04_agente_que_gasta.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+04 · Un agente que gasta
+────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  ✋ above_delegated_cap: el importe pasa del tope delegado de 500µ.
+  ⏸  run suspendido · herramienta 'capturar'
+     retenciones: 0 · pagos: 0
+     journal: 9 eventos en disco
+
+  … el dueño mira la petición y la aprueba …
+
+  ▶  reanudado · llamadas al modelo: 1
+     Transcripción contratada con whisper-api-x402 por 800µ.
+     pagos: ['capture 800µ → whisper-api-x402']
+     ✓ el pago ocurrió exactamente una vez
 ```
 
 ```python
@@ -248,3 +276,9 @@ un `require_approval` deja la herramienta con intención y sin resultado. Al
 reanudar, eso se parece a «no se sabe si se ejecutó» — pero **aquí sí se
 sabe**: se denegó *antes* de ejecutar. Por eso la denegación se registra como
 desenlace del paso y no como silencio.
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/agentes/04_agente_que_gasta.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/04_agente_que_gasta.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

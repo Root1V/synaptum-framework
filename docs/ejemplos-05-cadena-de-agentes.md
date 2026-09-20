@@ -1,7 +1,7 @@
 # 05 · Varios agentes en cadena, cada uno con su contexto
 
-> **Generada de [`examples/agentes/05_cadena_de_agentes.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/05_cadena_de_agentes.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/agentes/05_cadena_de_agentes.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/05_cadena_de_agentes.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 **Dominio: el pipeline de doblaje** — vídeo en inglés a español, todo local:
 Whisper transcribe, pyannote separa hablantes, un LLM traduce con contexto, y
@@ -21,8 +21,32 @@ Duplicar el contexto de un agente en otro es la forma más cara de equivocarse:
 se paga dos veces por los mismos tokens y el segundo hereda los errores del
 primero sin poder distinguirlos de sus datos.
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/agentes/05_cadena_de_agentes.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+05 · Cadena de agentes
+──────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  traductor  «Mira, no estoy diciendo que sea imposible. Estoy diciendo que nadie lo ha hecho todavía.»
+             registro coloquial · se mantiene «Mira,» por coherencia con seg-0007
+  revisor    corregida · cabe en el hueco: False
+             «Mira, no digo que sea imposible. Digo que nadie lo ha hecho aún.»
+
+  a síntesis «Mira, no digo que sea imposible. Digo que nadie lo ha hecho aún.»
+  coste total del segmento: entrada=500 salida=100
 ```
 
 ```python
@@ -212,3 +236,9 @@ traductor manejó una transcripción, un glosario y su razonamiento.
 Delegando como primitiva, el `DelegateStep` lo atribuye solo — es la
 diferencia principal entre las dos formas, y está en el ejemplo 09.
 ```
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/agentes/05_cadena_de_agentes.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/05_cadena_de_agentes.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.
