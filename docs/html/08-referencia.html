@@ -3208,6 +3208,26 @@ rompería la comparación de replay entre versiones.</p>
 <h3><code>__version__</code></h3>
 <p><code>__version__ = '1.0.0rc1'</code></p>
 <p>str(object='') -&gt; str str(bytes_or_buffer[, encoding[, errors]]) -&gt; str</p>
+<h2>Sin agrupar</h2>
+<p>Exportados y todavía sin sitio en esta página. Que aparezcan aquí es un aviso para quien mantiene la referencia, no para quien la lee.</p>
+<h3><code>deferred</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">deferred</span><span class="p-p">(</span><span class="p-n">herramientas</span><span class="p-p">:</span> <span class="p-n">Sequence</span><span class="p-p">[</span><span class="p-n">Tool</span><span class="p-p">],</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">max_resultados</span><span class="p-p">:</span> <span class="p-nb">int</span> <span class="p-o">=</span> <span class="p-mi">5</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">list</span><span class="p-p">[</span><span class="p-n">Tool</span><span class="p-p">]</span>
+</code></pre>
+<p>Convierte un catálogo grande en <strong>dos</strong> herramientas de prefijo fijo.</p>
+<p>Args:
+herramientas: el catálogo entero, decorado con <code>@tool</code>.
+max_resultados: cuántas devuelve una búsqueda. Más no ayuda: el modelo
+elige peor cuantas más ve, que es medio problema que esto resuelve.</p>
+<p>Returns:
+<code>[buscar_herramientas, usar_herramienta]</code>, listas para <code>Agent(tools=…)</code>.</p>
+<p>Ejemplo::</p>
+<p>agente = Agent(&quot;a&quot;, model=…, tools=deferred(las_cuarenta))</p>
+<h3><code>merece_la_pena</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">merece_la_pena</span><span class="p-p">(</span><span class="p-n">herramientas</span><span class="p-p">:</span> <span class="p-n">Sequence</span><span class="p-p">[</span><span class="p-n">Any</span><span class="p-p">])</span> <span class="p-o">-&gt;</span> <span class="p-nb">bool</span>
+</code></pre>
+<p>¿Vale la pena diferir este catálogo?</p>
+<p>Está expuesto a propósito: es mejor que alguien pueda preguntar a que lo
+descubra midiendo su factura.</p>
 <h2>Dobles de desarrollo</h2>
 <p><code>synaptum.testing</code> — Infraestructura, no una utilidad de test: es la vía principal para construir sin gastar.</p>
 <h3><code>FakeGateway</code></h3>

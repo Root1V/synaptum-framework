@@ -287,6 +287,62 @@ incompletos creyéndolos completos.</p>
 tiene dependencias. La regla práctica es ~4 caracteres por token en texto latino; menos en código y
 en CJK. Si necesitas un tope exacto, recórtalo en la herramienta — que es donde vive el conocimiento
 de qué se puede tirar.</p>
+<h2>Un catálogo grande: <code>deferred</code></h2>
+<p>Cuarenta herramientas son <strong>3.737 tokens de catálogo en cada turno</strong>, el 94 % de una ventana de
+4.096. Y el modelo tiene que elegir entre cuarenta, que es la otra mitad del problema.</p>
+<pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">synaptum</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">deferred</span><span class="p-p">,</span> <span class="p-n">merece_la_pena</span>
+
+<span class="p-n">agente</span> <span class="p-o">=</span> <span class="p-n">Agent</span><span class="p-p">(</span><span class="p-s2">"a"</span><span class="p-p">,</span> <span class="p-n">model</span><span class="p-o">=</span><span class="p-err">…</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-o">=</span><span class="p-n">deferred</span><span class="p-p">(</span><span class="p-n">las_cuarenta</span><span class="p-p">))</span>   <span class="p-c1"># 3.737 → 142 tokens</span>
+</code></pre>
+<h3>Lo obvio es peor que no hacer nada</h3>
+<p>Cargar herramientas cuando hagan falta parece la solución. <strong>Está medido contra un despliegue real,
+con un historial de run normal:</strong></p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Petición</th>
+<th><code>input</code></th>
+<th><code>cache_read</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10 herramientas, 2ª llamada</td>
+<td>1.444</td>
+<td>1.443 (<strong>100 %</strong>)</td>
+</tr>
+<tr>
+<td>11 — una sola añadida</td>
+<td>1.467</td>
+<td>0 (<strong>0 %</strong>)</td>
+</tr>
+</tbody>
+</table></div>
+<p>Añadir <strong>una</strong> herramienta a mitad de run destruye la caché entera, historial incluido. El catálogo
+vive en el prefijo estable, y un prefijo que cambia en el token 10 invalida los 10.000 siguientes.</p>
+<h3>Lo que sí funciona: mover el catálogo al historial</h3>
+<p>El prefijo se queda con <strong>dos herramientas fijas</strong> y no cambia nunca:</p>
+<ul>
+<li><code>buscar_herramientas(consulta)</code> — devuelve nombres, descripciones <strong>y esquemas</strong>;</li>
+<li><code>usar_herramienta(nombre, argumentos)</code> — ejecuta la que sea.</li>
+</ul>
+<p>El esquema que el modelo necesita llega como <strong>resultado de herramienta</strong>, y un resultado se añade al
+final de los mensajes. El final crece; crecer al final no invalida nada.</p>
+<p>Es el mismo principio que el prefijo estable, al revés: en vez de proteger lo de delante, se mueve lo
+variable hacia atrás.</p>
+<h3>Lo que cuesta</h3>
+<ul>
+<li><strong>Dos turnos extra como mínimo</strong>: buscar y luego usar.</li>
+<li><strong>El modelo pierde el esquema tipado en la llamada</strong>, así que los errores de argumentos suben. Se
+compensa validando al despachar y devolviendo el esquema en el error — pero es una compensación.</li>
+<li><strong>Por debajo de ~15 herramientas es estrictamente peor.</strong> <code>merece_la_pena(catalogo)</code> lo dice, en
+vez de dejar que se descubra midiendo una factura.</li>
+</ul>
+<h3>El riesgo no se blanquea</h3>
+<p>El despachador hereda <strong>el mayor riesgo del catálogo</strong>. Sin eso, esconder cuarenta herramientas
+detrás de una las blanquearía a todas: el gateway vería lectura y dejaría pasar la que borra el
+disco. Misma regla que en la delegación, y por lo mismo — quien llama no sabe qué hay detrás, pero el
+framework sí.</p>
 <h2>Herramientas de un servidor MCP</h2>
 <pre data-lenguaje="bash"><code>pip<span class="p-w"> </span>install<span class="p-w"> </span>synaptum<span class="p-o">[</span>mcp<span class="p-o">]</span>
 </code></pre>

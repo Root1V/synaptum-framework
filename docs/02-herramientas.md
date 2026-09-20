@@ -120,6 +120,58 @@ tiene dependencias. La regla práctica es ~4 caracteres por token en texto latin
 en CJK. Si necesitas un tope exacto, recórtalo en la herramienta — que es donde vive el conocimiento
 de qué se puede tirar.
 
+## Un catálogo grande: `deferred`
+
+Cuarenta herramientas son **3.737 tokens de catálogo en cada turno**, el 94 % de una ventana de
+4.096. Y el modelo tiene que elegir entre cuarenta, que es la otra mitad del problema.
+
+```python
+from synaptum import deferred, merece_la_pena
+
+agente = Agent("a", model=…, tools=deferred(las_cuarenta))   # 3.737 → 142 tokens
+```
+
+### Lo obvio es peor que no hacer nada
+
+Cargar herramientas cuando hagan falta parece la solución. **Está medido contra un despliegue real,
+con un historial de run normal:**
+
+| Petición | `input` | `cache_read` |
+|---|---|---|
+| 10 herramientas, 2ª llamada | 1.444 | 1.443 (**100 %**) |
+| 11 — una sola añadida | 1.467 | 0 (**0 %**) |
+
+Añadir **una** herramienta a mitad de run destruye la caché entera, historial incluido. El catálogo
+vive en el prefijo estable, y un prefijo que cambia en el token 10 invalida los 10.000 siguientes.
+
+### Lo que sí funciona: mover el catálogo al historial
+
+El prefijo se queda con **dos herramientas fijas** y no cambia nunca:
+
+- `buscar_herramientas(consulta)` — devuelve nombres, descripciones **y esquemas**;
+- `usar_herramienta(nombre, argumentos)` — ejecuta la que sea.
+
+El esquema que el modelo necesita llega como **resultado de herramienta**, y un resultado se añade al
+final de los mensajes. El final crece; crecer al final no invalida nada.
+
+Es el mismo principio que el prefijo estable, al revés: en vez de proteger lo de delante, se mueve lo
+variable hacia atrás.
+
+### Lo que cuesta
+
+- **Dos turnos extra como mínimo**: buscar y luego usar.
+- **El modelo pierde el esquema tipado en la llamada**, así que los errores de argumentos suben. Se
+  compensa validando al despachar y devolviendo el esquema en el error — pero es una compensación.
+- **Por debajo de ~15 herramientas es estrictamente peor.** `merece_la_pena(catalogo)` lo dice, en
+  vez de dejar que se descubra midiendo una factura.
+
+### El riesgo no se blanquea
+
+El despachador hereda **el mayor riesgo del catálogo**. Sin eso, esconder cuarenta herramientas
+detrás de una las blanquearía a todas: el gateway vería lectura y dejaría pasar la que borra el
+disco. Misma regla que en la delegación, y por lo mismo — quien llama no sabe qué hay detrás, pero el
+framework sí.
+
 ## Herramientas de un servidor MCP
 
 ```bash
