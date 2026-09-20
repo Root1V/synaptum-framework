@@ -2,10 +2,15 @@
 
 `SYN-46`. Esta política vale para cualquiera que construya sobre Synaptum, y no depende de quién sea.
 
-Nació de un caso concreto: un arnés retiró su DSL de autoría nativo apoyándose en que Synaptum sería
-esa capa. Una decisión así es difícil de revertir, y la contrapartida no podía quedarse en una frase
-de un acuerdo: tiene que decir qué está garantizado, durante cuánto y qué no. Lo que sigue aplica
-igual a quien llegue mañana sin haber estado en aquella conversación.
+Existe porque hay código ajeno que implementa nuestras costuras, y ese acoplamiento **no aparece en
+ningún fichero de dependencias**: un arnés escrito en Go implementa la costura de durabilidad y sigue
+la convención de `Usage` sin importar una sola línea nuestra. Un import se fija a una versión; una
+convención compartida, no. Si cambiamos la semántica de una fase o el significado de `input`, ese
+código compila igual y hace otra cosa.
+
+De ahí que la contrapartida no pueda quedarse en una frase de un acuerdo: tiene que decir qué está
+garantizado, durante cuánto y qué no — y aplicar igual a quien llegue mañana sin haber estado en
+ninguna conversación.
 
 ## Qué es superficie pública
 
