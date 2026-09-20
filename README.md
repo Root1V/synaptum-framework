@@ -6,7 +6,7 @@ Synaptum es dueño de la *semántica* de ejecución de un agente: qué es un pas
 qué puede repetirse, y cómo se vuelve a derivar el contexto. El *sustrato* —dónde se persiste, con
 qué retención, bajo qué política— pertenece al arnés que lo opera.
 
-> **Versión:** [`1.0.0rc1`](https://pypi.org/project/synaptum/) · **Python:** ≥ 3.13 · **Licencia:** MIT
+> **Versión:** [`1.0.0rc2`](https://pypi.org/project/synaptum/) · **Python:** ≥ 3.13 · **Licencia:** MIT
 >
 > **Candidato, no estable.** El compromiso de estabilidad de `API.md` arranca en `1.0.0`, y la
 > Fase 2 todavía puede tocar la superficie. La línea 0.x, con un diseño distinto, está congelada en
@@ -113,7 +113,7 @@ dominio real; y cuatro que enseñan qué garantiza el runtime debajo.
 pip install synaptum      # 0 dependencias
 ```
 
-Hoy la única versión publicada es `1.0.0rc1`, así que ese comando la instala sin `--pre`. **Deja de
+Hoy la última versión publicada es `1.0.0rc2`, así que ese comando la instala sin `--pre`. **Deja de
 hacerlo en cuanto exista una estable**, que es lo correcto: a partir de ahí un candidato se pide por
 su nombre (`pip install synaptum==1.0.0rc2`).
 
