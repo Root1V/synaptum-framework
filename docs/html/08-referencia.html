@@ -445,6 +445,8 @@ autónomo, donde no hay registro contra el que resolver.</p>
 </tr>
 </tbody>
 </table></div>
+<h2>Economía de contexto</h2>
+<p>Qué ve el modelo y qué costó. <code>Usage</code> dice cuánto; esto dice por qué.</p>
 <h3><code>cap_tool_output</code></h3>
 <pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">cap_tool_output</span><span class="p-p">(</span><span class="p-n">resultado</span><span class="p-p">:</span> <span class="p-n">ToolResult</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">max_chars</span><span class="p-p">:</span> <span class="p-nb">int</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-mi">16000</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">ToolResult</span>
 </code></pre>
@@ -455,6 +457,121 @@ max_chars: tope en caracteres. <code>None</code> desactiva el recorte.</p>
 <p>Returns:
 Un <code>ToolResult</code> nuevo si hubo que recortar; <strong>el mismo objeto</strong> si no
 —así quien compare por identidad puede saber si se tocó algo.</p>
+<h3><code>economy</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">economy</span><span class="p-p">(</span><span class="p-n">state</span><span class="p-p">:</span> <span class="p-n">RunState</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">ContextEconomy</span>
+</code></pre>
+<p>Calcula el informe de un run a partir de su journal.</p>
+<p>Empareja cada intención de modelo con su resultado: la petición vive en
+<code>ATTEMPTED</code> —es donde está el prefijo— y el consumo en <code>COMPLETED</code>.
+Un turno sin resultado no se cuenta: se intentó y no se sabe qué costó.</p>
+<h3><code>ContextEconomy</code></h3>
+<p>El informe de un run.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>turns</code></td>
+<td><code>tuple[TurnEconomy, ...]</code></td>
+<td><code>()</code></td>
+</tr>
+<tr>
+<td><code>prefix_changes</code></td>
+<td><code>tuple[str, ...]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cache_hit_ratio</code></td>
+<td>—</td>
+<td>Acierto de caché del run entero.</td>
+</tr>
+<tr>
+<td><code>input_growth</code></td>
+<td>—</td>
+<td>Cuánto crece la entrada por turno, en tokens.</td>
+</tr>
+<tr>
+<td><code>prefix_rewrites</code></td>
+<td>—</td>
+<td>Cuántas veces cambió el prefijo estable dentro del run.</td>
+</tr>
+<tr>
+<td><code>report</code></td>
+<td><code>report(self) -&gt; str</code></td>
+<td>El informe en texto, para leerlo en un terminal o pegarlo en un ticket.</td>
+</tr>
+<tr>
+<td><code>total</code></td>
+<td>—</td>
+<td>Suma de todos los turnos.  <code>None</code> en un contador se propaga.</td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>TurnEconomy</code></h3>
+<p>Un turno: una llamada al modelo y lo que costó.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>step_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>usage</code></td>
+<td><code>Usage</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>prefix_rewritten</code></td>
+<td><code>bool</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cache_hit_ratio</code></td>
+<td>—</td>
+<td>Fracción de la entrada servida desde caché, o <code>None</code> si no se midió.</td>
+</tr>
+</tbody>
+</table></div>
 <h2>Lo que cede el bucle</h2>
 <p>Los pasos que llegan por <code>async for</code>, y sus fases.</p>
 <h3><code>StepEvent</code></h3>
