@@ -122,7 +122,7 @@ país, al lado de un sueldo y una AFP. Nadie lo copió de ningún sitio, y daba 
 casi con seguridad lleva alguien, publicado en un repositorio, en un sitio web y dentro de los
 artefactos de PyPI. Que el dato sea inventado no ayuda a quien se llame así.
 
-Así que: **los marcadores de siempre** —`John Doe`, `ACME`— en vez de inventar uno nuevo. Un nombre
+Así que: **los marcadores de siempre** —John Doe, ACME— en vez de inventar uno nuevo. Un nombre
 que el lector ya reconoce como marcador se lee como «aquí va un nombre» sin pensarlo, y nadie se
 pregunta si detrás hay alguien. Además, identificadores que fallen su propio dígito verificador —el
 RUC del `03` lo hace a propósito— y cuentas truncadas. No hay un test que lo compruebe, y sería

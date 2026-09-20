@@ -55,7 +55,7 @@ class Boleta:
 # La regla, para el próximo ejemplo: si un nombre, un RUC o una cuenta pueden
 # ser de alguien, hay que cambiarlos aunque te los hayas inventado.
 #
-# Y se usan los marcadores de siempre —`John Doe`, `ACME`— en vez de inventar
+# Y se usan los marcadores de siempre —John Doe, ACME— en vez de inventar
 # uno nuevo. No es capricho: un nombre que el lector ya reconoce como marcador
 # se lee como «aquí va un nombre» sin tener que pensarlo, y nadie se pregunta
 # si detrás hay alguien. Un «PERSONA DE EJEMPLO UNO» cumple pero hay que
