@@ -49,6 +49,14 @@ Falta `sesion`, y es lo primero que hay que entender: [**Conceptos**](01-concept
 | [Qué no hace](07-limites.md) | Los límites, dichos en voz alta |
 | [Referencia](08-referencia.md) | Cada símbolo público, **generado del código** |
 
+## Empezar un proyecto
+
+```bash
+cp -r plantilla mi-agente && cd mi-agente && uv sync && uv run python -m mi_agente
+```
+
+Corre sin configurar nada, y trae los tests que enseñan a probar un agente sin gastar en inferencia.
+
 ## Ejecutar los ejemplos
 
 Doce ejemplos ejecutables en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples).
