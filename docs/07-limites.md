@@ -51,10 +51,14 @@ reenvía en cada turno. Con caché de prefijo eso suele salir más barato que re
 compactación va desactivada por defecto cuando llegue— pero hay un punto en el que deja de serlo, y
 hoy nadie lo detecta por ti.
 
-## No delega con contexto aislado
+## No deniega una delegación antes de que empiece
 
-`delegate()` es `SYN-41`. Se puede componer a mano —y funciona— con las tres consecuencias listadas
-en [Varios agentes](05-multiagente.md).
+Delegar **sí** existe, con contexto aislado, consumo agregado y reanudación. Lo que falta es que la
+delegación cruce la costura: el bucle arranca al subagente sin preguntar al gateway.
+
+Las herramientas del subagente sí cruzan, así que un efecto destructivo se detiene igual. Lo que se
+pierde es detenerlo *antes* de pagar la inferencia del hijo. Cerrarlo exige un método de la costura
+que autorice sin ejecutar, y eso es un cambio de contrato acordado entre varios proyectos.
 
 ## No emite trazas todavía
 

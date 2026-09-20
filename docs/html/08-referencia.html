@@ -196,7 +196,7 @@ aparece aquí puede cambiar sin aviso, aunque se pueda importar.</p>
 <p>Lo que se toca en el primer fichero.</p>
 <h3><code>Agent</code></h3>
 <p>Composición, no herencia.  Un agente es su configuración más el bucle.</p>
-<pre data-lenguaje="python"><code><span class="p-n">Agent</span><span class="p-p">(</span><span class="p-n">name</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">model</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">instructions</span><span class="p-p">:</span> <span class="p-n">Any</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-p">:</span> <span class="p-n">Sequence</span><span class="p-p">[</span><span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">=</span> <span class="p-p">(),</span> <span class="p-n">output</span><span class="p-p">:</span> <span class="p-n">Any</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">limits</span><span class="p-p">:</span> <span class="p-n">Limits</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+<pre data-lenguaje="python"><code><span class="p-n">Agent</span><span class="p-p">(</span><span class="p-n">name</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">model</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">instructions</span><span class="p-p">:</span> <span class="p-n">Any</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-p">:</span> <span class="p-n">Sequence</span><span class="p-p">[</span><span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">=</span> <span class="p-p">(),</span> <span class="p-n">delegates</span><span class="p-p">:</span> <span class="p-n">Sequence</span><span class="p-p">[</span><span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">=</span> <span class="p-p">(),</span> <span class="p-n">output</span><span class="p-p">:</span> <span class="p-n">Any</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">limits</span><span class="p-p">:</span> <span class="p-n">Limits</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
 </code></pre>
 <div class="tabla"><table>
 <thead>
@@ -266,6 +266,11 @@ aparece aquí puede cambiar sin aviso, aunque se pueda importar.</p>
 <td><code>50</code></td>
 </tr>
 <tr>
+<td><code>max_delegation_depth</code></td>
+<td><code>int</code></td>
+<td><code>3</code></td>
+</tr>
+<tr>
 <td><code>max_tool_chars</code></td>
 <td><code>int | None</code></td>
 <td><code>16000</code></td>
@@ -295,6 +300,58 @@ aparece aquí puede cambiar sin aviso, aunque se pueda importar.</p>
 <p>Son <strong>corrección, no política</strong>: evitan que un bucle mal formado no termine
 nunca.  Los límites de gasto pertenecen al harness y llegan por la costura
 como <code>Denied</code> con <code>terminate_run</code>.</p>
+<h3><code>Delegate</code></h3>
+<p>Un subagente, tal como lo ve quien delega.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>agent</code></td>
+<td><code>'Agent'</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>definition</code></td>
+<td>—</td>
+<td>Lo que el modelo ve: un nombre, cuándo usarlo, y un hueco para el brief.</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>risk</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Se presenta al modelo como una herramienta de <strong>un solo parámetro</strong>: el
+brief. No se le ofrecen las herramientas del subagente, y eso es lo que hace
+barato delegar — el catálogo del padre no crece con el del hijo.</p>
 <h3><code>tool</code></h3>
 <pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">tool</span><span class="p-p">(</span><span class="p-n">fn</span><span class="p-p">:</span> <span class="p-n">Callable</span><span class="p-p">[</span><span class="p-o">...</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">name</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">description</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">risk</span><span class="p-p">:</span> <span class="p-n">Risk</span> <span class="p-o">=</span> <span class="p-o">&lt;</span><span class="p-n">Risk</span><span class="p-o">.</span><span class="p-n">READ</span><span class="p-p">:</span> <span class="p-n">read</span><span class="p-o">&gt;</span><span class="p-p">,</span> <span class="p-n">idempotent</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">=</span> <span class="p-kc">False</span><span class="p-p">,</span> <span class="p-n">parameters</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Any</span>
 </code></pre>

@@ -184,18 +184,45 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   </nav>
   <main id="contenido">
 <h1>Varios agentes</h1>
-<p><strong><code>delegate()</code> no existe todavía</strong> — es <code>SYN-41</code>. El tipo <code>DelegateStep</code> está escrito y nada lo
-emite.</p>
-<p>Eso <strong>no impide</strong> construir sistemas multi-agente hoy: el bucle de un agente es un generador
-asíncrono de verdad, así que orquestar varios es código asyncio normal. Lo que <code>SYN-41</code> añadirá es
-que la delegación quede <strong>en el journal</strong> como un paso propio, con su consumo atribuido y su punto de
-reanudación.</p>
-<p>La regla que sí se puede seguir desde el primer día:</p>
+<p>Tres formas, y la primera ya es una primitiva del bucle.</p>
+<h2>Delegar a un subagente</h2>
+<pre data-lenguaje="python"><code><span class="p-n">analista</span> <span class="p-o">=</span> <span class="p-n">Agent</span><span class="p-p">(</span><span class="p-s2">"analista"</span><span class="p-p">,</span> <span class="p-n">model</span><span class="p-o">=...</span><span class="p-p">,</span> <span class="p-n">instructions</span><span class="p-o">=</span><span class="p-s2">"Analizas valores."</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-o">=</span><span class="p-p">[</span><span class="p-n">cotizacion</span><span class="p-p">])</span>
+<span class="p-n">mesa</span> <span class="p-o">=</span> <span class="p-n">Agent</span><span class="p-p">(</span><span class="p-s2">"mesa"</span><span class="p-p">,</span> <span class="p-n">model</span><span class="p-o">=...</span><span class="p-p">,</span> <span class="p-n">instructions</span><span class="p-o">=</span><span class="p-s2">"Enrutas al especialista."</span><span class="p-p">,</span> <span class="p-n">delegates</span><span class="p-o">=</span><span class="p-p">[</span><span class="p-n">analista</span><span class="p-p">])</span>
+</code></pre>
+<p>El subagente se presenta al modelo como <strong>una herramienta de un solo parámetro</strong>: el brief. El
+catálogo del padre no crece con el del hijo, y eso es lo que hace barato delegar — el analista puede
+tener quince herramientas y la mesa ve una firma de una línea.</p>
+<p>Al subagente le llega <strong>el brief y nada más</strong>: no ve la conversación del padre. De vuelta suben el
+resultado y el <strong>consumo agregado</strong>. Su historial se queda en su propio diario, donde se audita sin
+pagarlo en cada turno.</p>
+<h3>Qué cierra respecto a componerlos a mano</h3>
+<p><strong>El coste deja de ser invisible.</strong> El <code>usage</code> del <code>FinalStep</code> del padre incluye lo que gastó el
+subagente, porque el <code>DelegateStep</code> lo transporta. Antes había que sumarlo a mano, y un sistema que
+gastaba cinco veces más parecía igual de barato.</p>
+<p><strong>Un subagente es un paso durable.</strong> Tiene su propio <code>run_id</code>, derivado del padre:
+<code>{run_id}/{step_id}</code>. Si el proceso muere a mitad, al reanudar <strong>no se reejecuta</strong>:</p>
+<pre><code>1ª vuelta  modelo ×3 · herramienta del hijo ×1   ← muere aquí
+2ª vuelta  modelo ×1 · herramienta del hijo ×0   ← solo lo que faltaba
+</code></pre>
+<p><strong>El riesgo se deriva.</strong> <code>delegate_risk</code> es el mayor de las herramientas del subagente, y de los
+suyos. Aquí sí se puede derivar —quien delega no sabe qué tiene el otro, pero el framework sí— al
+contrario que en <code>@tool</code>, donde ninguna anotación puede saber que una función que devuelve <code>str</code>
+mueve dinero.</p>
 <blockquote>
-<p><strong>Entre agentes viaja el resultado, nunca el historial.</strong></p>
+<p><strong>Hasta dónde llega eso hoy.</strong> El riesgo <strong>se declara</strong> —el modelo lo ve, el arnés lo ve en el
+handshake— pero la delegación <strong>no cruza la costura</strong>: el bucle arranca al subagente sin
+preguntar. Las herramientas del subagente sí cruzan, así que un efecto destructivo se detiene
+igual; lo que se pierde es detenerlo <em>antes</em> de pagar la inferencia del hijo. Denegar la
+delegación en sí exigiría un método de la costura que autorice sin ejecutar, y eso es un cambio de
+contrato.</p>
 </blockquote>
-<p>Duplicar el contexto de un agente en otro se paga dos veces, y hace que el segundo herede los errores
-del primero sin poder distinguirlos de sus datos.</p>
+<p><strong>Los ciclos se paran.</strong> <code>Limits.max_delegation_depth</code> (3 por defecto). <code>max_steps</code> no lo cubre:
+cada nivel tiene su propio contador, así que dos agentes que se deleguen mutuamente no terminarían
+nunca.</p>
+<h3>Lo que sigue siendo válido componer a mano</h3>
+<p>Delegar sirve cuando <strong>el modelo decide</strong> a quién llamar. Cuando el orden lo decides tú —una cadena
+fija, un fan-out— componer con asyncio sigue siendo lo correcto y más simple. Las dos formas están
+abajo.</p>
 <h2>Cadena — uno detrás de otro</h2>
 <p>Cuando cada etapa necesita criterio distinto: traducir y luego revisar que quepa en el hueco.</p>
 <pre data-lenguaje="python"><code><span class="p-n">traduccion</span> <span class="p-o">=</span> <span class="p-k">await</span> <span class="p-n">ejecutar</span><span class="p-p">(</span><span class="p-n">traductor</span><span class="p-p">(),</span> <span class="p-s2">"Traduce el segmento seg-0042."</span><span class="p-p">,</span> <span class="p-s2">"dub-tr"</span><span class="p-p">)</span>

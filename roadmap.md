@@ -111,7 +111,7 @@ Solo después de que un agente único sea sólido. Regla: *single agent first*.
 
 | ID | Estado | Feature | Implica |
 |---|---|---|---|
-| SYN-41 | `PENDIENTE` | `delegate()` con contexto aislado | Orchestrator-worker. Brief estrecho, devuelve resultado y referencias, nunca historial. `asyncio.gather` real |
+| SYN-41 | `HECHO` | `delegate()` con contexto aislado | Cierra los tres agujeros que estaban documentados: el consumo del subagente sube al total del padre, el sub-run tiene diario propio con id derivado (`{run}/{step}`) y **no se reejecuta al reanudar**, y el riesgo se deriva del mayor de sus herramientas. Queda abierto que la delegación **no cruza la costura**: un gateway no puede denegarla antes de que empiece, y cerrarlo exige un método que autorice sin ejecutar — cambio de contrato |
 | SYN-42 | `PENDIENTE` | Grafo declarativo | Máquina de estados tipada sobre las primitivas. Sin duplicar `GraphPattern`/`GraphAgent` como en v0.4 |
 | SYN-43 | `PENDIENTE` | Recetas de patrones | Los 21 patrones portados como recetas de ~40 líneas, no como núcleo. Saga sobre journal, no sobre coreografía a mano |
 | SYN-44 | `PENDIENTE` | Adaptador A2A | Delegación a agentes remotos. Extra opcional |

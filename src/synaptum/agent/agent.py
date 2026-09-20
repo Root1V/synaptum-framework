@@ -52,6 +52,7 @@ from ..core.errors import (
 )
 from ..core.events import (
     ApprovalStep,
+    DelegateStep,
     Disposition,
     FinalStep,
     ModelStep,
@@ -78,6 +79,7 @@ from ..core.types import (
 from ..schema.protocol import Schema, schema_for
 from ..context.cap import DEFAULT_MAX_CHARS, cap_tool_output
 from ..context.prefix import describe_prefix_change, prefix_fingerprint
+from .delegation import Delegate, delegate_risk, sub_run_id
 from ..run.journal import Journal, MemoryCheckpointer, Replay
 
 __all__ = ["Limits", "Session", "Agent"]
@@ -95,6 +97,11 @@ class Limits:
     """
 
     max_steps: int = 50
+    max_delegation_depth: int = 3
+    """Cuántos niveles de subagente se permiten.
+
+    ``max_steps`` no lo cubre: cada nivel tiene su propio contador, así que dos
+    agentes que se deleguen mutuamente no terminarían nunca."""
     max_tool_chars: int | None = DEFAULT_MAX_CHARS
     """Tope de la salida de una herramienta **en el contexto**, en caracteres.
 
@@ -142,6 +149,7 @@ class Agent:
         model: str,
         instructions: Any = None,
         tools: Sequence[Any] = (),
+        delegates: Sequence[Any] = (),
         output: Any = None,
         limits: Limits | None = None,
     ) -> None:
@@ -154,8 +162,17 @@ class Agent:
         )
         # Acepta ToolDefinition o cualquier objeto que la exponga — un `@tool`,
         # sin que el bucle tenga que importar el decorador.
-        self.tools: tuple[ToolDefinition, ...] = tuple(
-            t.definition if hasattr(t, "definition") else t for t in tools
+        # Un subagente se presenta al modelo como una herramienta de un solo
+        # parámetro —el brief—, así que el catálogo del padre no crece con el
+        # del hijo. Eso es lo que hace barato delegar.
+        self.delegates: tuple[Delegate, ...] = tuple(
+            d if isinstance(d, Delegate) else Delegate(d) for d in delegates
+        )
+        self._delegates_by_name = {d.name: d for d in self.delegates}
+
+        propias = tuple(t.definition if hasattr(t, "definition") else t for t in tools)
+        self.tools: tuple[ToolDefinition, ...] = propias + tuple(
+            d.definition for d in self.delegates
         )
         self.limits = limits or Limits()
         self.output: Schema | None = schema_for(output) if output is not None else None
@@ -225,8 +242,12 @@ class Agent:
         return self._loop(task, session, stream=True)
 
     async def _loop(
-        self, task: str, session: Session, *, stream: bool
+        self, task: str, session: Session, *, stream: bool, depth: int = 0
     ) -> AsyncIterator[Any]:
+        # La profundidad viaja por parámetro y no en el objeto: un `Agent` es
+        # configuración reutilizable, y el mismo puede estar en mil runs a la
+        # vez. Guardarla dentro haría que dos delegaciones concurrentes se
+        # pisaran el contador.
         state = await session.checkpointer.load(session.run_id)
         journal = Journal(session.checkpointer, session.run_id)
         replay = Replay(state)
@@ -346,6 +367,23 @@ class Agent:
                 # ── Pasos de herramienta ──────────────────────────────────────
                 results: list[ToolResult] = []
                 for call in calls:
+                    # Una llamada a un subagente no es un paso de herramienta:
+                    # tiene su propio diario, su propio consumo y su propio punto
+                    # de reanudación. Por eso se despacha aparte.
+                    sub = self._delegates_by_name.get(call.name)
+                    if sub is not None:
+                        step_id = make_step_id(seq, "delegate")
+                        seq += 1
+                        async for evento, resultado in self._delegate(
+                            sub, call, session, journal, replay, step_id, seq - 1, depth
+                        ):
+                            if evento is not None:
+                                yield evento
+                            if resultado is not None:
+                                results.append(resultado[0])
+                                total += resultado[1]
+                        continue
+
                     step_id = make_step_id(seq, "tool")
                     seq += 1
                     spec = self._by_name.get(call.name)
@@ -601,6 +639,85 @@ class Agent:
             "Reanudar es continuar ese run; una configuración distinta es otro "
             "run — usa un run_id nuevo."
         )
+
+    async def _delegate(
+        self,
+        sub: Delegate,
+        call: ToolCall,
+        session: Session,
+        journal: Journal,
+        replay: Replay,
+        step_id: str,
+        step_seq: int,
+        depth: int,
+    ):
+        """Ejecuta un subagente y cede los eventos del padre.
+
+        Cede pares ``(evento, resultado)``: el evento se reenvía a quien consume
+        el run del padre, y el resultado —cuando llega— trae lo que hay que meter
+        en el contexto y el consumo que hay que sumar.
+
+        Los pasos del subagente **no se reenvían**. Quien mira el run del padre
+        ve una delegación, no la conversación ajena; la de dentro está entera en
+        su propio diario, que es donde se audita sin pagarla en cada turno.
+        """
+        brief = str(call.arguments.get("brief", "")).strip()
+
+        hecho = replay.resolve(step_id, idempotent=False)
+        if hecho is not None:
+            assert isinstance(hecho, DelegateStep)
+            yield hecho, (
+                ToolResult.of(call.id, str(hecho.result or "")),
+                hecho.usage,
+            )
+            return
+
+        if depth >= self.limits.max_delegation_depth:
+            # Un ciclo entre dos agentes que se delegan mutuamente no termina
+            # solo, y `max_steps` no lo ve: cada nivel tiene su propio contador.
+            yield None, (
+                ToolResult.of(
+                    call.id,
+                    f"No se puede delegar más: se alcanzó la profundidad máxima "
+                    f"({self.limits.max_delegation_depth}).",
+                    is_error=True,
+                ),
+                Usage.zero(),
+            )
+            return
+
+        intencion = DelegateStep(
+            run_id=session.run_id, step_id=step_id, step_seq=step_seq,
+            phase=Phase.ATTEMPTED, at=time.time(),
+            agent=sub.name, brief=brief,
+        )
+        await journal.record(intencion)
+        yield intencion, None
+
+        salida: Any = None
+        consumo = Usage.zero()
+        # Mismo almacén, otro `run_id`: un solo diario guarda el árbol entero, y
+        # reanudar al padre encuentra el sub-run donde lo dejó.
+        sesion_hija = Session(
+            sub_run_id(session.run_id, step_id), session.gateway, session.checkpointer
+        )
+        async for paso in sub.agent._loop(
+            brief, sesion_hija, stream=False, depth=depth + 1
+        ):
+            if isinstance(paso, FinalStep):
+                salida, consumo = paso.output, paso.usage
+
+        resultado = DelegateStep(
+            run_id=session.run_id, step_id=step_id, step_seq=step_seq,
+            phase=Phase.COMPLETED, at=time.time(),
+            agent=sub.name, result=salida,
+            # El consumo agregado del subagente sube aquí, y de aquí al total del
+            # padre. Es lo que hace que el coste de orquestar deje de ser
+            # invisible.
+            usage=consumo,
+        )
+        await journal.record(resultado)
+        yield resultado, (ToolResult.of(call.id, str(salida or "")), consumo)
 
     def _ctx(self, session: Session, step_id: str) -> CallContext:
         return CallContext(run_id=session.run_id, step_id=step_id)

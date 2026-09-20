@@ -45,6 +45,9 @@ migración**: la superficie no se parece. El estado por elemento está en [`road
 - **`economy(state)`** — informe de economía de contexto calculado del journal: acierto de caché,
   reescrituras de prefijo y crecimiento por turno.
 
+- **`Agent(delegates=[...])`** — delegar a un subagente con contexto aislado, diario propio y
+  consumo agregado. El subagente no se reejecuta al reanudar.
+
 ### Pendiente antes de `1.0.0`
 
 Economía de contexto (Fase 2) y multi-agente (Fase 3). Ver [`roadmap.md`](roadmap.md).

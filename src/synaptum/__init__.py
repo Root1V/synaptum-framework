@@ -84,7 +84,7 @@ from .core import (
 )
 from .core import UncertainEffect
 from .core import __all__ as _core_all
-from .agent import Agent, Limits, Session
+from .agent import Agent, Delegate, Limits, Session
 from .context import ContextEconomy, TurnEconomy, cap_tool_output, economy
 from .run import (
     Check,
@@ -113,6 +113,7 @@ __version__ = "1.0.0rc1"
 __all__ = [
     *_core_all,      # ya trae UncertainEffect: repetirlo aquí lo duplicaba
     "Agent",
+    "Delegate",
     "Limits",
     "Session",
     "cap_tool_output",

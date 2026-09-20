@@ -18,7 +18,7 @@ Lo que se toca en el primer fichero.
 Composición, no herencia.  Un agente es su configuración más el bucle.
 
 ```python
-Agent(name: str, *, model: str, instructions: Any = None, tools: Sequence[Any] = (), output: Any = None, limits: Limits | None = None) -> None
+Agent(name: str, *, model: str, instructions: Any = None, tools: Sequence[Any] = (), delegates: Sequence[Any] = (), output: Any = None, limits: Limits | None = None) -> None
 ```
 
 | Miembro | Firma | |
@@ -46,6 +46,7 @@ Topes del bucle.
 | Campo | Tipo | Por defecto |
 |---|---|---|
 | `max_steps` | `int` | `50` |
+| `max_delegation_depth` | `int` | `3` |
 | `max_tool_chars` | `int \| None` | `16000` |
 | `max_retries` | `int` | `2` |
 | `retry_base` | `float` | `0.5` |
@@ -55,6 +56,25 @@ Topes del bucle.
 Son **corrección, no política**: evitan que un bucle mal formado no termine
 nunca.  Los límites de gasto pertenecen al harness y llegan por la costura
 como ``Denied`` con ``terminate_run``.
+
+### `Delegate`
+
+Un subagente, tal como lo ve quien delega.
+
+| Campo | Tipo | Por defecto |
+|---|---|---|
+| `agent` | `'Agent'` | **obligatorio** |
+| `description` | `str` | `''` |
+
+| Miembro | Firma | |
+|---|---|---|
+| `definition` | — | Lo que el modelo ve: un nombre, cuándo usarlo, y un hueco para el brief. |
+| `name` | — |  |
+| `risk` | — |  |
+
+Se presenta al modelo como una herramienta de **un solo parámetro**: el
+brief. No se le ofrecen las herramientas del subagente, y eso es lo que hace
+barato delegar — el catálogo del padre no crece con el del hijo.
 
 ### `tool`
 
