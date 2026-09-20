@@ -84,6 +84,7 @@
   "Welcome",
   "__version__",
   "b64",
+  "cap_tool_output",
   "dumps",
   "fmt_dict",
   "fmt_list",

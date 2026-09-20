@@ -94,12 +94,12 @@ Economía de contexto y visibilidad de producción. Aquí es donde se gana o se 
 | ID | Estado | Feature | Implica |
 |---|---|---|---|
 | SYN-32 | `PENDIENTE` | Ensamblador de contexto cache-first | Orden estable del prefijo. Prohibido cambiar tools o modelo a mitad de sesión |
-| SYN-33 | `PENDIENTE` | Middleware `cap_tool_output` | Capar salidas a tamaño estable. Medido en −38 % de coste por turno sin pérdida de recall |
+| SYN-33 | `HECHO` | `cap_tool_output` | Se aplica **donde el resultado entra en el contexto**, así que recorta igual lo recién ejecutado y lo traído del journal — si solo recortara al ejecutar, reanudar produciría otro prompt. El journal guarda entero. Cabeza y cola, con la cola favorecida en los errores porque el mensaje de una traza está abajo. Medido: 156.010 → 16.010 caracteres en un caso real |
 | SYN-34 | `PENDIENTE` | Middleware `artifactize` | Resultados grandes fuera del contexto, con referencia. Umbral de 8–16k tokens |
 | SYN-35 | `PENDIENTE` | Almacén de artefactos | Direccionable por URI con procedencia. Protocolo, no implementación de producción |
 | SYN-36 | `PENDIENTE` | Compactación por niveles | Escalonada y **desactivada por defecto**: con caching, conservar todo suele salir más barato que resumir |
-| SYN-37 | `PENDIENTE` | Instrumentación OTel GenAI | Solo estructura del bucle: fronteras de turno, planificación, delegación. `chat` y `execute_tool` los emite Aeon |
-| SYN-38 | `PENDIENTE` | Métricas de economía de contexto | Tasa de acierto de caché, reescrituras de prefijo, frecuencia de compactación. `Usage` llega de vuelta por la costura |
+| SYN-37 | `APLAZADO` | Instrumentación OTel GenAI | **Aplazado al final de la fase**: hay una plataforma de observabilidad en construcción que va a decidir la forma de esto, y adelantarse sería instrumentar contra un contrato que todavía no existe. Solo estructura del bucle: fronteras de turno, planificación, delegación. `chat` y `execute_tool` los emite Aeon |
+| SYN-38 | `APLAZADO` | Métricas de economía de contexto | Tasa de acierto de caché, reescrituras de prefijo, frecuencia de compactación. `Usage` llega de vuelta por la costura |
 | SYN-39 | `HECHO` | Cliente MCP | Extra opcional; el núcleo no lo carga. Las herramientas de un servidor entran con su esquema y el bucle no nota que son remotas. **Las anotaciones son pistas y el servidor no es autoridad sobre el riesgo**: la traducción sigue los defectos de MCP —sin anotar, destructiva— y no los nuestros, porque nuestro `@tool` es permisivo por defecto solo porque el autor está delante para declarar. Probado contra un servidor MCP real arrancado por stdio, no contra un doble del propio cliente |
 | SYN-40 | `PENDIENTE` | Carga diferida de tools | Búsqueda de tools para catálogos grandes, sin inflar el prefijo |
 

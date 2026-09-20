@@ -266,6 +266,11 @@ aparece aquí puede cambiar sin aviso, aunque se pueda importar.</p>
 <td><code>50</code></td>
 </tr>
 <tr>
+<td><code>max_tool_chars</code></td>
+<td><code>int | None</code></td>
+<td><code>16000</code></td>
+</tr>
+<tr>
 <td><code>max_retries</code></td>
 <td><code>int</code></td>
 <td><code>2</code></td>
@@ -440,6 +445,16 @@ autónomo, donde no hay registro contra el que resolver.</p>
 </tr>
 </tbody>
 </table></div>
+<h3><code>cap_tool_output</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">cap_tool_output</span><span class="p-p">(</span><span class="p-n">resultado</span><span class="p-p">:</span> <span class="p-n">ToolResult</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">max_chars</span><span class="p-p">:</span> <span class="p-nb">int</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-mi">16000</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">ToolResult</span>
+</code></pre>
+<p>Devuelve el resultado recortado, o el mismo si cabe.</p>
+<p>Args:
+resultado: lo que la herramienta devolvió.
+max_chars: tope en caracteres. <code>None</code> desactiva el recorte.</p>
+<p>Returns:
+Un <code>ToolResult</code> nuevo si hubo que recortar; <strong>el mismo objeto</strong> si no
+—así quien compare por identidad puede saber si se tocó algo.</p>
 <h2>Lo que cede el bucle</h2>
 <p>Los pasos que llegan por <code>async for</code>, y sus fases.</p>
 <h3><code>StepEvent</code></h3>

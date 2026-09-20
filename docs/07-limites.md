@@ -40,11 +40,12 @@ arnés, y está bien que lo sea.
 
 ## No compacta el contexto por ti
 
-Todavía no hay ensamblador de contexto ni middleware de recorte (`SYN-32`, `SYN-33`). Hoy, si una
-herramienta devuelve 39 000 tokens, entran enteros. Con un modelo de 4 096 de contexto eso es un
-fallo inmediato; con uno de 131 072, es caro.
+**Sí recorta** la salida de una herramienta (`Limits.max_tool_chars`), pero eso es un tope, no
+compactación. No hay todavía ensamblador de contexto cache-first (`SYN-32`) ni compactación por
+niveles (`SYN-36`), así que el historial completo de un run largo se reenvía entero en cada turno.
 
-Mientras tanto, recorta en la herramienta.
+El `cache_read` que verás subir entre turnos ocurre porque el prefijo resulta estable, no porque
+nada lo garantice: cambiar una herramienta a mitad de sesión lo invalida en silencio.
 
 ## No delega con contexto aislado
 

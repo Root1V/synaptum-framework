@@ -31,6 +31,13 @@ migración**: la superficie no se parece. El estado por elemento está en [`road
 - `FakeGateway` y `ReplayGateway` como infraestructura de desarrollo de primera clase.
 - Marcador `py.typed`: los tipos llegan a quien consume el paquete.
 
+### Cambia una conducta por defecto
+
+- **La salida de una herramienta se recorta a 16.000 caracteres antes de entrar en el contexto**
+  (`Limits.max_tool_chars`). Activado por defecto porque no recortar falla **en silencio**: con una
+  ventana pequeña revienta, y con una grande solo cuesta dinero en cada turno. El journal sigue
+  guardando el resultado entero. Se desactiva con `max_tool_chars=None`.
+
 ### Pendiente antes de `1.0.0`
 
 Economía de contexto (Fase 2) y multi-agente (Fase 3). Ver [`roadmap.md`](roadmap.md).

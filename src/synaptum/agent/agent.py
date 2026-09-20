@@ -70,6 +70,7 @@ from ..core.types import (
     dumps,
 )
 from ..schema.protocol import Schema, schema_for
+from ..context.cap import DEFAULT_MAX_CHARS, cap_tool_output
 from ..run.journal import Journal, MemoryCheckpointer, Replay
 
 __all__ = ["Limits", "Session", "Agent"]
@@ -87,6 +88,15 @@ class Limits:
     """
 
     max_steps: int = 50
+    max_tool_chars: int | None = DEFAULT_MAX_CHARS
+    """Tope de la salida de una herramienta **en el contexto**, en caracteres.
+
+    ``None`` lo desactiva.  El journal guarda el resultado entero pase lo que
+    pase: esto solo decide qué se le reenvía al modelo en cada turno.
+
+    Está activado por defecto porque no recortar falla **en silencio**: con una
+    ventana pequeña revienta, y con una grande solo cuesta dinero en cada turno
+    posterior, que es peor porque nadie lo mira."""
     max_retries: int = 2
     retry_base: float = 0.5
     """Espera inicial entre reintentos, en segundos.  Se dobla en cada intento."""
@@ -381,7 +391,24 @@ class Agent:
                     yield tool_result
                     results.append(outcome)
 
-                messages.append(Message.tool_results(*results))
+                # El recorte se aplica **aquí** y no al ejecutar, y el sitio
+                # importa: por este punto pasan tanto los resultados recién
+                # ejecutados como los que vienen del journal al reanudar. Así el
+                # contexto reconstruido es idéntico al original — si se recortara
+                # solo en la ejecución, reanudar produciría otro prompt, fallaría
+                # la caché y podría cambiar la respuesta.
+                #
+                # El paso ya se registró con el resultado **entero**: el diario
+                # cuenta lo que ocurrió, el contexto lleva lo que el modelo
+                # necesita ver.
+                messages.append(
+                    Message.tool_results(
+                        *(
+                            cap_tool_output(r, max_chars=self.limits.max_tool_chars)
+                            for r in results
+                        )
+                    )
+                )
 
             typed = self._final_output(messages[-1].text)
             final = FinalStep(

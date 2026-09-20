@@ -85,6 +85,7 @@ from .core import (
 from .core import UncertainEffect
 from .core import __all__ as _core_all
 from .agent import Agent, Limits, Session
+from .context import cap_tool_output
 from .run import (
     Check,
     HttpModel,
@@ -114,6 +115,7 @@ __all__ = [
     "Agent",
     "Limits",
     "Session",
+    "cap_tool_output",
     "Journal",
     "MemoryCheckpointer",
     "Replay",

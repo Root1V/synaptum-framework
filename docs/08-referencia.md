@@ -46,6 +46,7 @@ Topes del bucle.
 | Campo | Tipo | Por defecto |
 |---|---|---|
 | `max_steps` | `int` | `50` |
+| `max_tool_chars` | `int \| None` | `16000` |
 | `max_retries` | `int` | `2` |
 | `retry_base` | `float` | `0.5` |
 | `max_retry_wait` | `float` | `30.0` |
@@ -143,6 +144,22 @@ ToolChoice(mode: "Literal['auto', 'none', 'required', 'named']" = 'auto', name: 
 |---|---|---|
 | `mode` | `Literal['auto', 'none', 'required', 'named']` | `'auto'` |
 | `name` | `str \| None` | `None` |
+
+### `cap_tool_output`
+
+```python
+def cap_tool_output(resultado: ToolResult, *, max_chars: int | None = 16000) -> ToolResult
+```
+
+Devuelve el resultado recortado, o el mismo si cabe.
+
+Args:
+    resultado: lo que la herramienta devolvió.
+    max_chars: tope en caracteres. ``None`` desactiva el recorte.
+
+Returns:
+    Un ``ToolResult`` nuevo si hubo que recortar; **el mismo objeto** si no
+    —así quien compare por identidad puede saber si se tocó algo.
 
 ## Lo que cede el bucle
 

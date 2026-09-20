@@ -261,6 +261,32 @@ el modelo lo ve y suele corregir. Un modelo que no ve el error no puede corregir
 <p>Lo que <strong>sí</strong> se propaga es una llamada mal formada: argumentos que no encajan en la firma no son
 algo que el modelo pueda arreglar leyendo un mensaje, son un desajuste entre el esquema y la
 función.</p>
+<h2>La salida se recorta antes de entrar en el contexto</h2>
+<p>Una herramienta que lee un fichero de log puede devolver <strong>39.000 tokens</strong>. Con una ventana de 4.096
+es un fallo inmediato; con una de 131.072 es solo caro — y caro <strong>en cada turno posterior</strong>, porque
+ese bloque se reenvía entero cada vez.</p>
+<p>Por eso hay un tope, <strong>activado por defecto</strong>:</p>
+<pre data-lenguaje="python"><code><span class="p-n">Limits</span><span class="p-p">(</span><span class="p-n">max_tool_chars</span><span class="p-o">=</span><span class="p-mi">16_000</span><span class="p-p">)</span>   <span class="p-c1"># ~4.000 tokens. `None` lo desactiva.</span>
+</code></pre>
+<p>Cuatro cosas que conviene entender antes de cambiarlo:</p>
+<p><strong>El journal guarda entero; el contexto lleva recortado.</strong> El paso registra lo que la herramienta
+devolvió de verdad — si mañana hay que auditar qué leyó el agente, la respuesta está ahí. Lo que se
+recorta es la copia que viaja al modelo.</p>
+<p><strong>El recorte es determinista, o rompería la reanudación.</strong> Al reanudar, el contexto se vuelve a
+derivar del journal y se recorta igual. Si dependiera del reloj o del espacio restante, el prompt
+reconstruido sería distinto del original: caché fallada, y potencialmente otra respuesta a la misma
+pregunta.</p>
+<p><strong>Se conservan los dos extremos.</strong> El encabezado dice qué es y el final trae el total, el resumen o
+la excepción. En un resultado de error el reparto se inclina hacia la cola, porque el mensaje de una
+traza está abajo.</p>
+<p><strong>Dice lo que quitó.</strong> Un texto truncado en silencio hace que el modelo concluya sobre datos
+incompletos creyéndolos completos.</p>
+<pre><code>[… recortado: 91.700 de 92.000 caracteres. Pide un rango concreto si necesitas lo que falta …]
+</code></pre>
+<p>Se mide en <strong>caracteres y no en tokens</strong> porque contar tokens exige un tokenizador y el núcleo no
+tiene dependencias. La regla práctica es ~4 caracteres por token en texto latino; menos en código y
+en CJK. Si necesitas un tope exacto, recórtalo en la herramienta — que es donde vive el conocimiento
+de qué se puede tirar.</p>
 <h2>Herramientas de un servidor MCP</h2>
 <pre data-lenguaje="bash"><code>pip<span class="p-w"> </span>install<span class="p-w"> </span>synaptum<span class="p-o">[</span>mcp<span class="p-o">]</span>
 </code></pre>

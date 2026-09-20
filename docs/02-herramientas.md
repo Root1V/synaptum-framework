@@ -81,6 +81,45 @@ Lo que **sí** se propaga es una llamada mal formada: argumentos que no encajan 
 algo que el modelo pueda arreglar leyendo un mensaje, son un desajuste entre el esquema y la
 función.
 
+## La salida se recorta antes de entrar en el contexto
+
+Una herramienta que lee un fichero de log puede devolver **39.000 tokens**. Con una ventana de 4.096
+es un fallo inmediato; con una de 131.072 es solo caro — y caro **en cada turno posterior**, porque
+ese bloque se reenvía entero cada vez.
+
+Por eso hay un tope, **activado por defecto**:
+
+```python
+Limits(max_tool_chars=16_000)   # ~4.000 tokens. `None` lo desactiva.
+```
+
+Cuatro cosas que conviene entender antes de cambiarlo:
+
+**El journal guarda entero; el contexto lleva recortado.** El paso registra lo que la herramienta
+devolvió de verdad — si mañana hay que auditar qué leyó el agente, la respuesta está ahí. Lo que se
+recorta es la copia que viaja al modelo.
+
+**El recorte es determinista, o rompería la reanudación.** Al reanudar, el contexto se vuelve a
+derivar del journal y se recorta igual. Si dependiera del reloj o del espacio restante, el prompt
+reconstruido sería distinto del original: caché fallada, y potencialmente otra respuesta a la misma
+pregunta.
+
+**Se conservan los dos extremos.** El encabezado dice qué es y el final trae el total, el resumen o
+la excepción. En un resultado de error el reparto se inclina hacia la cola, porque el mensaje de una
+traza está abajo.
+
+**Dice lo que quitó.** Un texto truncado en silencio hace que el modelo concluya sobre datos
+incompletos creyéndolos completos.
+
+```
+[… recortado: 91.700 de 92.000 caracteres. Pide un rango concreto si necesitas lo que falta …]
+```
+
+Se mide en **caracteres y no en tokens** porque contar tokens exige un tokenizador y el núcleo no
+tiene dependencias. La regla práctica es ~4 caracteres por token en texto latino; menos en código y
+en CJK. Si necesitas un tope exacto, recórtalo en la herramienta — que es donde vive el conocimiento
+de qué se puede tirar.
+
 ## Herramientas de un servidor MCP
 
 ```bash

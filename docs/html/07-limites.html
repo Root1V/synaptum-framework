@@ -209,10 +209,11 @@ agentes. El stream de eventos es <strong>una sola cosa cediendo control</strong>
 <p>Si necesitas agentes en procesos distintos comunicándose de forma asíncrona y persistente, eso es un
 arnés, y está bien que lo sea.</p>
 <h2>No compacta el contexto por ti</h2>
-<p>Todavía no hay ensamblador de contexto ni middleware de recorte (<code>SYN-32</code>, <code>SYN-33</code>). Hoy, si una
-herramienta devuelve 39 000 tokens, entran enteros. Con un modelo de 4 096 de contexto eso es un
-fallo inmediato; con uno de 131 072, es caro.</p>
-<p>Mientras tanto, recorta en la herramienta.</p>
+<p><strong>Sí recorta</strong> la salida de una herramienta (<code>Limits.max_tool_chars</code>), pero eso es un tope, no
+compactación. No hay todavía ensamblador de contexto cache-first (<code>SYN-32</code>) ni compactación por
+niveles (<code>SYN-36</code>), así que el historial completo de un run largo se reenvía entero en cada turno.</p>
+<p>El <code>cache_read</code> que verás subir entre turnos ocurre porque el prefijo resulta estable, no porque
+nada lo garantice: cambiar una herramienta a mitad de sesión lo invalida en silencio.</p>
 <h2>No delega con contexto aislado</h2>
 <p><code>delegate()</code> es <code>SYN-41</code>. Se puede componer a mano —y funciona— con las tres consecuencias listadas
 en <a href="05-multiagente.html">Varios agentes</a>.</p>
