@@ -407,3 +407,105 @@ def test_a_retry_after_from_the_sdk_survives_the_translation():
     assert traducido.status == 429
     assert traducido.retryable is True
     assert traducido.retry_after == 3.0
+
+
+# ── Canario de forma del SDK ──────────────────────────────────────────────────
+#
+# `_field()` lee atributo **o** clave, y eso lo hace bueno para sobrevivir a un
+# cambio de forma del SDK y **malo para enterarse**. Entre `rc3` y `rc4` las
+# tool calls pasaron de dicts a objetos tipados: no nos rompió, y tampoco nos
+# avisó. Nos enteramos porque otro equipo lo publicó.
+#
+# Estos tests no comprueban nuestro código: comprueban **la forma que el SDK nos
+# entrega hoy**. Si cambia otra vez, fallan aquí —con el nombre del campo— en
+# vez de pasar desapercibidos hasta que algo se pierda en silencio.
+
+sdk = pytest.importorskip("axonium", reason="el puente es un extra opcional")
+
+
+def _expone(modelo, nombre: str) -> bool:
+    """¿El modelo entrega este nombre, sea como sea?
+
+    Mirar solo `model_fields` no basta y el canario lo encontró a la primera:
+    `meta` no es un campo de pydantic, es una **propiedad** de `APIObject`. Un
+    canario que solo mire una de las dos formas canta cuando no debe, y eso es
+    peor que no tenerlo — se acaba silenciando.
+    """
+    campos = getattr(modelo, "model_fields", None) or {}
+    if nombre in campos:
+        return True
+    return isinstance(getattr(modelo, nombre, None), property)
+
+
+def _campo_de(modelo, nombre: str):
+    campos = getattr(modelo, "model_fields", None) or {}
+    return campos.get(nombre)
+
+
+def test_the_sdk_still_exposes_the_response_fields_the_bridge_reads():
+    """Lo que leemos de una respuesta, y de dónde.
+
+    Si el SDK renombra o mueve alguno, aquí se ve el nombre exacto que falta.
+    """
+    from axonium.models.chat import ChatCompletion
+
+    for campo in ("choices", "usage", "model", "meta"):
+        assert _expone(ChatCompletion, campo), (
+            f"ChatCompletion ya no expone '{campo}' — el puente lo lee"
+        )
+
+
+def test_the_sdk_still_exposes_the_usage_counters_we_translate():
+    """Los cinco contadores y el bit de estimación, por nombre.
+
+    Perder uno en silencio es exactamente el fallo que el `Usage` de tres
+    estados existe para evitar.
+    """
+    from axonium.models.chat import Usage as UsageAxonium
+
+    for campo in ("prompt_tokens", "completion_tokens", "cache_read_tokens", "estimated"):
+        assert _expone(UsageAxonium, campo), (
+            f"Usage del SDK ya no expone '{campo}' — lo traducimos"
+        )
+
+
+def test_the_shape_of_a_tool_call_is_the_one_the_bridge_assumes():
+    """Dicts u objetos: da igual cuál, pero que no cambie sin que lo sepamos.
+
+    Este es el canario. En `rc3` eran `list[dict]` y en `rc4` son `list[ToolCall]`
+    con `.function.name` y `.name`. `_field()` absorbe las dos, así que un tercer
+    cambio tampoco nos rompería — y tampoco nos enteraríamos.
+    """
+    from axonium.models.chat import CompletionMessage
+
+    campo = _campo_de(CompletionMessage, "tool_calls")
+    assert campo is not None, "CompletionMessage ya no expone 'tool_calls'"
+
+    forma = str(campo.annotation)
+    assert "ToolCall" in forma or "dict" in forma, (
+        f"la forma de tool_calls cambió a algo que no esperábamos: {forma}. "
+        "Comprueba que `_field()` sigue alcanzando el nombre y los argumentos."
+    )
+
+
+def test_the_bridge_reaches_name_and_arguments_whatever_the_shape():
+    """Lo único que de verdad importa: que lleguemos al nombre y a los argumentos.
+
+    Se comprueba contra las **dos** formas que el SDK ha tenido, porque un
+    consumidor puede estar en cualquiera de las dos y el puente las cubre.
+    """
+    from types import SimpleNamespace
+
+    from synaptum.providers.axonium import _field
+
+    como_dict = {"index": 0, "id": "c1", "function": {"name": "f", "arguments": '{"a":1}'}}
+    como_objeto = SimpleNamespace(
+        index=0, id="c1", name="f",
+        function=SimpleNamespace(name="f", arguments='{"a":1}'),
+    )
+
+    for forma, llamada in (("dict", como_dict), ("objeto", como_objeto)):
+        funcion = _field(llamada, "function")
+        assert _field(funcion, "name") == "f", f"no se alcanza el nombre en forma {forma}"
+        assert _field(funcion, "arguments") == '{"a":1}', f"argumentos, forma {forma}"
+        assert _field(llamada, "id") == "c1", f"id, forma {forma}"

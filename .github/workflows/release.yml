@@ -35,6 +35,38 @@ jobs:
   tests:
     uses: ./.github/workflows/tests.yml
 
+  # Publicar en PyPI exige haber ensayado en TestPyPI **esa misma versión**.
+  #
+  # Antes era una nota que decía «usa primero el índice de pruebas», y una
+  # disciplina que depende de que alguien se acuerde no es un control: es una
+  # intención. Axonium se saltó su propio ensayo y publicó un rc roto; nosotros
+  # teníamos el mismo agujero y ninguna excusa, porque el suyo ya había pasado.
+  #
+  # No comprueba que la versión *esté subida* a TestPyPI, sino que sea
+  # **instalable** desde allí. Subirla y que no instale es justo el fallo que el
+  # ensayo existe para encontrar.
+  ensayo:
+    if: inputs.index == 'pypi'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - name: esta versión se ensayó en TestPyPI
+        run: |
+          VERSION=$(python -c "
+          import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])
+          ")
+          echo "comprobando que synaptum==$VERSION instala desde TestPyPI"
+          if ! uv run --isolated --no-project \
+                --index-url https://test.pypi.org/simple/ \
+                --extra-index-url https://pypi.org/simple/ \
+                --with "synaptum==$VERSION" python -c "import synaptum" ; then
+            echo "::error::synaptum==$VERSION no se puede instalar desde TestPyPI."
+            echo "Publica primero ahí: Run workflow → index=testpypi."
+            exit 1
+          fi
+
   build:
     needs: tests
     runs-on: ubuntu-latest
@@ -59,7 +91,11 @@ jobs:
           path: dist/
 
   publish:
-    needs: build
+    # `always()` porque `ensayo` se salta cuando el índice es testpypi, y un job
+    # saltado bloquea a quien lo necesita si no se dice lo contrario. Lo que no
+    # se tolera es que haya fallado.
+    needs: [build, ensayo]
+    if: always() && needs.build.result == 'success' && needs.ensayo.result != 'failure' 
     runs-on: ubuntu-latest
     environment: ${{ inputs.index }}
     permissions:
