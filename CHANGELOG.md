@@ -3,6 +3,45 @@
 Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado según
 [`API.md`](API.md): SemVer desde `1.0.0`, con ventana de deprecación de dos versiones menores.
 
+## [Sin publicar]
+
+Lo que hay en `main` desde la `1.0.0rc2`. Se anota aquí según entra y no al cortar la versión:
+reconstruir un registro del `git log` tres semanas después produce una lista de commits, no un
+registro de cambios — y lo que se pierde es siempre el *porqué*, que es la mitad que sirve.
+
+### Documentación
+
+- **Los dieciséis ejemplos son una sección del sitio**, una página por ejemplo, con el fichero
+  entero, **lo que imprime al correrlo** —capturado ejecutándolo, no escrito a mano— y el enlace a
+  GitHub. Se generan de `examples/`: copiarlos crearía dos originales que envejecen por separado.
+- **El CI ejecuta los ejemplos**, como efecto de lo anterior. Hasta ahora nada los corría: un
+  ejemplo roto pasaba la suite entera.
+- Los nombres de los sistemas sobre los que están montados enlazan a su repositorio, una vez por
+  página y una por fila de tabla.
+- La documentación **le habla a quien la lee**. Dos ejemplos se dirigían al autor («cualquiera de
+  tus repos»), lo que para quien acaba de instalar el paquete significa que el ejemplo es para otro.
+- Los datos de los ejemplos son ahora **inequívocamente** inventados —`John Doe`, `ACME`— y la regla
+  está escrita en `examples/README.md`. Había un nombre verosímil al lado de un sueldo: sintético no
+  es lo mismo que inocuo.
+
+### Publicación
+
+- **Publicar en PyPI exige la aprobación de una persona**, en el entorno de GitHub. Un permiso que
+  depende de acordarse de preguntar no es un control: es una costumbre. TestPyPI se queda sin puerta
+  a propósito — pedir un clic por cada ensayo acabaría con los ensayos.
+- **El job que verifica lo publicado no se estaba ejecutando.** GitHub propaga el salto de un job
+  por toda la cadena de `needs`, así que añadir `ensayo` apagó `verify` sin que nada fallara. Dos
+  releases salieron en verde sin que nadie comprobara que lo publicado se instala.
+- Y `--extra-index-url` invertía la búsqueda: uv mira los índices extra **antes** que el principal,
+  así que desde que el paquete existe en PyPI, pedir una versión que solo está en TestPyPI fallaba
+  con «no existe».
+
+### Corregido
+
+- `ContextEconomy.report()` mezclaba separadores de millares en el mismo informe.
+- `validar_ruc`, en el ejemplo `03`, prometía comprobar el dígito verificador y solo comprobaba el
+  formato. Una herramienta que declara más de lo que hace es lo peor que puede haber en un catálogo.
+
 ## [1.0.0rc2] — 2026-09-20
 
 Segundo candidato. Todo lo de la Fase 2 —economía de contexto— y la Fase 3 —multi-agente— que no
