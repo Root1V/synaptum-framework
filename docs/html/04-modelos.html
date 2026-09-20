@@ -255,6 +255,28 @@ de ese contador es <code>None</code> — sumar solo lo conocido daría una cota 
 exacta.</p>
 <p><strong><code>input</code> es inclusivo</strong>: contiene los tokens servidos desde caché, y <code>cache_read</code> dice cuántos.
 Confirmado contra grabaciones reales, donde <code>prompt_tokens == prompt_n + cache_n</code>.</p>
+<h2>El prefijo estable</h2>
+<p>Los proveedores cachean <strong>prefijos exactos</strong>. Medido contra un despliegue real, con un prefijo de
+2.477 tokens:</p>
+<pre><code>1ª llamada         input=2477   cache_read=0       ← nada cacheado todavía
+mismo prefijo      input=2477   cache_read=2473    ← 99,8 % servido de caché
+prefijo cambiado   input=2479   cache_read=0       ← tres palabras al principio
+</code></pre>
+<p>Cambiar tres palabras al inicio tiró la caché entera: un prefijo que cambia en el token 10 invalida
+los 10.000 siguientes.</p>
+<p>Lo que no debe cambiar dentro de un run, en este orden: <strong>el modelo</strong>, <strong>las instrucciones</strong>, <strong>el
+catálogo de herramientas</strong> —nombres, descripciones y esquemas, en su orden— y <strong>el formato de
+salida</strong>. Los mensajes van después y crecen; crecer al final no invalida nada.</p>
+<h3>Reanudar con otra configuración está prohibido</h3>
+<pre data-lenguaje="python"><code><span class="p-n">ConfigurationError</span><span class="p-p">:</span> <span class="p-n">El</span> <span class="p-n">run</span> <span class="p-s1">'r1'</span> <span class="p-n">se</span> <span class="p-n">creó</span> <span class="p-n">con</span> <span class="p-n">otra</span> <span class="p-n">configuración</span> <span class="p-n">y</span> <span class="p-n">reanudarlo</span> <span class="p-n">con</span> <span class="p-n">esta</span>
+<span class="p-n">mezclaría</span> <span class="p-n">dos</span> <span class="p-n">agentes</span> <span class="p-n">en</span> <span class="p-n">un</span> <span class="p-n">mismo</span> <span class="p-n">diario</span> <span class="p-p">(</span><span class="p-n">herramientas</span><span class="p-p">:</span> <span class="p-p">[</span><span class="p-s1">'leer'</span><span class="p-p">]</span> <span class="p-err">→</span> <span class="p-p">[</span><span class="p-s1">'leer'</span><span class="p-p">,</span> <span class="p-s1">'borrar'</span><span class="p-p">])</span><span class="p-o">.</span>
+<span class="p-n">Reanudar</span> <span class="p-n">es</span> <span class="p-n">continuar</span> <span class="p-n">ese</span> <span class="p-n">run</span><span class="p-p">;</span> <span class="p-n">una</span> <span class="p-n">configuración</span> <span class="p-n">distinta</span> <span class="p-n">es</span> <span class="p-n">otro</span> <span class="p-n">run</span> <span class="p-err">—</span> <span class="p-n">usa</span> <span class="p-n">un</span> <span class="p-n">run_id</span> <span class="p-n">nuevo</span><span class="p-o">.</span>
+</code></pre>
+<p><strong>Y el motivo de fondo no es el dinero.</strong> Que se pierda la caché es la consecuencia visible. La que
+hace daño es que la primera mitad del run la ejecutó una configuración y la segunda otra, y el
+journal lo registra como uno solo: una auditoría de «qué hizo el agente» devuelve una historia que
+<strong>ninguna configuración produjo nunca</strong>.</p>
+<p>Reordenar herramientas cuenta como cambio, porque por el cable lo es.</p>
 <h2>Streaming</h2>
 <pre data-lenguaje="python"><code><span class="p-k">async</span> <span class="p-k">for</span> <span class="p-n">evento</span> <span class="p-ow">in</span> <span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">stream</span><span class="p-p">(</span><span class="p-n">tarea</span><span class="p-p">,</span> <span class="p-n">session</span><span class="p-o">=</span><span class="p-n">sesion</span><span class="p-p">):</span>
     <span class="p-k">if</span> <span class="p-n">evento</span><span class="p-o">.</span><span class="p-n">kind</span> <span class="p-o">==</span> <span class="p-s2">"text_delta"</span><span class="p-p">:</span>

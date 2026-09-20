@@ -38,14 +38,18 @@ agentes. El stream de eventos es **una sola cosa cediendo control**, no N cosas 
 Si necesitas agentes en procesos distintos comunicándose de forma asíncrona y persistente, eso es un
 arnés, y está bien que lo sea.
 
-## No compacta el contexto por ti
+## No reduce el historial cuando crece
 
-**Sí recorta** la salida de una herramienta (`Limits.max_tool_chars`), pero eso es un tope, no
-compactación. No hay todavía ensamblador de contexto cache-first (`SYN-32`) ni compactación por
-niveles (`SYN-36`), así que el historial completo de un run largo se reenvía entero en cada turno.
+Dos piezas de economía de contexto **sí** existen, y conviene no confundirlas con la que falta:
 
-El `cache_read` que verás subir entre turnos ocurre porque el prefijo resulta estable, no porque
-nada lo garantice: cambiar una herramienta a mitad de sesión lo invalida en silencio.
+- La salida de una herramienta se recorta antes de entrar en el contexto.
+- El prefijo estable está protegido: reanudar con otra configuración se rechaza en vez de mezclar
+  dos agentes en un mismo diario.
+
+Lo que **no** hay es compactación por niveles (`SYN-36`). En un run largo, el historial completo se
+reenvía en cada turno. Con caché de prefijo eso suele salir más barato que resumir —por eso la
+compactación va desactivada por defecto cuando llegue— pero hay un punto en el que deja de serlo, y
+hoy nadie lo detecta por ti.
 
 ## No delega con contexto aislado
 

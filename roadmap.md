@@ -93,7 +93,7 @@ Economía de contexto y visibilidad de producción. Aquí es donde se gana o se 
 
 | ID | Estado | Feature | Implica |
 |---|---|---|---|
-| SYN-32 | `PENDIENTE` | Ensamblador de contexto cache-first | Orden estable del prefijo. Prohibido cambiar tools o modelo a mitad de sesión |
+| SYN-32 | `HECHO` | Prefijo estable del run | Huella de modelo + instrucciones + catálogo de herramientas + formato de salida, registrada en el primer paso y comprobada al reanudar. **Reanudar con otra configuración se rechaza**, y no por la caché: sin esto la primera mitad del run la ejecuta un agente y la segunda otro, y el journal lo registra como uno solo — una auditoría devuelve una historia que ninguna configuración produjo. Medido contra el despliegue: cambiar tres palabras al inicio de un prefijo de 2.477 tokens tira `cache_read` de 2.473 a 0 |
 | SYN-33 | `HECHO` | `cap_tool_output` | Se aplica **donde el resultado entra en el contexto**, así que recorta igual lo recién ejecutado y lo traído del journal — si solo recortara al ejecutar, reanudar produciría otro prompt. El journal guarda entero. Cabeza y cola, con la cola favorecida en los errores porque el mensaje de una traza está abajo. Medido: 156.010 → 16.010 caracteres en un caso real |
 | SYN-34 | `PENDIENTE` | Middleware `artifactize` | Resultados grandes fuera del contexto, con referencia. Umbral de 8–16k tokens |
 | SYN-35 | `PENDIENTE` | Almacén de artefactos | Direccionable por URI con procedencia. Protocolo, no implementación de producción |

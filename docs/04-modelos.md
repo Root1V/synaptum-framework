@@ -80,6 +80,39 @@ exacta.
 **`input` es inclusivo**: contiene los tokens servidos desde caché, y `cache_read` dice cuántos.
 Confirmado contra grabaciones reales, donde `prompt_tokens == prompt_n + cache_n`.
 
+## El prefijo estable
+
+Los proveedores cachean **prefijos exactos**. Medido contra un despliegue real, con un prefijo de
+2.477 tokens:
+
+```
+1ª llamada         input=2477   cache_read=0       ← nada cacheado todavía
+mismo prefijo      input=2477   cache_read=2473    ← 99,8 % servido de caché
+prefijo cambiado   input=2479   cache_read=0       ← tres palabras al principio
+```
+
+Cambiar tres palabras al inicio tiró la caché entera: un prefijo que cambia en el token 10 invalida
+los 10.000 siguientes.
+
+Lo que no debe cambiar dentro de un run, en este orden: **el modelo**, **las instrucciones**, **el
+catálogo de herramientas** —nombres, descripciones y esquemas, en su orden— y **el formato de
+salida**. Los mensajes van después y crecen; crecer al final no invalida nada.
+
+### Reanudar con otra configuración está prohibido
+
+```python
+ConfigurationError: El run 'r1' se creó con otra configuración y reanudarlo con esta
+mezclaría dos agentes en un mismo diario (herramientas: ['leer'] → ['leer', 'borrar']).
+Reanudar es continuar ese run; una configuración distinta es otro run — usa un run_id nuevo.
+```
+
+**Y el motivo de fondo no es el dinero.** Que se pierda la caché es la consecuencia visible. La que
+hace daño es que la primera mitad del run la ejecutó una configuración y la segunda otra, y el
+journal lo registra como uno solo: una auditoría de «qué hizo el agente» devuelve una historia que
+**ninguna configuración produjo nunca**.
+
+Reordenar herramientas cuenta como cambio, porque por el cable lo es.
+
 ## Streaming
 
 ```python

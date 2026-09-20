@@ -38,6 +38,10 @@ migración**: la superficie no se parece. El estado por elemento está en [`road
   ventana pequeña revienta, y con una grande solo cuesta dinero en cada turno. El journal sigue
   guardando el resultado entero. Se desactiva con `max_tool_chars=None`.
 
+- **Reanudar un run con otra configuración se rechaza** con `ConfigurationError`. Si el modelo, las
+  instrucciones, el catálogo de herramientas o el formato de salida cambian, es otro run y necesita
+  otro `run_id`. Evita que el journal describa una historia que ninguna configuración produjo.
+
 ### Pendiente antes de `1.0.0`
 
 Economía de contexto (Fase 2) y multi-agente (Fase 3). Ver [`roadmap.md`](roadmap.md).
