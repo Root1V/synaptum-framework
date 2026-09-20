@@ -3,10 +3,10 @@
 > **Esto es un fichero que se ejecuta:** [`examples/agentes/08_herramientas_mcp.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/08_herramientas_mcp.py) ↗
 > Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
-**Dominio: cualquiera de tus repos.** Hasta aquí cada herramienta era una función
-con `@tool`. En una aplicación real, buena parte de lo que un agente necesita ya
-existe detrás de un servidor MCP — git, ficheros, bases de datos, la API de tu
-propia plataforma — y escribirlas otra vez es trabajo tirado.
+**Dominio: cualquier proyecto de GitHub.** Hasta aquí cada herramienta era una
+función con `@tool`. En una aplicación real, buena parte de lo que un agente
+necesita ya existe detrás de un servidor MCP — git, ficheros, bases de datos, la
+API de la propia plataforma — y escribirlas otra vez es trabajo tirado.
 
 `MCPTools` las trae con su esquema y las adapta a lo que el bucle ya consume, así
 que **el agente no nota la diferencia**: son herramientas como las demás.

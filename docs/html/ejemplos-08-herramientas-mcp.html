@@ -195,10 +195,10 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
 <p><strong>Esto es un fichero que se ejecuta:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/08_herramientas_mcp.py"><code>examples/agentes/08_herramientas_mcp.py</code></a> ↗
 Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.</p>
 </blockquote>
-<p><strong>Dominio: cualquiera de tus repos.</strong> Hasta aquí cada herramienta era una función
-con <code>@tool</code>. En una aplicación real, buena parte de lo que un agente necesita ya
-existe detrás de un servidor MCP — git, ficheros, bases de datos, la API de tu
-propia plataforma — y escribirlas otra vez es trabajo tirado.</p>
+<p><strong>Dominio: cualquier proyecto de GitHub.</strong> Hasta aquí cada herramienta era una
+función con <code>@tool</code>. En una aplicación real, buena parte de lo que un agente
+necesita ya existe detrás de un servidor MCP — git, ficheros, bases de datos, la
+API de la propia plataforma — y escribirlas otra vez es trabajo tirado.</p>
 <p><code>MCPTools</code> las trae con su esquema y las adapta a lo que el bucle ya consume, así
 que <strong>el agente no nota la diferencia</strong>: son herramientas como las demás.</p>
 <p>Lo que este ejemplo enseña de verdad no es cómo conectarse —son cuatro líneas—
