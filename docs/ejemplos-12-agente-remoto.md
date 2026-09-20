@@ -3,7 +3,8 @@
 > **Esto es un fichero que se ejecuta:** [`examples/agentes/12_agente_remoto.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/12_agente_remoto.py) ↗
 > Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
-**Dominio: el pipeline de doblaje.** El revisor de sincronía no es tuyo: lo
+**Dominio: el pipeline de doblaje (Prosodia).** El revisor de sincronía no es
+tuyo: lo
 mantiene otro equipo, se despliega por su cuenta y se actualiza cuando ellos
 quieren. No puedes importarlo — solo hablarle.
 

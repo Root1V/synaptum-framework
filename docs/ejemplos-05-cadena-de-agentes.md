@@ -3,7 +3,8 @@
 > **Esto es un fichero que se ejecuta:** [`examples/agentes/05_cadena_de_agentes.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/05_cadena_de_agentes.py) ↗
 > Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
-**Dominio: el pipeline de doblaje** — vídeo en inglés a español, todo local:
+**Dominio: el pipeline de doblaje (Prosodia)** — vídeo en inglés a español, todo
+local:
 Whisper transcribe, pyannote separa hablantes, un LLM traduce con contexto, y
 IndexTTS clona cada voz. Las etapas del medio son las que necesitan criterio, y
 ahí es donde entran los agentes.
