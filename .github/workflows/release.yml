@@ -11,9 +11,20 @@
 #     workflow    release.yml
 #     environment testpypi   (o pypi)
 #
-# El `environment` no es decorativo: es lo que permite exigir una aprobación
-# manual antes de que algo salga, y lo que hace que el publisher no valga para
-# cualquier workflow del repositorio.
+# El `environment` no es decorativo, y ya no es solo una posibilidad:
+#
+#     pypi       exige **aprobación manual** de @Root1V antes de publicar.
+#     testpypi   sin puerta: es el índice de ensayo, y pedir un clic por cada
+#                ensayo acabaría con los ensayos.
+#
+# La puerta está en GitHub y no en quien lanza el workflow. Un permiso que
+# depende de acordarse de preguntar no es un control: es una costumbre. Así el
+# run se puede disparar desde cualquier sitio —o por un agente— y lo que sale a
+# un índice público sigue necesitando que una persona lo mire.
+#
+# Se configura en Settings → Environments → pypi → Required reviewers, o por
+# API. Y el `environment` es además lo que hace que el publisher de Trusted
+# Publishing no valga para cualquier workflow del repositorio.
 name: release
 
 on:
