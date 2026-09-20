@@ -65,10 +65,12 @@ Un subagente, tal como lo ve quien delega.
 |---|---|---|
 | `agent` | `'Agent'` | **obligatorio** |
 | `description` | `str` | `''` |
+| `_depth` | `int` | `0` |
 
 | Miembro | Firma | |
 |---|---|---|
 | `definition` | — | Lo que el modelo ve: un nombre, cuándo usarlo, y un hueco para el brief. |
+| `execute` | `async execute(self, brief: str, session: Any, run_id: str) -> tuple[Any, Any]` | Corre el subagente y devuelve ``(resultado, consumo)``. |
 | `name` | — |  |
 | `risk` | — |  |
 
@@ -1651,3 +1653,153 @@ Los valores por defecto son los de la especificación MCP, no los nuestros:
 **sin anotaciones, destructiva**. Nuestro ``@tool`` usa ``READ`` por defecto
 porque quien escribe la función está delante y puede declarar; aquí el autor
 no está, y suponer en su lugar es suponer a favor.
+
+## Agentes remotos (A2A)
+
+`synaptum.a2a` — Solo biblioteca estándar. En el camino gobernado la llamada sale por el proxy del arnés.
+
+### `RemoteDelegate`
+
+Un agente remoto, tal como lo ve quien delega.
+
+| Campo | Tipo | Por defecto |
+|---|---|---|
+| `name` | `str` | **obligatorio** |
+| `url` | `str` | **obligatorio** |
+| `description` | `str` | `''` |
+| `risk` | `Risk` | `<Risk.DESTRUCTIVE: 'destructive'>` |
+| `poll_every` | `float` | `1.0` |
+| `timeout` | `float` | `600.0` |
+| `headers` | `Any` | `None` |
+| `_depth` | `int` | `0` |
+
+| Miembro | Firma | |
+|---|---|---|
+| `definition` | — |  |
+| `execute` | `async execute(self, brief: str, session: Any, run_id: str) -> tuple[Any, Usage]` | Manda el brief, espera, y devuelve el resultado. |
+
+Args:
+    name: con qué nombre lo ve el modelo.
+    url: el agente, o **el proxy que lo gobierna**. En el camino gobernado
+        es lo segundo: el framework apunta al endpoint del arnés y no cambia
+        nada más.
+    description: cuándo usarlo. Si falta se toma de su tarjeta.
+    risk: **hay que declararlo**. Sin declaración, destructivo — ver abajo.
+    poll_every: segundos entre consultas mientras la tarea trabaja.
+    timeout: tope total de espera.
+
+### `A2AClient`
+
+Los cuatro métodos que hacen falta para delegar.
+
+```python
+A2AClient(base_url: str, *, headers: Mapping[str, str] | None = None, timeout: float = 120.0) -> None
+```
+
+| Miembro | Firma | |
+|---|---|---|
+| `agent_card` | `async agent_card(self) -> AgentCard` | Lee `/.well-known/agent-card.json`. |
+| `cancel_task` | `async cancel_task(self, task_id: str) -> Task` | Cancelar es lo que hacemos al cerrar el iterador, también por red. |
+| `get_task` | `async get_task(self, task_id: str) -> Task` |  |
+| `list_tasks` | `async list_tasks(self, *, context_id: str) -> list[Task]` | Las tareas de un contexto. |
+| `send_message` | `async send_message(self, brief: str, *, context_id: str, message_id: str, task_id: str \| None = None) -> Task` |  |
+
+Args:
+    base_url: raíz del agente remoto, o del proxy que lo gobierna.
+    headers: cabeceras extra — lo que pida el `securitySchemes` de su tarjeta.
+    timeout: segundos por lectura. Un agente puede tardar mucho en el primer
+        byte y eso no es un fallo.
+
+### `AgentCard`
+
+Lo que un agente publica en ``/.well-known/agent-card.json``.
+
+| Campo | Tipo | Por defecto |
+|---|---|---|
+| `name` | `str` | **obligatorio** |
+| `description` | `str` | `''` |
+| `url` | `str` | `''` |
+| `version` | `str` | `''` |
+| `skills` | `tuple[Mapping[str, Any], ...]` | `()` |
+| `capabilities` | `Mapping[str, Any]` | *(fábrica)* |
+| `security_schemes` | `Mapping[str, Any]` | *(fábrica)* |
+
+| Miembro | Firma | |
+|---|---|---|
+| `push_notifications` | — |  |
+| `streaming` | — |  |
+
+Declara **qué sabe hacer**, no **qué puede romper**: no hay campo de riesgo
+en la especificación. De ahí que un agente remoto entre como destructivo
+mientras alguien no diga lo contrario.
+
+### `Task`
+
+Una unidad de trabajo al otro lado.
+
+| Campo | Tipo | Por defecto |
+|---|---|---|
+| `task_id` | `str` | **obligatorio** |
+| `context_id` | `str` | `''` |
+| `state` | `TaskState` | `<TaskState.SUBMITTED: 'submitted'>` |
+| `message` | `str` | `''` |
+| `artifacts` | `tuple[Artifact, ...]` | `()` |
+| `raw` | `Mapping[str, Any]` | *(fábrica)* |
+
+| Miembro | Firma | |
+|---|---|---|
+| `esperando` | — |  |
+| `result` | — | Lo que vuelve al agente que delegó. |
+| `terminal` | — |  |
+
+``task_id`` lo asigna **el servidor** y no podemos aportarlo — es el hecho
+que decide todo nuestro diseño de reanudación. ``context_id`` sí lo ponemos
+nosotros, y es por donde se reencuentra.
+
+### `TaskState`
+
+Los ocho estados de una tarea A2A.
+
+| Valor | |
+|---|---|
+| `TaskState.SUBMITTED` | `'submitted'` |
+| `TaskState.WORKING` | `'working'` |
+| `TaskState.COMPLETED` | `'completed'` |
+| `TaskState.FAILED` | `'failed'` |
+| `TaskState.CANCELED` | `'canceled'` |
+| `TaskState.REJECTED` | `'rejected'` |
+| `TaskState.INPUT_REQUIRED` | `'input_required'` |
+| `TaskState.AUTH_REQUIRED` | `'auth_required'` |
+
+Se distinguen tres clases, y la distinción es la que decide qué hace el
+bucle: los **terminales** no aceptan más mensajes, los que **esperan a
+alguien** sí, y el resto siguen su curso.
+
+### `Artifact`
+
+Un entregable producido por una tarea.
+
+| Campo | Tipo | Por defecto |
+|---|---|---|
+| `artifact_id` | `str` | `''` |
+| `name` | `str` | `''` |
+| `parts` | `tuple[Mapping[str, Any], ...]` | `()` |
+
+| Miembro | Firma | |
+|---|---|---|
+| `text` | — |  |
+
+Distinto de un mensaje: un mensaje es conversación, un artefacto es
+resultado.
+
+### `TERMINALES`
+
+`TERMINALES = frozenset({<TaskState.CANCELED: 'canceled'>, <TaskState.COMPLETED: 'completed'>, <TaskState.FAILED: 'failed'>, <TaskState.REJECTED: 'rejected'>})`
+
+Build an immutable unordered collection of unique elements.
+
+### `ESPERANDO`
+
+`ESPERANDO = frozenset({<TaskState.AUTH_REQUIRED: 'auth_required'>, <TaskState.INPUT_REQUIRED: 'input_required'>})`
+
+Build an immutable unordered collection of unique elements.

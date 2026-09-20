@@ -165,8 +165,12 @@ class Agent:
         # Un subagente se presenta al modelo como una herramienta de un solo
         # parámetro —el brief—, así que el catálogo del padre no crece con el
         # del hijo. Eso es lo que hace barato delegar.
-        self.delegates: tuple[Delegate, ...] = tuple(
-            d if isinstance(d, Delegate) else Delegate(d) for d in delegates
+        # Se acepta cualquier cosa que **ya cumpla el contrato** —`name`,
+        # `definition`, `execute`— y se envuelve un `Agent` suelto por comodidad.
+        # Comprobar el tipo en vez del contrato dejaría fuera a un delegado
+        # remoto, que es exactamente lo que no debe distinguirse de uno local.
+        self.delegates: tuple[Any, ...] = tuple(
+            d if hasattr(d, "execute") else Delegate(d) for d in delegates
         )
         self._delegates_by_name = {d.name: d for d in self.delegates}
 
@@ -694,18 +698,16 @@ class Agent:
         await journal.record(intencion)
         yield intencion, None
 
-        salida: Any = None
-        consumo = Usage.zero()
         # Mismo almacén, otro `run_id`: un solo diario guarda el árbol entero, y
-        # reanudar al padre encuentra el sub-run donde lo dejó.
-        sesion_hija = Session(
-            sub_run_id(session.run_id, step_id), session.gateway, session.checkpointer
+        # reanudar al padre encuentra el sub-run donde lo dejó. El `run_id` del
+        # hijo es además el `contextId` de A2A cuando el subagente es remoto.
+        #
+        # `execute` es lo único que sabe **dónde** vive el subagente. Lo demás
+        # —paso durable, reanudación, consumo agregado, riesgo— es igual aquí y
+        # al otro lado de una red, y por eso vive fuera de él.
+        salida, consumo = await replace(sub, _depth=depth + 1).execute(
+            brief, session, sub_run_id(session.run_id, step_id)
         )
-        async for paso in sub.agent._loop(
-            brief, sesion_hija, stream=False, depth=depth + 1
-        ):
-            if isinstance(paso, FinalStep):
-                salida, consumo = paso.output, paso.usage
 
         resultado = DelegateStep(
             run_id=session.run_id, step_id=step_id, step_seq=step_seq,

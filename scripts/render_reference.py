@@ -102,6 +102,8 @@ EXTRAS: list[tuple[str, str, str]] = [
      "Infraestructura, no una utilidad de test: es la vía principal para construir sin gastar."),
     ("synaptum.mcp", "Cliente MCP",
      "Extra `[mcp]`. El núcleo no lo carga."),
+    ("synaptum.a2a", "Agentes remotos (A2A)",
+     "Solo biblioteca estándar. En el camino gobernado la llamada sale por el proxy del arnés."),
 ]
 
 
@@ -226,7 +228,22 @@ def _render_simbolo(nombre: str, obj: Any) -> list[str]:
         return _render_clase(nombre, obj)
     if inspect.isfunction(obj) or inspect.isbuiltin(obj):
         return _render_funcion(nombre, obj)
-    return [f"### `{nombre}`", "", f"`{nombre} = {obj!r}`", "", _resumen(obj), ""]
+    return [f"### `{nombre}`", "", f"`{nombre} = {_valor(obj)}`", "", _resumen(obj), ""]
+
+
+def _valor(obj: Any) -> str:
+    """El valor de una constante, **en orden estable**.
+
+    Un `set` o un `frozenset` se recorren en distinto orden en cada proceso, así
+    que el fichero generado salía distinto cada vez. Un fichero generado que no
+    es determinista no puede tener un test de «corresponde al código»: fallaría
+    de forma intermitente, que es la peor forma de fallar — se acaba
+    silenciando el test en vez de arreglar la causa.
+    """
+    if isinstance(obj, (set, frozenset)):
+        dentro = ", ".join(sorted(repr(x) for x in obj))
+        return f"{type(obj).__name__}({{{dentro}}})"
+    return repr(obj)
 
 
 def main() -> int:
