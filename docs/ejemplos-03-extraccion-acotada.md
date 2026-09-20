@@ -37,7 +37,7 @@ sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un
   → leer_pagina
   → validar_ruc
 
-  PERSONA DE EJEMPLO UNO · 2026-09
+  JOHN DOE · 2026-09
   bruto 4,302.50 − descuentos 548.55 = neto 3,753.95
   ✓ el neto cuadra con bruto − descuentos
 
@@ -82,16 +82,23 @@ repositorio público, en un sitio web y dentro de los artefactos publicados en
 PyPI. Que el dato sea falso no ayuda a quien se llame así.
 
 La regla, para el próximo ejemplo: si un nombre, un RUC o una cuenta pueden
-ser de alguien, hay que cambiarlos aunque te los hayas inventado. El RUC de
-abajo **falla el dígito verificador** a propósito, así que no es de ninguna
-empresa; se comprueba con los pesos 5,4,3,2,7,6,5,4,3,2.
+ser de alguien, hay que cambiarlos aunque te los hayas inventado.
+
+Y se usan los marcadores de siempre —`John Doe`, `ACME`— en vez de inventar
+uno nuevo. No es capricho: un nombre que el lector ya reconoce como marcador
+se lee como «aquí va un nombre» sin tener que pensarlo, y nadie se pregunta
+si detrás hay alguien. Un «PERSONA DE EJEMPLO UNO» cumple pero hay que
+leerlo dos veces.
+
+El RUC de abajo **falla el dígito verificador** a propósito, así que no es de
+ninguna empresa; se comprueba con los pesos 5,4,3,2,7,6,5,4,3,2.
 
 ```python
 PAGINA = """
-EMPRESA DE EJEMPLO S.A.C.
+ACME CONSTRUCTORA S.A.C.
 RUC 20481234567
 BOLETA DE PAGO - SETIEMBRE 2026
-Trabajador: PERSONA DE EJEMPLO UNO
+Trabajador: JOHN DOE
 Remuneración básica        4,200.00
 Asignación familiar          102.50
 --------------------------------
@@ -125,7 +132,7 @@ async def validar_ruc(
     """
     if len(ruc) != 11 or not ruc.isdigit():
         return f"RUC {ruc} inválido: deben ser 11 dígitos."
-    return f"RUC {ruc}: hallado en el padrón · EMPRESA DE EJEMPLO S.A.C."
+    return f"RUC {ruc}: hallado en el padrón · ACME CONSTRUCTORA S.A.C."
 
 async def main() -> None:
     encabezado("03 · Extracción acotada, con el camino de error")
@@ -152,9 +159,9 @@ async def main() -> None:
         # Primer intento del modelo: JSON mal formado. Pasa, y pasa más de lo que
         # nadie admite. El bucle lo trata como reintentable —el muestreo es
         # estocástico— y vuelve a pedirlo sin que el llamante se entere.
-        says('{"ruc": "20481234567", "trabajador": "PERSONA DE EJEMPLO UNO",'),
+        says('{"ruc": "20481234567", "trabajador": "JOHN DOE",'),
         says(
-            '{"ruc": "20481234567", "trabajador": "PERSONA DE EJEMPLO UNO", '
+            '{"ruc": "20481234567", "trabajador": "JOHN DOE", '
             '"periodo": "2026-09", "bruto": 4302.50, "descuentos": 548.55, '
             '"neto": 3753.95}'
         ),
