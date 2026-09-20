@@ -509,3 +509,30 @@ def test_the_bridge_reaches_name_and_arguments_whatever_the_shape():
         assert _field(funcion, "name") == "f", f"no se alcanza el nombre en forma {forma}"
         assert _field(funcion, "arguments") == '{"a":1}', f"argumentos, forma {forma}"
         assert _field(llamada, "id") == "c1", f"id, forma {forma}"
+
+
+def test_no_field_we_read_changed_its_type():
+    """Lo que el canario de arriba **no** puede ver.
+
+    Aquel comprueba que los campos que leemos sigan existiendo. Este comprueba
+    que no cambien de tipo — que es justo lo que `_field()` se traga sin avisar,
+    porque lee atributo **o** clave y las dos formas le valen.
+
+    Entre `rc3` y `rc4` las tool calls pasaron de `list[dict]` a `list[ToolCall]`.
+    No nos rompió, no nos avisó, y nos enteramos porque otro equipo lo publicó.
+    Con esta comprobación habría salido en una línea, cuatro días antes.
+
+    El método es de Axonium. Si falla, mira si te afecta y anota la nueva forma:
+
+        uv run python scripts/forma_del_sdk.py --write
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    raiz = Path(__file__).resolve().parents[1]
+    hecho = subprocess.run(
+        [sys.executable, "scripts/forma_del_sdk.py", "--check"],
+        cwd=raiz, capture_output=True, text=True,
+    )
+    assert hecho.returncode == 0, hecho.stderr

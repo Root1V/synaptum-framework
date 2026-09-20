@@ -115,12 +115,16 @@ requisito que le pedimos al otro lado, y conviene decirlo así.
 
 Un `AgentCard` declara `skills`, no riesgo. No hay forma de saber qué puede hacer un agente ajeno.
 
-Se aplica **la misma regla que con MCP**: sin declaración, `Risk.DESTRUCTIVE`. Ahí el autor no está
-delante para declarar, y suponer en su lugar es suponer a favor. Con un agente remoto es más claro
-todavía: no solo no sabemos qué hace, es que **puede cambiar sin avisarnos**.
+La primera versión ponía `Risk.DESTRUCTIVE` por defecto, como en MCP. **Aeon señaló el fallo:** un
+defecto conservador es correcto **y silencioso** — nadie se entera nunca de que el riesgo no se
+declaró, y la decisión la toma un valor por defecto en vez de una persona.
 
-Si A2A estandariza una extensión de riesgo, se lee. Mientras tanto, se puede declarar a mano al
-construir el delegado remoto — explícito y de quien asume la consecuencia.
+La diferencia con MCP es quién está delante. Allí el autor de la herramienta no está, así que un
+defecto es lo único posible. Aquí **sí hay alguien**: quien construye el `RemoteDelegate`. Así que
+`risk` es **obligatorio y sin valor por defecto** — la decisión se toma una vez, con un nombre
+detrás.
+
+Si A2A estandariza una extensión de riesgo, se lee.
 
 ## Quién gobierna la llamada: una cuarta forma que no estaba en la lista
 
@@ -176,7 +180,23 @@ perímetro, y entre contenedores normalmente no lo cruza.
   persona.
 - `CancelTask` al cerrar el iterador. Cerrar **es** la señal, también por red.
 
-**Servidor** (`synaptum[a2a]`, el mismo extra)
+**Servidor** — con una regla que no estaba en el diseño y que es una condición, no un detalle
+
+Aeon señaló un tercer caso que no estaba en la pregunta, y es el mismo agujero que acabamos de
+cerrar **del revés**: un `Agent` corriendo **dentro** de un arnés que exponga además su propia puerta
+de entrada A2A.
+
+Ayer acordamos que una delegación saliente no puede esquivar el gateway. Un agente gobernado con
+puerta propia deja que **alguien lo alcance sin cruzarla** — y entonces el principal, la política y
+la atribución se los salta por donde nadie mira.
+
+> **En modo gobernado, la puerta de entrada es la del arnés. En modo autónomo, la nuestra, y no hay
+> arnés que engañar. Lo que no debe existir es un agente gobernado con puerta propia.**
+
+Así que si se construye el servidor, avisa al arrancar igual que avisa `LocalGateway`, y lo dice en
+su primera línea de documentación.
+
+**Servidor** (mismo paquete)
 
 - Exponer un `Agent` como servidor A2A: `AgentCard`, `SendMessage`, `GetTask`, `CancelTask`.
 - El `taskId` se **persiste antes de devolverlo**. Es el fallo que la búsqueda encuentra una y otra

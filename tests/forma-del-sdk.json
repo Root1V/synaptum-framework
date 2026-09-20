@@ -1,0 +1,294 @@
+{
+ "all": [
+  "APIError",
+  "APIObject",
+  "AsyncAxonium",
+  "AsyncChatCompletionStream",
+  "AsyncTokenProvider",
+  "AuthTransportError",
+  "Axonium",
+  "AxoniumConfig",
+  "AxoniumError",
+  "BackendUnavailableError",
+  "BadRequestError",
+  "ChatChoice",
+  "ChatCompletion",
+  "ChatCompletionChunk",
+  "ChatCompletionRequest",
+  "ChatCompletionStream",
+  "ChoiceDelta",
+  "CompletionMessage",
+  "ConfigurationError",
+  "ContentPart",
+  "ContextExceededError",
+  "CooldownRegistry",
+  "CreateEmbeddingResponse",
+  "DEFAULT_GATEWAY_BASE_URL",
+  "Embedding",
+  "EmbeddingsRequest",
+  "ForbiddenError",
+  "FunctionCall",
+  "GeneratedImage",
+  "IdempotencyInProgressError",
+  "IdempotencyKeyReuseError",
+  "IdempotencyResponseNotRetainedError",
+  "ImageGenerationRequest",
+  "ImagesResponse",
+  "InconsistentModelGroupError",
+  "InvalidClientError",
+  "InvalidDateError",
+  "InvalidIdempotencyKeyError",
+  "InvalidRangeError",
+  "InvalidRequestError",
+  "InvalidScopeError",
+  "InvalidTokenError",
+  "Message",
+  "MissingCredentialsError",
+  "ModalityMismatchError",
+  "Model",
+  "ModelList",
+  "ModelNotLoadedError",
+  "NotFoundError",
+  "OAuthError",
+  "RangeTooLargeError",
+  "RateLimitError",
+  "RateLimitSnapshot",
+  "RateLimitingUnavailableError",
+  "RequestUsage",
+  "RerankRequest",
+  "RerankResponse",
+  "RerankResult",
+  "ResponseMeta",
+  "RetryPolicy",
+  "ServerError",
+  "SpendCapExceededError",
+  "StreamChoice",
+  "StreamInterruptedError",
+  "TimeoutError",
+  "Timeouts",
+  "Timings",
+  "TokenClaims",
+  "TokenEndpointNotConfiguredError",
+  "TokenEndpointUnavailableError",
+  "TokenExpiredError",
+  "TokenProvider",
+  "TokenRevokedError",
+  "TokenSet",
+  "ToolCall",
+  "ToolCallArgumentsError",
+  "TransportError",
+  "UnauthorizedClientError",
+  "UnauthorizedError",
+  "UnauthorizedRequestError",
+  "UnknownInstanceError",
+  "UnknownModelError",
+  "UnsupportedFieldWarning",
+  "UnsupportedGrantTypeError",
+  "UnusedCredentialWarning",
+  "UpstreamError",
+  "Usage",
+  "UsageStoreUnavailableError",
+  "ValidationError",
+  "__version__"
+ ],
+ "models": {
+  "AxoniumConfig": {
+   "ca_bundle": "str | None",
+   "client_id": "str | None",
+   "client_secret": "pydantic.types.SecretStr | None",
+   "gateway_base_url": "<class 'str'>",
+   "otel_enabled": "<class 'bool'>",
+   "refresh_ahead_min_seconds": "<class 'float'>",
+   "refresh_ahead_ratio": "<class 'float'>",
+   "scope": "str | None",
+   "timeouts": "<class 'axonium.config.Timeouts'>",
+   "verify_modality": "<class 'bool'>"
+  },
+  "ChatChoice": {
+   "finish_reason": "str | None",
+   "index": "int | None",
+   "message": "axonium.models.chat.CompletionMessage | None"
+  },
+  "ChatCompletion": {
+   "choices": "list[axonium.models.chat.ChatChoice]",
+   "created": "int | None",
+   "id": "str | None",
+   "model": "str | None",
+   "object": "str | None",
+   "system_fingerprint": "str | None",
+   "timings": "axonium.models.chat.Timings | None",
+   "usage": "axonium.models.common.Usage | None"
+  },
+  "ChatCompletionChunk": {
+   "choices": "list[axonium.models.chat.StreamChoice]",
+   "created": "int | None",
+   "id": "str | None",
+   "model": "str | None",
+   "object": "str | None",
+   "timings": "axonium.models.chat.Timings | None",
+   "usage": "axonium.models.common.Usage | None"
+  },
+  "ChatCompletionRequest": {
+   "max_tokens": "int | None",
+   "messages": "list[axonium.models.requests.Message]",
+   "model": "<class 'str'>",
+   "stop": "str | list[str] | None",
+   "stream": "<class 'bool'>",
+   "temperature": "float | None",
+   "tool_choice": "str | dict[str, typing.Any] | None",
+   "tools": "list[dict[str, typing.Any]] | None",
+   "top_p": "float | None"
+  },
+  "ChoiceDelta": {
+   "content": "str | None",
+   "reasoning_content": "str | None",
+   "role": "str | None",
+   "tool_calls": "list[dict[str, typing.Any]] | None"
+  },
+  "CompletionMessage": {
+   "content": "str | None",
+   "reasoning_content": "str | None",
+   "role": "str | None",
+   "tool_calls": "list[axonium.models.chat.ToolCall] | None"
+  },
+  "ContentPart": {
+   "image_url": "dict[str, typing.Any] | None",
+   "text": "str | None",
+   "type": "<class 'str'>"
+  },
+  "CreateEmbeddingResponse": {
+   "data": "list[axonium.models.inference.Embedding]",
+   "model": "str | None",
+   "object": "str | None",
+   "usage": "axonium.models.common.Usage | None"
+  },
+  "Embedding": {
+   "embedding": "list[float]",
+   "index": "int | None",
+   "object": "str | None"
+  },
+  "EmbeddingsRequest": {
+   "input": "str | list[str]",
+   "model": "<class 'str'>"
+  },
+  "FunctionCall": {
+   "arguments": "<class 'str'>",
+   "name": "str | None"
+  },
+  "GeneratedImage": {
+   "b64_json": "str | None"
+  },
+  "ImageGenerationRequest": {
+   "model": "<class 'str'>",
+   "n": "int | None",
+   "prompt": "<class 'str'>",
+   "size": "str | None"
+  },
+  "ImagesResponse": {
+   "created": "int | None",
+   "data": "list[axonium.models.inference.GeneratedImage]",
+   "output_format": "str | None"
+  },
+  "Message": {
+   "content": "str | list[axonium.models.requests.ContentPart] | None",
+   "name": "str | None",
+   "role": "typing.Literal['system', 'user', 'assistant', 'tool']",
+   "tool_call_id": "str | None",
+   "tool_calls": "list[axonium.models.chat.ToolCall] | None"
+  },
+  "Model": {
+   "context_length": "int | None",
+   "family": "str | None",
+   "id": "<class 'str'>",
+   "modality": "typing.Union[typing.Literal['text', 'vision', 'embedding', 'image'], str, NoneType]",
+   "object": "<class 'str'>",
+   "owned_by": "str | None",
+   "quantization": "str | None"
+  },
+  "ModelList": {
+   "data": "list[axonium.models.catalog.Model]",
+   "object": "<class 'str'>"
+  },
+  "RateLimitSnapshot": {
+   "limit_requests": "int | None",
+   "limit_tokens": "int | None",
+   "remaining_requests": "int | None",
+   "remaining_tokens": "int | None",
+   "reset_requests": "int | None",
+   "reset_tokens": "int | None"
+  },
+  "RequestUsage": {
+   "cost_usd": "float | None",
+   "created_at": "str | None",
+   "image_count": "int | None",
+   "instance_id": "str | None",
+   "interrupted": "bool | None",
+   "model": "str | None",
+   "request_id": "str | None",
+   "request_kind": "str | None",
+   "termination_reason": "str | None",
+   "usage": "axonium.models.common.Usage | None"
+  },
+  "RerankRequest": {
+   "documents": "list[str]",
+   "model": "<class 'str'>",
+   "query": "<class 'str'>",
+   "top_n": "int | None"
+  },
+  "RerankResponse": {
+   "model": "str | None",
+   "object": "str | None",
+   "results": "list[axonium.models.inference.RerankResult]",
+   "usage": "axonium.models.common.Usage | None"
+  },
+  "RerankResult": {
+   "index": "int | None",
+   "relevance_score": "float | None"
+  },
+  "ResponseMeta": {
+   "idempotent_replay": "<class 'bool'>",
+   "idempotent_replay_of": "str | None",
+   "instance": "str | None",
+   "instance_id": "str | None",
+   "rate_limit": "axonium.models.common.RateLimitSnapshot | None",
+   "request_id": "str | None",
+   "trace_id": "str | None"
+  },
+  "StreamChoice": {
+   "delta": "axonium.models.chat.ChoiceDelta | None",
+   "finish_reason": "str | None",
+   "index": "int | None"
+  },
+  "Timeouts": {
+   "auth_read": "<class 'float'>",
+   "connect": "<class 'float'>",
+   "pool": "<class 'float'>",
+   "read": "<class 'float'>",
+   "stream_read": "<class 'float'>",
+   "write": "<class 'float'>"
+  },
+  "Timings": {
+   "cache_n": "int | None",
+   "predicted_ms": "float | None",
+   "predicted_n": "int | None",
+   "predicted_per_second": "float | None",
+   "predicted_per_token_ms": "float | None",
+   "prompt_ms": "float | None",
+   "prompt_n": "int | None",
+   "prompt_per_second": "float | None"
+  },
+  "ToolCall": {
+   "function": "<class 'axonium.models.chat.FunctionCall'>",
+   "id": "str | None",
+   "type": "str | None"
+  },
+  "Usage": {
+   "cache_read_tokens": "int | None",
+   "completion_tokens": "int | None",
+   "estimated": "<class 'bool'>",
+   "prompt_tokens": "int | None",
+   "total_tokens": "int | None"
+  }
+ },
+ "version": "1.0.0rc4"
+}

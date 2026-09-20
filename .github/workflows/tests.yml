@@ -27,6 +27,12 @@ jobs:
       - name: pytest
         run: uv run --frozen pytest
 
+      # Un accesor tolerante absorbe un cambio de forma del SDK sin romperse y
+      # **sin avisar**. Esto compara la forma publicada contra la anotada, y
+      # separa lo aditivo —que no nos afecta— de un cambio de tipo, que sí.
+      - name: ningún campo del SDK cambió de tipo
+        run: uv run --frozen python scripts/forma_del_sdk.py --check
+
       # La documentación en HTML se genera del Markdown. Si alguien edita uno y
       # no regenera el otro, se separan — y el que diverge siempre es el que
       # nadie mira.

@@ -47,6 +47,19 @@ mueve dinero.
 cada nivel tiene su propio contador, así que dos agentes que se deleguen mutuamente no terminarían
 nunca.
 
+### Un agente remoto declara su riesgo, o no se conecta
+
+```python
+RemoteDelegate(name="analista", url="https://…", risk=Risk.READ)   # `risk` es obligatorio
+```
+
+Un `AgentCard` declara `skills`, no riesgo: la especificación no tiene ese campo. Poner un defecto
+conservador sería correcto **y silencioso** — nadie se enteraría de que nunca se declaró.
+
+La diferencia con `@tool` es quién está delante. Ahí el autor de la función puede declarar, y por eso
+`Risk.READ` por defecto es razonable. Con un agente ajeno el autor no está, pero **quien lo conecta
+sí** — así que la decisión es suya y se le pide que la tome.
+
 ### Lo que sigue siendo válido componer a mano
 
 Delegar sirve cuando **el modelo decide** a quién llamar. Cuando el orden lo decides tú —una cadena

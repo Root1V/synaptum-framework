@@ -51,6 +51,9 @@ migración**: la superficie no se parece. El estado por elemento está en [`road
 - **`deferred(herramientas)`** — un catálogo grande sin inflar el prefijo: dos herramientas fijas y
   el esquema por el historial. `merece_la_pena()` dice cuándo compensa.
 
+- **`RemoteDelegate.risk` pasa a ser obligatorio**, sin valor por defecto. Un defecto conservador
+  es correcto y **silencioso**: nadie se entera de que el riesgo nunca se declaró.
+
 ### Pendiente antes de `1.0.0`
 
 Economía de contexto (Fase 2) y multi-agente (Fase 3). Ver [`roadmap.md`](roadmap.md).
