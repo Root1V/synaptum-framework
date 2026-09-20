@@ -65,7 +65,13 @@ def test_the_html_matches_the_markdown():
     assert resultado.returncode == 0, resultado.stderr
 
 
-@pytest.mark.parametrize("pagina", paginas(), ids=lambda p: p.stem)
+#: La referencia se genera **de** los símbolos, así que no puede nombrar uno que
+#: no exista — y cita en prosa tipos de la biblioteca estándar que este test
+#: tomaría por símbolos nuestros. Comprobarla aquí sería comprobar el generador.
+_ESCRITAS_A_MANO = [p for p in paginas() if p.stem != "08-referencia"]
+
+
+@pytest.mark.parametrize("pagina", _ESCRITAS_A_MANO, ids=lambda p: p.stem)
 def test_every_symbol_the_docs_name_actually_exists(pagina: Path):
     """Los nombres entre comillas invertidas que parecen símbolos, existen.
 
@@ -116,3 +122,38 @@ def test_the_roadmap_items_the_docs_cite_are_still_open():
     assert not ya_hechos, (
         f"la documentación los da por pendientes y el roadmap dice HECHO: {ya_hechos}"
     )
+
+
+def test_the_reference_matches_the_code():
+    """La referencia se genera del código; si el código cambia, se regenera.
+
+    Escribirla a mano sería escribir algo que caduca — y una referencia caducada
+    manda a buscar un símbolo que ya no está.
+
+    Si falla: `uv run python scripts/render_reference.py`
+    """
+    generado = DOCS / "08-referencia.md"
+    antes = generado.read_text(encoding="utf-8") if generado.exists() else ""
+
+    resultado = subprocess.run(
+        [sys.executable, "scripts/render_reference.py"],
+        cwd=RAIZ, capture_output=True, text=True,
+    )
+    assert resultado.returncode == 0, resultado.stderr
+
+    despues = generado.read_text(encoding="utf-8")
+    if antes != despues:
+        generado.write_text(antes, encoding="utf-8")   # no dejar el árbol tocado
+        pytest.fail(
+            "docs/08-referencia.md no corresponde al código actual. "
+            "Regenera con: uv run python scripts/render_reference.py"
+        )
+
+
+def test_every_public_symbol_appears_in_the_reference():
+    """Si algo es público y no está documentado, no es usable sin leer el código."""
+    import synaptum
+
+    texto = (DOCS / "08-referencia.md").read_text(encoding="utf-8")
+    ausentes = [n for n in synaptum.__all__ if f"### `{n}`" not in texto]
+    assert not ausentes, f"exportados y sin documentar: {ausentes}"

@@ -1,0 +1,3222 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Referencia · Synaptum</title>
+<style>
+/* Paleta ───────────────────────────────────────────────────────────────────
+   Los colores hacen un trabajo, no decoran: el acento marca lo navegable, el
+   ámbar marca lo que hay que leer despacio, y el código tiene su propia escala
+   para que la sintaxis se distinga sin gritar. Todo con contraste suficiente
+   en claro y en oscuro — una documentación que solo se ve bien en un tema es
+   una documentación que la mitad de la gente lee peor. */
+:root {
+  color-scheme: light dark;
+  --tinta: #16181d; --fondo: #fcfcfb; --papel: #ffffff;
+  --tenue: #5c6672; --linea: #e4e6ea; --linea-suave: #eef0f3;
+  --acento: #0a5ac4; --acento-suave: #eef4fd;
+  --aviso: #9a5b00; --aviso-borde: #e8a33d; --aviso-fondo: #fff8ec;
+  --codigo-fondo: #f7f8fa; --codigo-borde: #e6e9ee; --codigo-tinta: #2a2f3a;
+  --etiqueta: #8b94a0;
+  --sx-clave: #9226a8;   /* def, class, return, async  */
+  --sx-cadena: #0a6b3d;  /* "texto"                    */
+  --sx-func: #1a55c4;    /* nombres de función          */
+  --sx-tipo: #0b6d8c;    /* int, str, builtins          */
+  --sx-num: #a8471a;     /* 42, 0.5                     */
+  --sx-com: #6a7482;     /* # comentarios               */
+  --sx-dec: #a8471a;     /* @tool                       */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tinta: #e4e6ea; --fondo: #14161a; --papel: #191c21;
+    --tenue: #98a1ad; --linea: #2a2e35; --linea-suave: #23262c;
+    --acento: #6fa8f5; --acento-suave: #1a2433;
+    --aviso: #e7ab5a; --aviso-borde: #8a6a2f; --aviso-fondo: #221d14;
+    --codigo-fondo: #1b1e24; --codigo-borde: #2a2e35; --codigo-tinta: #d4d8de;
+    --etiqueta: #6e7682;
+    --sx-clave: #d79bec; --sx-cadena: #7ec99b; --sx-func: #7fb0f2;
+    --sx-tipo: #5fc0dd; --sx-num: #e0a07a; --sx-com: #79828f; --sx-dec: #e0a07a;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fondo); color: var(--tinta);
+  font: 17px/1.68 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased;
+}
+.saltar { position: absolute; left: -9999px; }
+.saltar:focus { left: 1rem; top: 1rem; background: var(--papel); padding: .5rem 1rem;
+                z-index: 9; border-radius: .4rem; border: 1px solid var(--acento); }
+.marco { display: grid; grid-template-columns: 17.5rem minmax(0, 1fr); gap: 3.5rem;
+         max-width: 70rem; margin: 0 auto; padding: 2.5rem 1.5rem 7rem; }
+
+/* Navegación ─────────────────────────────────────────────────────────────── */
+nav { position: sticky; top: 2.5rem; align-self: start; font-size: .92rem; }
+.marca { margin: 0; font-weight: 650; letter-spacing: -.015em; font-size: 1.12rem; }
+.marca a { color: var(--tinta); text-decoration: none; }
+.marca a::before {
+  content: ""; display: inline-block; width: .5rem; height: .5rem; margin-right: .5rem;
+  border-radius: 50%; background: var(--acento); vertical-align: .08em;
+}
+.version { margin: .15rem 0 1.5rem 1rem; color: var(--etiqueta); font-size: .78rem;
+           letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+nav ol { list-style: none; margin: 0; padding: 0; }
+nav li { margin: .08rem 0; }
+nav a { display: block; padding: .34rem .7rem; margin-left: -.7rem; border-radius: .45rem;
+        color: var(--tenue); text-decoration: none; border-left: 2px solid transparent;
+        transition: background .12s, color .12s; }
+nav a:hover { background: var(--linea-suave); color: var(--tinta); }
+nav a[aria-current] { color: var(--acento); font-weight: 600; background: var(--acento-suave);
+                      border-left-color: var(--acento); }
+.fuente { margin-top: 1.8rem; padding-top: 1rem; border-top: 1px solid var(--linea);
+          font-size: .82rem; }
+.fuente a { color: var(--tenue); text-decoration: none; }
+.fuente a:hover { color: var(--acento); text-decoration: underline; }
+
+/* Texto ──────────────────────────────────────────────────────────────────── */
+main { min-width: 0; }
+h1 { font-size: 2.25rem; line-height: 1.12; letter-spacing: -.028em; margin: 0 0 1.7rem;
+     font-weight: 700; }
+h2 { font-size: 1.36rem; letter-spacing: -.016em; margin: 3.2rem 0 1rem; font-weight: 650;
+     padding-top: 1.5rem; border-top: 1px solid var(--linea); }
+h3 { font-size: 1.07rem; margin: 2.1rem 0 .6rem; font-weight: 640; color: var(--tinta); }
+p, li { max-width: 41rem; }
+li { margin: .3rem 0; }
+strong { font-weight: 640; }
+a { color: var(--acento); text-decoration-thickness: 1px; text-underline-offset: .15em; }
+a:hover { text-decoration-thickness: 2px; }
+
+/* Código ─────────────────────────────────────────────────────────────────── */
+code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+       font-size: .87em; background: var(--codigo-fondo); color: var(--codigo-tinta);
+       padding: .13em .4em; border-radius: .3rem; border: 1px solid var(--codigo-borde); }
+pre { position: relative; background: var(--codigo-fondo); color: var(--codigo-tinta);
+      padding: 1.1rem 1.2rem; border-radius: .7rem; overflow-x: auto;
+      border: 1px solid var(--codigo-borde); margin: 1.3rem 0; }
+pre code { background: none; padding: 0; border: 0; font-size: .855rem; line-height: 1.62; }
+pre[data-lenguaje]::after {
+  content: attr(data-lenguaje); position: absolute; top: .55rem; right: .8rem;
+  font: 600 .66rem/1 ui-monospace, monospace; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--etiqueta); pointer-events: none;
+}
+.p-k, .p-kn, .p-kd, .p-kc, .p-ow { color: var(--sx-clave); font-weight: 600; }
+.p-s, .p-s1, .p-s2, .p-sd, .p-se, .p-sa, .p-si { color: var(--sx-cadena); }
+.p-nf, .p-fm { color: var(--sx-func); font-weight: 600; }
+.p-nb, .p-nc, .p-ne, .p-nn { color: var(--sx-tipo); }
+.p-m, .p-mi, .p-mf, .p-kt { color: var(--sx-num); }
+.p-c, .p-c1, .p-cm, .p-ch, .p-cs { color: var(--sx-com); font-style: italic; }
+.p-nd { color: var(--sx-dec); font-weight: 600; }
+.p-err { color: inherit; }
+
+/* Aviso ──────────────────────────────────────────────────────────────────── */
+blockquote { margin: 1.5rem 0; padding: .95rem 1.2rem; border-left: 3px solid var(--aviso-borde);
+             background: var(--aviso-fondo); border-radius: 0 .5rem .5rem 0; color: var(--tinta); }
+blockquote p { margin: .3rem 0; max-width: none; }
+blockquote strong { color: var(--aviso); }
+
+/* Tablas ─────────────────────────────────────────────────────────────────── */
+.tabla { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--linea);
+         border-radius: .6rem; background: var(--papel); }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th, td { text-align: left; padding: .6rem .9rem; border-bottom: 1px solid var(--linea-suave);
+         vertical-align: top; }
+thead th { font-weight: 640; background: var(--linea-suave); color: var(--tinta);
+           border-bottom: 1px solid var(--linea); }
+tbody tr:last-child td { border-bottom: 0; }
+td code, th code { background: transparent; border: 0; padding: 0; color: var(--sx-func); }
+
+hr { border: 0; border-top: 1px solid var(--linea); margin: 2.8rem 0; }
+
+/* Copiar ─────────────────────────────────────────────────────────────────── */
+.copiar {
+  position: absolute; top: .45rem; right: .5rem; z-index: 2;
+  font: 600 .68rem/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  padding: .35rem .6rem; border-radius: .4rem; cursor: pointer;
+  color: var(--tenue); background: var(--papel); border: 1px solid var(--codigo-borde);
+  opacity: 0; transition: opacity .13s, color .13s, border-color .13s;
+}
+pre:hover .copiar, .copiar:focus-visible { opacity: 1; }
+.copiar:hover { color: var(--acento); border-color: var(--acento); }
+.copiar.hecho { color: var(--sx-cadena); border-color: var(--sx-cadena); opacity: 1; }
+/* Con el botón visible, la etiqueta del lenguaje estorbaría. */
+pre:hover[data-lenguaje]::after { opacity: 0; }
+pre[data-lenguaje]::after { transition: opacity .13s; }
+/* Sin puntero —táctil o teclado— el botón se queda visible: no hay hover. */
+@media (hover: none) { .copiar { opacity: 1; } pre[data-lenguaje]::after { display: none; } }
+
+/* Anterior / siguiente ───────────────────────────────────────────────────── */
+.paginado {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  margin: 4rem 0 0; padding-top: 2rem; border-top: 1px solid var(--linea);
+}
+.paginado a {
+  display: block; padding: .9rem 1.1rem; border: 1px solid var(--linea);
+  border-radius: .6rem; text-decoration: none; background: var(--papel);
+  transition: border-color .13s, background .13s;
+}
+.paginado a:hover { border-color: var(--acento); background: var(--acento-suave); }
+.paginado .siguiente { grid-column: 2; text-align: right; }
+.paginado .etiqueta { display: block; font-size: .74rem; letter-spacing: .06em;
+                      text-transform: uppercase; color: var(--etiqueta); margin-bottom: .2rem; }
+.paginado .nombre { color: var(--tinta); font-weight: 600; font-size: .98rem; }
+@media (max-width: 40rem) {
+  .paginado { grid-template-columns: 1fr; }
+  .paginado .siguiente { grid-column: 1; text-align: left; }
+}
+
+@media (max-width: 62rem) {
+  .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
+  nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
+  nav ol { columns: 2; column-gap: 1.5rem; }
+  h1 { font-size: 1.85rem; }
+}
+</style>
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="marco">
+  <nav aria-label="Secciones">
+    <p class="marca"><a href="index.html">Synaptum</a></p>
+    <p class="version">1.0.0rc1</p>
+    <ol><li><a href="index.html">Empezar</a></li><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="08-referencia.html" aria-current="page">Referencia</a></li></ol>
+    <p class="fuente"><a href="../08-referencia.md">Leer en Markdown&nbsp;↗</a></p>
+  </nav>
+  <main id="contenido">
+<h1>Referencia</h1>
+<p><strong>Generada del código.</strong> Escribir esto a mano sería escribir algo que caduca, y una
+referencia caducada manda a buscar un símbolo que ya no está.</p>
+<p>Dice <strong>qué hay</strong>. El <strong>por qué</strong> y el <strong>cuándo</strong> están en las páginas anteriores, y eso no
+se deriva de una firma.</p>
+<blockquote>
+<p>La superficie pública es lo que <code>synaptum/__init__.py</code> exporta, y nada más. Lo que no
+aparece aquí puede cambiar sin aviso, aunque se pueda importar.</p>
+</blockquote>
+<h2>Escribir un agente</h2>
+<p>Lo que se toca en el primer fichero.</p>
+<h3><code>Agent</code></h3>
+<p>Composición, no herencia.  Un agente es su configuración más el bucle.</p>
+<pre data-lenguaje="python"><code><span class="p-n">Agent</span><span class="p-p">(</span><span class="p-n">name</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">model</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">instructions</span><span class="p-p">:</span> <span class="p-n">Any</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-p">:</span> <span class="p-n">Sequence</span><span class="p-p">[</span><span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">=</span> <span class="p-p">(),</span> <span class="p-n">output</span><span class="p-p">:</span> <span class="p-n">Any</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">limits</span><span class="p-p">:</span> <span class="p-n">Limits</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run</code></td>
+<td><code>run(self, task: str, *, session: Session) -&gt; AsyncIterator[StepEvent]</code></td>
+<td>Ejecuta el agente cediendo cada paso.</td>
+</tr>
+<tr>
+<td><code>stream</code></td>
+<td><code>stream(self, task: str, *, session: Session) -&gt; AsyncIterator[StepEvent | StreamEvent]</code></td>
+<td>Lo mismo, entregando además los fragmentos del modelo según llegan.</td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>Session</code></h3>
+<p>Un run: su identidad, por dónde sale y dónde se recuerda.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>gateway</code></td>
+<td><code>Gateway</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>checkpointer</code></td>
+<td><code>Checkpointer</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+</tbody>
+</table></div>
+<p>Reanudar es construir una <code>Session</code> con el mismo <code>run_id</code> y el mismo
+<code>checkpointer</code>.  No hay nada más.</p>
+<h3><code>Limits</code></h3>
+<p>Topes del bucle.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_steps</code></td>
+<td><code>int</code></td>
+<td><code>50</code></td>
+</tr>
+<tr>
+<td><code>max_retries</code></td>
+<td><code>int</code></td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td><code>retry_base</code></td>
+<td><code>float</code></td>
+<td><code>0.5</code></td>
+</tr>
+<tr>
+<td><code>max_retry_wait</code></td>
+<td><code>float</code></td>
+<td><code>30.0</code></td>
+</tr>
+<tr>
+<td><code>reserved_output</code></td>
+<td><code>float</code></td>
+<td><code>0.25</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Son <strong>corrección, no política</strong>: evitan que un bucle mal formado no termine
+nunca.  Los límites de gasto pertenecen al harness y llegan por la costura
+como <code>Denied</code> con <code>terminate_run</code>.</p>
+<h3><code>tool</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">tool</span><span class="p-p">(</span><span class="p-n">fn</span><span class="p-p">:</span> <span class="p-n">Callable</span><span class="p-p">[</span><span class="p-o">...</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">name</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">description</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">risk</span><span class="p-p">:</span> <span class="p-n">Risk</span> <span class="p-o">=</span> <span class="p-o">&lt;</span><span class="p-n">Risk</span><span class="p-o">.</span><span class="p-n">READ</span><span class="p-p">:</span> <span class="p-n">read</span><span class="p-o">&gt;</span><span class="p-p">,</span> <span class="p-n">idempotent</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">=</span> <span class="p-kc">False</span><span class="p-p">,</span> <span class="p-n">parameters</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Any</span>
+</code></pre>
+<p>Convierte una función tipada en una herramienta.</p>
+<p>Se puede usar con o sin paréntesis::</p>
+<p>@tool
+def buscar(q: str) -&gt; str: ...</p>
+<p>@tool(risk=Risk.HARD_WRITE, idempotent=False)
+async def transferir(cuenta: str, importe: float) -&gt; str: ...</p>
+<p>Args:
+name: por defecto, el nombre de la función.
+description: por defecto, el primer párrafo del docstring.
+risk: clase de riesgo del efecto.  Synaptum declara; el harness decide.
+idempotent: si el efecto puede repetirse sin consecuencias.  Determina
+si el replay puede reintentar el paso tras una caída, y si su
+registro en el journal puede diferirse.
+parameters: esquema a mano, para el caso raro en el que la firma no
+baste.  Salta la derivación por completo.</p>
+<h3><code>Tool</code></h3>
+<p>Una función con su contrato.</p>
+<pre data-lenguaje="python"><code><span class="p-n">Tool</span><span class="p-p">(</span><span class="p-n">fn</span><span class="p-p">:</span> <span class="p-n">Callable</span><span class="p-p">[</span><span class="p-o">...</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">],</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">name</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">description</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">risk</span><span class="p-p">:</span> <span class="p-n">Risk</span> <span class="p-o">=</span> <span class="p-o">&lt;</span><span class="p-n">Risk</span><span class="p-o">.</span><span class="p-n">READ</span><span class="p-p">:</span> <span class="p-n">read</span><span class="p-o">&gt;</span><span class="p-p">,</span> <span class="p-n">idempotent</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">=</span> <span class="p-kc">False</span><span class="p-p">,</span> <span class="p-n">parameters</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">localns</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>invoke</code></td>
+<td><code>async invoke(self, call_id: str, arguments: Mapping[str, Any]) -&gt; ToolResult</code></td>
+<td>Ejecuta y envuelve el resultado.</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Sigue siendo invocable con normalidad — el decorador no la esconde — y
+además expone <code>definition</code>, que es lo que viaja en el <code>Hello</code> y lo que
+el modelo ve.</p>
+<h3><code>Risk</code></h3>
+<p>Nivel de riesgo del efecto de una herramienta — RM-21.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Valor</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Risk.READ</code></td>
+<td><code>'read'</code></td>
+</tr>
+<tr>
+<td><code>Risk.SOFT_WRITE</code></td>
+<td><code>'soft_write'</code></td>
+</tr>
+<tr>
+<td><code>Risk.HARD_WRITE</code></td>
+<td><code>'hard_write'</code></td>
+</tr>
+<tr>
+<td><code>Risk.DESTRUCTIVE</code></td>
+<td><code>'destructive'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Synaptum <strong>declara</strong>; el harness <strong>decide</strong>.  El bucle garantiza que un paso
+destructivo no se ejecuta antes de tener una decisión; cuál sea esa decisión
+no es asunto suyo.</p>
+<p>Vive aquí, junto a <code>ToolDefinition</code>, porque es parte del contrato de la
+herramienta: viaja con ella en el handshake y el gateway lo necesita para
+decidir antes de ejecutar.</p>
+<h3><code>ToolDefinition</code></h3>
+<p>Definición de una tool.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>parameters</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>ref</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>risk</code></td>
+<td><code>Risk</code></td>
+<td><code>&lt;Risk.READ: 'read'&gt;</code></td>
+</tr>
+<tr>
+<td><code>idempotent</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>ref</code> es la referencia versionada de H5.  Cuando está presente, el esquema
+no viaja en cada llamada: el handshake lo resolvió una vez y el prefijo
+cacheado se mantiene estable.  <code>parameters</code> sigue disponible para el modo
+autónomo, donde no hay registro contra el que resolver.</p>
+<h3><code>ToolChoice</code></h3>
+<p>ToolChoice(mode: &quot;Literal['auto', 'none', 'required', 'named']&quot; = 'auto', name: 'str | None' = None)</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mode</code></td>
+<td><code>Literal['auto', 'none', 'required', 'named']</code></td>
+<td><code>'auto'</code></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+</tbody>
+</table></div>
+<h2>Lo que cede el bucle</h2>
+<p>Los pasos que llegan por <code>async for</code>, y sus fases.</p>
+<h3><code>StepEvent</code></h3>
+<p>Base común.  No se instancia directamente.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_seq</code></td>
+<td><code>int</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>phase</code></td>
+<td><code>Phase</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>at</code></td>
+<td><code>float | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>meta</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>decision</code></td>
+<td><code>Decision | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>str</code></td>
+<td><code>'step'</code></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>durability</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>key</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>ModelStep</code></h3>
+<p>Una llamada al modelo.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_seq</code></td>
+<td><code>int</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>phase</code></td>
+<td><code>Phase</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>at</code></td>
+<td><code>float | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>meta</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>decision</code></td>
+<td><code>Decision | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>str</code></td>
+<td><code>'model'</code></td>
+</tr>
+<tr>
+<td><code>request</code></td>
+<td><code>Request | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>response</code></td>
+<td><code>Response | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>usage</code></td>
+<td><code>Usage</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>durability</code></td>
+<td>—</td>
+<td>La intención es diferible; el resultado, no.</td>
+</tr>
+<tr>
+<td><code>key</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Siempre <code>DURABLE</code>: una inferencia cuesta dinero y no es reproducible, así
+que perder el registro de que ocurrió es exactamente el fallo que la
+durabilidad existe para evitar.</p>
+<h3><code>ToolStep</code></h3>
+<p>La ejecución de una herramienta.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_seq</code></td>
+<td><code>int</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>phase</code></td>
+<td><code>Phase</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>at</code></td>
+<td><code>float | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>meta</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>decision</code></td>
+<td><code>Decision | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>str</code></td>
+<td><code>'tool'</code></td>
+</tr>
+<tr>
+<td><code>call</code></td>
+<td><code>ToolCall | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>result</code></td>
+<td><code>ToolResult | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>risk</code></td>
+<td><code>Risk</code></td>
+<td><code>&lt;Risk.READ: 'read'&gt;</code></td>
+</tr>
+<tr>
+<td><code>idempotent</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>durability</code></td>
+<td>—</td>
+<td>Depende del efecto, y ambas fases por igual.</td>
+</tr>
+<tr>
+<td><code>key</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Es el único evento cuya durabilidad depende del efecto: releer un fichero se
+puede repetir sin consecuencias, ordenar una transferencia no.  Esa
+diferencia la declara el contrato de la tool, dentro del framework — es
+justamente lo que un harness no puede deducir desde fuera.</p>
+<h3><code>ApprovalStep</code></h3>
+<p>Una pausa a la espera de decisión.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_seq</code></td>
+<td><code>int</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>phase</code></td>
+<td><code>Phase</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>at</code></td>
+<td><code>float | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>meta</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>decision</code></td>
+<td><code>Decision | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>str</code></td>
+<td><code>'approval'</code></td>
+</tr>
+<tr>
+<td><code>subject</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>durability</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>key</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Siempre <code>DURABLE</code>, y por una razón distinta a las demás: no se le pregunta
+dos veces a una persona porque el proceso se cayó.</p>
+<h3><code>DelegateStep</code></h3>
+<p>Delegación a un subagente con contexto aislado.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_seq</code></td>
+<td><code>int</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>phase</code></td>
+<td><code>Phase</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>at</code></td>
+<td><code>float | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>meta</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>decision</code></td>
+<td><code>Decision | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>str</code></td>
+<td><code>'delegate'</code></td>
+</tr>
+<tr>
+<td><code>agent</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>brief</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>result</code></td>
+<td><code>Any</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>usage</code></td>
+<td><code>Usage</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>durability</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>key</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>El worker recibe un brief estrecho y devuelve resultado y referencias, nunca
+su historial: es lo que hace que delegar aísle contexto en vez de duplicarlo.</p>
+<h3><code>FinalStep</code></h3>
+<p>Cierre del run.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_seq</code></td>
+<td><code>int</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>phase</code></td>
+<td><code>Phase</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>at</code></td>
+<td><code>float | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>meta</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>decision</code></td>
+<td><code>Decision | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>str</code></td>
+<td><code>'final'</code></td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td><code>Any</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>usage</code></td>
+<td><code>Usage</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>durability</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>key</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>Phase</code></h3>
+<p>Las dos fases de un paso, con los nombres del contrato compartido.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Valor</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Phase.ATTEMPTED</code></td>
+<td><code>'attempted'</code></td>
+</tr>
+<tr>
+<td><code>Phase.COMPLETED</code></td>
+<td><code>'completed'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>attempted</code> y <code>completed</code> describen el <strong>estado</strong> del paso, no el
+contenido del evento — y coinciden con los nombres de las consultas
+derivadas de <code>RunState</code>, que es donde se leen.</p>
+<h3><code>Durability</code></h3>
+<p>Con qué urgencia debe persistirse un evento — RM-14.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Valor</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Durability.DURABLE</code></td>
+<td><code>'durable'</code></td>
+</tr>
+<tr>
+<td><code>Durability.DEFERRABLE</code></td>
+<td><code>'deferrable'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Separar las dos costuras no sirve para que el journal sea asíncrono: sirve
+para que cada evento tenga la política que le toca en vez de heredar la peor
+de las dos.</p>
+<h3><code>Event</code></h3>
+<p><code>Event = synaptum.core.events.ModelStep | synaptum.core.events.ToolStep | synaptum.core.events.DelegateStep | synaptum.core.events.ApprovalStep | synaptum.core.events.FinalStep</code></p>
+<p>Represent a PEP 604 union type</p>
+<h3><code>make_step_id</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">make_step_id</span><span class="p-p">(</span><span class="p-n">seq</span><span class="p-p">:</span> <span class="p-nb">int</span><span class="p-p">,</span> <span class="p-n">kind</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">str</span>
+</code></pre>
+<p>Acuña un identificador de paso determinista.</p>
+<p>Deriva de la posición del paso en el run, nunca de un UUID ni de un reloj:
+un run reproducido debe acuñar exactamente los mismos identificadores, o el
+replay no puede reconocer lo ya hecho.</p>
+<p>El ancho fijo mantiene el orden lexicográfico alineado con el numérico, de
+modo que un almacén que ordene por clave devuelve el journal en orden de
+ejecución sin índice adicional.</p>
+<h3><code>idempotency_key</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">idempotency_key</span><span class="p-p">(</span><span class="p-n">event</span><span class="p-p">:</span> <span class="p-s2">"StepEvent"</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">tuple</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-nb">str</span><span class="p-p">]</span>
+</code></pre>
+<p>La clave con la que el <code>Checkpointer</code> deduplica — A3.</p>
+<p>Un <code>append</code> repetido con esta misma clave es un no-op, nunca un error.</p>
+<h2>Vocabulario del modelo</h2>
+<p>La forma que viaja por la costura. Contrato versionado, no detalle interno.</p>
+<h3><code>Message</code></h3>
+<p>Message(role: 'Role', content: 'tuple[ContentPart, ...]' = (), name: 'str | None' = None)</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>role</code></td>
+<td><code>Role</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td><code>tuple[ContentPart, ...]</code></td>
+<td><code>()</code></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>assistant</code></td>
+<td><code>assistant(text: str) -&gt; &quot;Message&quot;</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>developer</code></td>
+<td><code>developer(text: str) -&gt; &quot;Message&quot;</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>—</td>
+<td>Concatena las partes de texto.  Ignora razonamiento y binarios.</td>
+</tr>
+<tr>
+<td><code>tool_calls</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>tool_results</code></td>
+<td><code>tool_results(*results: ToolResult) -&gt; &quot;Message&quot;</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>user</code></td>
+<td><code>user(text: str, *, name: str | None = None) -&gt; &quot;Message&quot;</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>Role</code></h3>
+<p>Los cinco roles que cualquier proveedor sabe expresar.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Valor</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Role.SYSTEM</code></td>
+<td><code>'system'</code></td>
+</tr>
+<tr>
+<td><code>Role.USER</code></td>
+<td><code>'user'</code></td>
+</tr>
+<tr>
+<td><code>Role.ASSISTANT</code></td>
+<td><code>'assistant'</code></td>
+</tr>
+<tr>
+<td><code>Role.TOOL</code></td>
+<td><code>'tool'</code></td>
+</tr>
+<tr>
+<td><code>Role.DEVELOPER</code></td>
+<td><code>'developer'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>AUTO</code></h3>
+<p><code>AUTO = ToolChoice(mode='auto', name=None)</code></p>
+<p>ToolChoice(mode: &quot;Literal['auto', 'none', 'required', 'named']&quot; = 'auto', name: 'str | None' = None)</p>
+<h3><code>ContentPart</code></h3>
+<p><code>ContentPart = synaptum.core.types.Text | synaptum.core.types.Image | synaptum.core.types.Audio | synaptum.core.types.Document | synaptum.core.types.ToolCall | synaptum.core.types.ToolResult | synaptum.core.types.Thinking | synaptum.core.types.RedactedThinking</code></p>
+<p>Represent a PEP 604 union type</p>
+<h3><code>Text</code></h3>
+<p>Text(text: 'str', kind: &quot;Literal['text']&quot; = 'text')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['text']</code></td>
+<td><code>'text'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>Image</code></h3>
+<p>Image(media_type: 'str', data: 'str | None' = None, url: 'str | None' = None, kind: &quot;Literal['image']&quot; = 'image')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>media_type</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['image']</code></td>
+<td><code>'image'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>Audio</code></h3>
+<p>Audio(media_type: 'str', data: 'str | None' = None, url: 'str | None' = None, kind: &quot;Literal['audio']&quot; = 'audio')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>media_type</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['audio']</code></td>
+<td><code>'audio'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>Document</code></h3>
+<p>Document(media_type: 'str', data: 'str | None' = None, url: 'str | None' = None, name: 'str | None' = None, kind: &quot;Literal['document']&quot; = 'document')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>media_type</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['document']</code></td>
+<td><code>'document'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>ToolCall</code></h3>
+<p>Invocación pedida por el modelo.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>arguments</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['tool_call']</code></td>
+<td><code>'tool_call'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>arguments</code> ya viene decodificado.  Los proveedores que lo entregan como
+cadena JSON lo parsean en su adaptador: el bucle no debería tener que
+adivinar si recibió un objeto o su serialización.</p>
+<h3><code>ToolResult</code></h3>
+<p>Resultado devuelto al modelo.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>call_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td><code>tuple['ContentPart', ...]</code></td>
+<td><code>()</code></td>
+</tr>
+<tr>
+<td><code>is_error</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['tool_result']</code></td>
+<td><code>'tool_result'</code></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>of</code></td>
+<td><code>of(call_id: str, text: str, *, is_error: bool = False) -&gt; &quot;ToolResult&quot;</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>is_error</code> conserva la evidencia del fallo en vez de ocultarla: un modelo
+que no ve el error no puede corregirlo.</p>
+<h3><code>Thinking</code></h3>
+<p>Razonamiento visible.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>signature</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['thinking']</code></td>
+<td><code>'thinking'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>signature</code> transporta el token de verificación que algunos proveedores
+exigen devolver intacto en el siguiente turno.</p>
+<h3><code>RedactedThinking</code></h3>
+<p>Razonamiento cifrado por el proveedor.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>data</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['redacted_thinking']</code></td>
+<td><code>'redacted_thinking'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Opaco para nosotros, pero debe reenviarse tal cual o el proveedor pierde el
+hilo de su propio razonamiento.</p>
+<h3><code>Request</code></h3>
+<p>Lo que cruza la costura hacia quien ejecuta la llamada.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>messages</code></td>
+<td><code>tuple[Message, ...]</code></td>
+<td><code>()</code></td>
+</tr>
+<tr>
+<td><code>system</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>tools</code></td>
+<td><code>tuple[ToolDefinition, ...]</code></td>
+<td><code>()</code></td>
+</tr>
+<tr>
+<td><code>tool_choice</code></td>
+<td><code>ToolChoice</code></td>
+<td><code>ToolChoice(mode='auto', name=None)</code></td>
+</tr>
+<tr>
+<td><code>max_output_tokens</code></td>
+<td><code>int | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>temperature</code></td>
+<td><code>float | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>top_p</code></td>
+<td><code>float | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>stop</code></td>
+<td><code>tuple[str, ...]</code></td>
+<td><code>()</code></td>
+</tr>
+<tr>
+<td><code>response_format</code></td>
+<td><code>ResponseFormat | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>provider_options</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>provider_options</code> es la válvula de escape para lo que un proveedor
+concreto expone y el vocabulario común no cubre.  Existe para que nadie
+tenga que bifurcar el tipo; usarla para algo que sí es común es una señal de
+que falta un campo en la especificación.</p>
+<h3><code>Response</code></h3>
+<p>Response(message: 'Message', finish_reason: 'FinishReason', usage: 'Usage' = &lt;factory&gt;, model: 'str' = '', provider_metadata: 'Mapping[str, Any]' = &lt;factory&gt;)</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>message</code></td>
+<td><code>Message</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>finish_reason</code></td>
+<td><code>FinishReason</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>usage</code></td>
+<td><code>Usage</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>provider_metadata</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>tool_calls</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>Usage</code></h3>
+<p>Contadores de tokens — H3.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input</code></td>
+<td><code>int | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>output</code></td>
+<td><code>int | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>reasoning</code></td>
+<td><code>int | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>cache_read</code></td>
+<td><code>int | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>cache_write</code></td>
+<td><code>int | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>estimated</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cache_hit_ratio</code></td>
+<td>—</td>
+<td>Fracción de <code>input</code> servida desde caché, o <code>None</code> si no se midió.</td>
+</tr>
+<tr>
+<td><code>total</code></td>
+<td>—</td>
+<td>Tokens facturables, o <code>None</code> si falta alguno por medir.</td>
+</tr>
+<tr>
+<td><code>zero</code></td>
+<td><code>zero() -&gt; &quot;Usage&quot;</code></td>
+<td>Punto de partida para acumular.  Distinto de <code>Usage()</code>, que es «nada medido».</td>
+</tr>
+</tbody>
+</table></div>
+<p>Cinco campos, y <strong>ninguno por defecto a cero</strong>.  <code>None</code> significa «nadie
+lo midió»; <code>0</code> significa «se midió y fue cero».  La distinción no es
+purismo: si <code>cache_write</code> llega como cero cuando en realidad la fuente no
+lo reporta, el bucle concluye que escribir en caché es gratis y decide mal
+en cada compactación.  Ese fallo no salta — solo cuadra mal.</p>
+<p>No es hipotético.  Un backend llama.cpp, por ejemplo, solo puede alimentar
+<code>input</code>, <code>output</code> y <code>cache_read</code>; <code>reasoning</code> y <code>cache_write</code> no
+existen en la fuente.</p>
+<p><code>estimated</code> marca los contadores <strong>derivados</strong> en vez de reportados —
+llama.cpp obliga a deducirlos de los <code>timings</code> del chunk final.  Sin ese
+bit, FinOps factura sobre una estimación creyéndola exacta.</p>
+<p><code>input</code> es <strong>inclusivo</strong>: contiene los tokens servidos desde caché, y
+<code>cache_read</code> dice cuántos de ellos lo fueron.  Sin fijarlo, dos
+implementaciones eligen convenciones distintas y la factura sale mal sin que
+nada falle.</p>
+<h3><code>FinishReason</code></h3>
+<p>str(object='') -&gt; str str(bytes_or_buffer[, encoding[, errors]]) -&gt; str</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Valor</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FinishReason.STOP</code></td>
+<td><code>'stop'</code></td>
+</tr>
+<tr>
+<td><code>FinishReason.LENGTH</code></td>
+<td><code>'length'</code></td>
+</tr>
+<tr>
+<td><code>FinishReason.TOOL_CALLS</code></td>
+<td><code>'tool_calls'</code></td>
+</tr>
+<tr>
+<td><code>FinishReason.CONTENT_FILTER</code></td>
+<td><code>'content_filter'</code></td>
+</tr>
+<tr>
+<td><code>FinishReason.ERROR</code></td>
+<td><code>'error'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Create a new string object from the given object. If encoding or
+errors is specified, then the object must expose a data buffer
+that will be decoded using the given encoding and error handler.
+Otherwise, returns the result of object.<strong>str</strong>() (if defined)
+or repr(object).
+encoding defaults to 'utf-8'.
+errors defaults to 'strict'.</p>
+<h3><code>ResponseFormat</code></h3>
+<p>ResponseFormat(kind: &quot;Literal['text', 'json_object', 'json_schema']&quot; = 'text', schema: 'Mapping[str, Any] | None' = None, name: 'str | None' = None, strict: 'bool' = True)</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['text', 'json_object', 'json_schema']</code></td>
+<td><code>'text'</code></td>
+</tr>
+<tr>
+<td><code>schema</code></td>
+<td><code>Mapping[str, Any] | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>strict</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+</tr>
+</tbody>
+</table></div>
+<h2>Streaming</h2>
+<p>El ciclo start/delta/end de cada clase de contenido.</p>
+<h3><code>StreamEvent</code></h3>
+<p><code>StreamEvent = synaptum.core.types.StreamStart | synaptum.core.types.TextStart | synaptum.core.types.TextDelta | synaptum.core.types.TextEnd | synaptum.core.types.ReasoningStart | synaptum.core.types.ReasoningDelta | synaptum.core.types.ReasoningEnd | synaptum.core.types.ToolCallStart | synaptum.core.types.ToolCallDelta | synaptum.core.types.ToolCallEnd | synaptum.core.types.Finish</code></p>
+<p>Represent a PEP 604 union type</p>
+<h3><code>StreamStart</code></h3>
+<p>StreamStart(model: 'str' = '', kind: &quot;Literal['stream_start']&quot; = 'stream_start')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['stream_start']</code></td>
+<td><code>'stream_start'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>TextStart</code></h3>
+<p>TextStart(index: 'int' = 0, kind: &quot;Literal['text_start']&quot; = 'text_start')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>index</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['text_start']</code></td>
+<td><code>'text_start'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>TextDelta</code></h3>
+<p>TextDelta(text: 'str' = '', index: 'int' = 0, kind: &quot;Literal['text_delta']&quot; = 'text_delta')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>index</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['text_delta']</code></td>
+<td><code>'text_delta'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>TextEnd</code></h3>
+<p>TextEnd(index: 'int' = 0, kind: &quot;Literal['text_end']&quot; = 'text_end')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>index</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['text_end']</code></td>
+<td><code>'text_end'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>ReasoningStart</code></h3>
+<p>ReasoningStart(index: 'int' = 0, kind: &quot;Literal['reasoning_start']&quot; = 'reasoning_start')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>index</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['reasoning_start']</code></td>
+<td><code>'reasoning_start'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>ReasoningDelta</code></h3>
+<p>ReasoningDelta(text: 'str' = '', index: 'int' = 0, kind: &quot;Literal['reasoning_delta']&quot; = 'reasoning_delta')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>index</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['reasoning_delta']</code></td>
+<td><code>'reasoning_delta'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>ReasoningEnd</code></h3>
+<p>ReasoningEnd(index: 'int' = 0, signature: 'str | None' = None, kind: &quot;Literal['reasoning_end']&quot; = 'reasoning_end')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>index</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>signature</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['reasoning_end']</code></td>
+<td><code>'reasoning_end'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>ToolCallStart</code></h3>
+<p>ToolCallStart(id: 'str' = '', name: 'str' = '', index: 'int' = 0, kind: &quot;Literal['tool_call_start']&quot; = 'tool_call_start')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>id</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>index</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['tool_call_start']</code></td>
+<td><code>'tool_call_start'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>ToolCallDelta</code></h3>
+<p>Fragmento de los argumentos, tal como llegan del proveedor.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>arguments_delta</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>index</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['tool_call_delta']</code></td>
+<td><code>'tool_call_delta'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Los argumentos se transmiten troceados y sin garantía de ser JSON válido
+hasta el final; quien consume acumula y solo parsea al recibir el
+<code>ToolCallEnd</code> correspondiente.</p>
+<h3><code>ToolCallEnd</code></h3>
+<p>ToolCallEnd(index: 'int' = 0, kind: &quot;Literal['tool_call_end']&quot; = 'tool_call_end')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>index</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['tool_call_end']</code></td>
+<td><code>'tool_call_end'</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>Finish</code></h3>
+<p>Cierre del stream con la respuesta acumulada.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>response</code></td>
+<td><code>Response</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>Literal['finish']</code></td>
+<td><code>'finish'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Lleva el <code>Response</code> completo para que quien consumió los deltas no tenga
+que reconstruirlo, y para que <code>Usage</code> vuelva por la costura (H3) aunque el
+span de <code>chat</code> lo emita quien ejecutó la llamada (A5).</p>
+<h2>Las dos costuras</h2>
+<p>Protocolos estructurales: quien los implemente no hereda ni importa nada.</p>
+<h3><code>Gateway</code></h3>
+<p>Decide y ejecuta.  Vive fuera del proceso del bucle.</p>
+<pre data-lenguaje="python"><code><span class="p-n">Gateway</span><span class="p-p">(</span><span class="p-o">*</span><span class="p-n">args</span><span class="p-p">,</span> <span class="p-o">**</span><span class="p-n">kwargs</span><span class="p-p">)</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>handshake</code></td>
+<td><code>async handshake(self, hello: Hello) -&gt; Welcome</code></td>
+<td>Negocia versión y registra el catálogo de tools.  Una vez por sesión.</td>
+</tr>
+<tr>
+<td><code>invoke_model</code></td>
+<td><code>async invoke_model(self, request: Request, ctx: CallContext) -&gt; Response</code></td>
+<td>Ejecuta una llamada al modelo y devuelve la respuesta completa.</td>
+</tr>
+<tr>
+<td><code>invoke_tool</code></td>
+<td><code>async invoke_tool(self, call: ToolCall, ctx: CallContext, *, risk: Risk, tool_ref: str | None = None) -&gt; ToolResult</code></td>
+<td>Ejecuta una herramienta.</td>
+</tr>
+<tr>
+<td><code>stream_model</code></td>
+<td><code>stream_model(self, request: Request, ctx: CallContext) -&gt; AsyncIterator[StreamEvent]</code></td>
+<td>Ejecuta una llamada al modelo en streaming — H2.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Cada método puede lanzar <code>Denied</code> con la <code>Decision</code> que corresponda —
+<code>deny_step</code> admite que el bucle intente otra cosa, <code>terminate_run</code> no, y
+<code>require_approval</code> suspende el run sin que sea un fallo.</p>
+<p>Toda respuesta devuelve <code>Usage</code> (H3).  El span de la operación lo emite
+este lado, porque es quien la realiza; pero los contadores vuelven, porque
+la economía de contexto del bucle depende de ellos y no son derivables desde
+fuera.</p>
+<h3><code>Checkpointer</code></h3>
+<p>Persiste el journal.  No decide nada.</p>
+<pre data-lenguaje="python"><code><span class="p-n">Checkpointer</span><span class="p-p">(</span><span class="p-o">*</span><span class="p-n">args</span><span class="p-p">,</span> <span class="p-o">**</span><span class="p-n">kwargs</span><span class="p-p">)</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>append</code></td>
+<td><code>async append(self, run_id: str, event: StepEvent) -&gt; AppendResult</code></td>
+<td>Añade un evento al journal.</td>
+</tr>
+<tr>
+<td><code>load</code></td>
+<td><code>async load(self, run_id: str) -&gt; RunState</code></td>
+<td>Reconstruye el diario de un run, en orden de escritura.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Es lo único que el harness tiene que implementar de forma obligatoria: dos
+métodos contra el almacén que ya use.  No necesita entender el bucle del
+agente, ni la lógica de replay, ni cómo se acuñan los identificadores.</p>
+<h3><code>CallContext</code></h3>
+<p>Lo que acompaña a cada cruce de la costura.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>traceparent</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>tracestate</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>deadline_s</code></td>
+<td><code>float | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>extra</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>traceparent</code> y <code>tracestate</code> son W3C y no son decorativos: el harness
+emite los spans de <code>chat</code> y <code>execute_tool</code> porque es quien ejecuta la
+E/S, mientras el bucle emite los suyos de estructura.  Sin propagar el
+contexto, unos y otros acaban en árboles de traza distintos y nadie puede
+seguir un run de punta a punta.</p>
+<h3><code>Decision</code></h3>
+<p>Decision(disposition: 'Disposition', reason_code: 'str' = '', message: 'str' = '')</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>disposition</code></td>
+<td><code>Disposition</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>reason_code</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>allowed</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>Disposition</code></h3>
+<p>«No» no es una sola cosa.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Valor</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Disposition.ALLOW</code></td>
+<td><code>'allow'</code></td>
+</tr>
+<tr>
+<td><code>Disposition.DENY_STEP</code></td>
+<td><code>'deny_step'</code></td>
+</tr>
+<tr>
+<td><code>Disposition.TERMINATE_RUN</code></td>
+<td><code>'terminate_run'</code></td>
+</tr>
+<tr>
+<td><code>Disposition.REQUIRE_APPROVAL</code></td>
+<td><code>'require_approval'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Sin distinguir estos casos el bucle no sabe si reintentar con otra cosa,
+esperar o parar, y cada implementación acabaría inventando su convención.</p>
+<h3><code>ALLOW</code></h3>
+<p><code>ALLOW = Decision(disposition=&lt;Disposition.ALLOW: 'allow'&gt;, reason_code='', message='')</code></p>
+<p>Decision(disposition: 'Disposition', reason_code: 'str' = '', message: 'str' = '')</p>
+<h3><code>Hello</code></h3>
+<p>Apertura de sesión, enviada por el bucle.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>versions</code></td>
+<td><code>tuple[str, ...]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>tools</code></td>
+<td><code>tuple[ToolDefinition, ...]</code></td>
+<td><code>()</code></td>
+</tr>
+<tr>
+<td><code>client</code></td>
+<td><code>str</code></td>
+<td><code>'synaptum'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Combina la negociación de versión con el registro de herramientas en un solo
+viaje, y no por ahorrar una llamada: <strong>las dos cosas tienen que ocurrir
+antes del primer turno y ninguna puede repetirse a mitad de sesión.</strong>
+Cambiar el catálogo de tools con la sesión abierta reescribe el prefijo del
+prompt y tira la caché del proveedor.</p>
+<h3><code>Welcome</code></h3>
+<p>Respuesta del harness al <code>Hello</code>.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>version</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>tool_refs</code></td>
+<td><code>Mapping[str, str]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>tool_refs</code> mapea nombre de tool a <strong>referencia versionada</strong> (H5).  A
+partir de aquí el esquema no viaja en cada llamada: se resolvió una vez y el
+prefijo cacheado se mantiene estable turno tras turno.</p>
+<h3><code>RunState</code></h3>
+<p>Lo que <code>load</code> devuelve: el journal de un run, en orden.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>events</code></td>
+<td><code>tuple[StepEvent, ...]</code></td>
+<td><code>()</code></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>attempted</code></td>
+<td><code>attempted(self, step_id: str) -&gt; bool</code></td>
+<td><code>True</code> si hay intención <strong>y no</strong> resultado.</td>
+</tr>
+<tr>
+<td><code>completed</code></td>
+<td><code>completed(self, step_id: str) -&gt; bool</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>final</code></td>
+<td>—</td>
+<td>El evento de cierre, si el run ya terminó.</td>
+</tr>
+<tr>
+<td><code>next_seq</code></td>
+<td>—</td>
+<td>Posición que ocupará la siguiente entrada del diario.</td>
+</tr>
+<tr>
+<td><code>result_of</code></td>
+<td><code>result_of(self, step_id: str) -&gt; StepEvent | None</code></td>
+<td>Resultado ya registrado de un paso, si lo hay.</td>
+</tr>
+</tbody>
+</table></div>
+<p>El bucle lo usa para adelantar — <code>fast-forward</code> — sobre los pasos que ya
+tienen resultado registrado, en vez de volver a ejecutarlos.  Ahí está el
+valor entero de la ejecución durable: <strong>al reanudar, una inferencia ya
+pagada no se paga otra vez.</strong></p>
+<h3><code>SEAM_VERSION</code></h3>
+<p><code>SEAM_VERSION = '0.1'</code></p>
+<p>str(object='') -&gt; str str(bytes_or_buffer[, encoding[, errors]]) -&gt; str</p>
+<h3><code>SUPPORT_WINDOW</code></h3>
+<p><code>SUPPORT_WINDOW = 2</code></p>
+<p>int([x]) -&gt; integer int(x, base=10) -&gt; integer</p>
+<h3><code>negotiate</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">negotiate</span><span class="p-p">(</span><span class="p-n">peer</span><span class="p-p">:</span> <span class="p-n">Sequence</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">],</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">current</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-mf">0.1</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">str</span>
+</code></pre>
+<p>Elige la versión más alta que ambos extremos hablan.</p>
+<p>Recorre las nuestras de más nueva a más vieja, de modo que dos extremos al
+día no se quedan atascados en una antigua solo porque ambos la soportan.</p>
+<p>Raises:
+SeamVersionError: si no hay ninguna en común.  Fallar aquí es mucho
+mejor que descubrir la incompatibilidad campo a campo.</p>
+<h3><code>supported_versions</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">supported_versions</span><span class="p-p">(</span><span class="p-n">current</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-mf">0.1</span><span class="p-p">,</span> <span class="p-n">window</span><span class="p-p">:</span> <span class="p-nb">int</span> <span class="p-o">=</span> <span class="p-mi">2</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">tuple</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">...</span><span class="p-p">]</span>
+</code></pre>
+<p>Versiones que este extremo acepta, de la más nueva a la más vieja.</p>
+<h2>Runtime</h2>
+<p>Implementaciones de referencia. Ninguna es para producción a escala.</p>
+<h3><code>LocalGateway</code></h3>
+<p><code>Gateway</code> de referencia para modo autónomo.</p>
+<pre data-lenguaje="python"><code><span class="p-n">LocalGateway</span><span class="p-p">(</span><span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">model</span><span class="p-p">:</span> <span class="p-n">ModelCall</span><span class="p-p">,</span> <span class="p-n">stream</span><span class="p-p">:</span> <span class="p-n">ModelStream</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-p">:</span> <span class="p-n">Sequence</span><span class="p-p">[</span><span class="p-n">Tool</span><span class="p-p">]</span> <span class="p-o">=</span> <span class="p-p">(),</span> <span class="p-n">policy</span><span class="p-p">:</span> <span class="p-n">Policy</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">warn</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">=</span> <span class="p-kc">True</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>handshake</code></td>
+<td><code>async handshake(self, hello: Hello) -&gt; Welcome</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>invoke_model</code></td>
+<td><code>async invoke_model(self, request: Request, ctx: CallContext) -&gt; Response</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>invoke_tool</code></td>
+<td><code>async invoke_tool(self, call: ToolCall, ctx: CallContext, *, risk: Risk = &lt;Risk.READ: read&gt;, tool_ref: str | None = None) -&gt; ToolResult</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>report</code></td>
+<td><code>report(self) -&gt; str</code></td>
+<td>Qué habría decidido un gateway real, en texto.</td>
+</tr>
+<tr>
+<td><code>stream_model</code></td>
+<td><code>stream_model(self, request: Request, ctx: CallContext) -&gt; AsyncIterator[StreamEvent]</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Args:
+model: callable <code>(Request) -&gt; Awaitable[Response]</code>.  Cualquier
+adaptador de proveedor encaja sin que este módulo lo conozca.
+stream: opcional.  Si falta, el streaming se sirve igual entregando la
+respuesta completa como un único fragmento — y el <code>Finish</code> lo
+declara en <code>provider_metadata[&quot;streamed&quot;]</code>.  Ocultar la
+diferencia haría creer a quien corta por presupuesto que está
+ahorrando cuando ya ha pagado la respuesta entera.
+tools: herramientas decoradas con <code>@tool</code>, que se ejecutan de verdad.
+policy: política simulada, opcional.
+warn: pon <code>False</code> solo si ya sabes que esto no aplica nada.</p>
+<h3><code>Check</code></h3>
+<p>Una decisión que un gateway real habría tomado.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kind</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>step_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>risk</code></td>
+<td><code>Risk</code></td>
+<td><code>&lt;Risk.READ: 'read'&gt;</code></td>
+</tr>
+<tr>
+<td><code>arguments</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>decision</code></td>
+<td><code>Decision | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>enforced</code></td>
+<td><code>bool</code></td>
+<td><code>False</code></td>
+</tr>
+<tr>
+<td><code>detail</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>MemoryCheckpointer</code></h3>
+<p><code>Checkpointer</code> en memoria.  Cumple el contrato completo.</p>
+<pre data-lenguaje="python"><code><span class="p-n">MemoryCheckpointer</span><span class="p-p">()</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>append</code></td>
+<td><code>async append(self, run_id: str, event: StepEvent) -&gt; AppendResult</code></td>
+<td>Idempotente por <code>(run_id, step_id, phase)</code>.  Un duplicado es no-op.</td>
+</tr>
+<tr>
+<td><code>event_count</code></td>
+<td><code>event_count(self, run_id: str) -&gt; int</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>load</code></td>
+<td><code>async load(self, run_id: str) -&gt; RunState</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Existe para dos cosas: que Synaptum sea utilizable sin harness, y que haya
+una implementación contra la que contrastar cualquier otra.  No es un
+motor de producción y no pretende serlo.</p>
+<h3><code>SqliteCheckpointer</code></h3>
+<p><code>Checkpointer</code> sobre SQLite.  Cumple el contrato completo.</p>
+<pre data-lenguaje="python"><code><span class="p-n">SqliteCheckpointer</span><span class="p-p">(</span><span class="p-n">path</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-n">Path</span> <span class="p-o">=</span> <span class="p-s1">':memory:'</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>append</code></td>
+<td><code>async append(self, run_id: str, event: StepEvent) -&gt; AppendResult</code></td>
+<td>Añade un evento.  Un duplicado es no-op, garantizado por la clave.</td>
+</tr>
+<tr>
+<td><code>close</code></td>
+<td><code>close(self) -&gt; None</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>load</code></td>
+<td><code>async load(self, run_id: str) -&gt; RunState</code></td>
+<td>Reconstruye el estado del run, o <code>None</code> si no existe.</td>
+</tr>
+<tr>
+<td><code>runs</code></td>
+<td><code>runs(self) -&gt; list[str]</code></td>
+<td>Identificadores de los runs almacenados.  Fuera del protocolo.</td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>Journal</code></h3>
+<p>Escribe eventos respetando la durabilidad que cada uno declara.</p>
+<pre data-lenguaje="python"><code><span class="p-n">Journal</span><span class="p-p">(</span><span class="p-n">checkpointer</span><span class="p-p">:</span> <span class="p-n">Checkpointer</span><span class="p-p">,</span> <span class="p-n">run_id</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>flush</code></td>
+<td><code>async flush(self) -&gt; None</code></td>
+<td>Vacía lo diferido.  Se llama al cerrar el run, y ante cualquier salida.</td>
+</tr>
+<tr>
+<td><code>record</code></td>
+<td><code>async record(self, event: StepEvent) -&gt; None</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>El orden importa más de lo que parece.  Los eventos diferidos se vacían
+<strong>antes</strong> de escribir uno durable, de modo que el journal conserva el orden
+de ejecución: si no, un evento estructural anterior aparecería después del
+efecto que lo siguió, y el registro dejaría de describir lo que pasó.</p>
+<h3><code>Replay</code></h3>
+<p>Consulta al journal si un paso ya ocurrió.</p>
+<pre data-lenguaje="python"><code><span class="p-n">Replay</span><span class="p-p">(</span><span class="p-n">state</span><span class="p-p">:</span> <span class="p-n">RunState</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>active</code></td>
+<td>—</td>
+<td><code>True</code> si hay algo que reproducir.</td>
+</tr>
+<tr>
+<td><code>closed</code></td>
+<td>—</td>
+<td>El cierre del run, si ya lo hubo.</td>
+</tr>
+<tr>
+<td><code>resolve</code></td>
+<td><code>resolve(self, step_id: str, *, idempotent: bool = True) -&gt; StepEvent | None</code></td>
+<td>Devuelve el resultado ya registrado, o <code>None</code> si toca ejecutar.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Tres respuestas posibles para cada paso, y la tercera es la interesante:</p>
+<ul>
+<li><strong>Hecho</strong> — hay resultado registrado.  Se devuelve y no se ejecuta nada.
+Aquí es donde se ahorra la inferencia.</li>
+<li><strong>Nuevo</strong> — no hay rastro.  Se ejecuta con normalidad.</li>
+<li><strong>Denegado</strong> — hay resultado, y dice que la costura no dejó ocurrir el
+efecto.  Se vuelve a intentar: entre una reanudación y otra alguien pudo
+aprobar lo que antes se denegó.</li>
+<li><strong>Incierto</strong> — hay intención sin resultado.  El proceso cayó en medio, así
+que el efecto <strong>pudo haber ocurrido</strong>.</li>
+</ul>
+<h3><code>HttpModel</code></h3>
+<p>Llama a un endpoint HTTP y devuelve respuestas ya normalizadas.</p>
+<pre data-lenguaje="python"><code><span class="p-n">HttpModel</span><span class="p-p">(</span><span class="p-n">base_url</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">api_key</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">provider</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">path</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">'/chat/completions'</span><span class="p-p">,</span> <span class="p-n">headers</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-nb">str</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">timeout</span><span class="p-p">:</span> <span class="p-nb">float</span> <span class="p-o">=</span> <span class="p-mf">120.0</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>stream</code></td>
+<td><code>stream(self, request: Request) -&gt; AsyncIterator[StreamEvent]</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Args:
+base_url: raíz del servicio, por ejemplo <code>http://localhost:8080/v1</code>.
+api_key: si falta, no se manda cabecera de autorización — hay
+despliegues locales que no la piden, y mandar <code>Bearer None</code> es
+peor que no mandar nada.
+provider: nombre del adaptador. Por defecto se toma del prefijo de
+<code>Request.model</code> (<code>&quot;openai-compatible:qwen3-0.6b&quot;</code>), que es lo
+que el agente ya escribe.
+path: ruta del endpoint de chat, relativa a <code>base_url</code>.
+headers: cabeceras extra. Se mandan tal cual.
+timeout: segundos de espera <strong>por lectura</strong>, no por respuesta completa.
+Un modelo de razonamiento puede tardar mucho en emitir el primer
+token y eso no es un fallo.</p>
+<h2>Errores</h2>
+<p>La reintentabilidad viaja <strong>en el tipo</strong>, no en una tabla de códigos.</p>
+<h3><code>SynaptumError</code></h3>
+<p>Raíz de todo lo que este framework lanza a propósito.</p>
+<pre data-lenguaje="python"><code><span class="p-n">SynaptumError</span><span class="p-p">(</span><span class="p-n">message</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">retryable</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">retry_after</span><span class="p-p">:</span> <span class="p-nb">float</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<p><code>retryable</code> es la única pregunta que el bucle le hace a un error.</p>
+<h3><code>ConfigurationError</code></h3>
+<p>Falta algo, sobra algo, o dos cosas se contradicen.</p>
+<pre data-lenguaje="python"><code><span class="p-n">ConfigurationError</span><span class="p-p">(</span><span class="p-n">message</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">retryable</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">retry_after</span><span class="p-p">:</span> <span class="p-nb">float</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<p>Nunca reintentable: el entorno no se arregla solo entre dos intentos.</p>
+<h3><code>ProviderError</code></h3>
+<p>Error devuelto por el proveedor, con su estado HTTP si lo hubo.</p>
+<pre data-lenguaje="python"><code><span class="p-n">ProviderError</span><span class="p-p">(</span><span class="p-n">message</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">status</span><span class="p-p">:</span> <span class="p-nb">int</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">provider</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-n">retryable</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">retry_after</span><span class="p-p">:</span> <span class="p-nb">float</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<p>Cuando no se pasa <code>retryable</code> explícito, se deduce del estado según la
+regla de clasificación.  Un error sin estado se considera transitorio.</p>
+<h3><code>RequestTimeoutError</code></h3>
+<p>La petición no respondió dentro del plazo.</p>
+<pre data-lenguaje="python"><code><span class="p-n">RequestTimeoutError</span><span class="p-p">(</span><span class="p-n">message</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">retryable</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">retry_after</span><span class="p-p">:</span> <span class="p-nb">float</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<h3><code>NetworkError</code></h3>
+<p>Falló el camino, no el destino.</p>
+<pre data-lenguaje="python"><code><span class="p-n">NetworkError</span><span class="p-p">(</span><span class="p-n">message</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">retryable</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">retry_after</span><span class="p-p">:</span> <span class="p-nb">float</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<h3><code>AbortError</code></h3>
+<p>Alguien canceló deliberadamente — H2.</p>
+<pre data-lenguaje="python"><code><span class="p-n">AbortError</span><span class="p-p">(</span><span class="p-n">message</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">retryable</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">retry_after</span><span class="p-p">:</span> <span class="p-nb">float</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<p>No es un fallo del sistema y no se reintenta: reintentar una cancelación es
+exactamente lo contrario de lo que pidió quien canceló.</p>
+<h3><code>Denied</code></h3>
+<p>La costura de aplicación no dejó ocurrir el efecto — H4.</p>
+<pre data-lenguaje="python"><code><span class="p-n">Denied</span><span class="p-p">(</span><span class="p-n">decision</span><span class="p-p">:</span> <span class="p-n">Decision</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>disposition</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>terminal</code></td>
+<td>—</td>
+<td><code>True</code> si el run no puede continuar por ninguna vía.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Lleva la <code>Decision</code> entera para que el bucle sepa qué hacer: <code>deny_step</code>
+admite intentar otra cosa, <code>terminate_run</code> no, y <code>require_approval</code>
+suspende el run sin que sea un fallo.</p>
+<h3><code>InvalidToolCallError</code></h3>
+<p>El modelo pidió una tool que no existe, o con argumentos que no validan.</p>
+<pre data-lenguaje="python"><code><span class="p-n">InvalidToolCallError</span><span class="p-p">(</span><span class="p-n">message</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">tool</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-n">call_id</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<p>No reintentable tal cual: lo que corrige esto es devolverle el error al
+modelo como <code>ToolResult</code> para que rectifique, no repetir la llamada.</p>
+<h3><code>ToolExecutionError</code></h3>
+<p>La tool existía, se invocó bien, y falló al ejecutarse.</p>
+<pre data-lenguaje="python"><code><span class="p-n">ToolExecutionError</span><span class="p-p">(</span><span class="p-n">message</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">tool</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-n">retryable</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">=</span> <span class="p-kc">False</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<p>Reintentable solo si quien la definió declara que el efecto es idempotente.</p>
+<h3><code>NoObjectGeneratedError</code></h3>
+<p>Se pidió salida estructurada y no salió un objeto válido.</p>
+<pre data-lenguaje="python"><code><span class="p-n">NoObjectGeneratedError</span><span class="p-p">(</span><span class="p-n">message</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">raw</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<p>Reintentable: el muestreo es estocástico y una segunda pasada suele acertar.</p>
+<h3><code>LimitExceeded</code></h3>
+<p>Se agotó un límite del bucle: pasos, reintentos, presupuesto de ventana.</p>
+<pre data-lenguaje="python"><code><span class="p-n">LimitExceeded</span><span class="p-p">(</span><span class="p-n">limit</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">value</span><span class="p-p">:</span> <span class="p-nb">int</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<p>Es corrección, no política: los límites de gasto pertenecen al harness y
+llegan como <code>Denied</code> con <code>terminate_run</code>.</p>
+<h3><code>UncertainEffect</code></h3>
+<p>Al reanudar hay una intención registrada sin resultado, y el efecto no es idempotente.</p>
+<pre data-lenguaje="python"><code><span class="p-n">UncertainEffect</span><span class="p-p">(</span><span class="p-n">step_id</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">detail</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<p>El proceso cayó entre el registro y el efecto, así que el efecto <strong>pudo
+haber ocurrido</strong> y no hay forma de saberlo desde aquí.  Repetirlo a ciegas
+es lo peor posible; ignorarlo, tampoco es correcto.</p>
+<p>El bucle no puede resolverlo por sí mismo — lo levanta para que lo decida
+quien tiene la información: el harness, o una persona.</p>
+<h3><code>SeamVersionError</code></h3>
+<p>No hay versión de costura común entre los dos extremos — RM-12.</p>
+<pre data-lenguaje="python"><code><span class="p-n">SeamVersionError</span><span class="p-p">(</span><span class="p-n">message</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">retryable</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">retry_after</span><span class="p-p">:</span> <span class="p-nb">float</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<h3><code>retryable_for_status</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">retryable_for_status</span><span class="p-p">(</span><span class="p-n">status</span><span class="p-p">:</span> <span class="p-nb">int</span> <span class="p-o">|</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">bool</span>
+</code></pre>
+<p>Aplica la regla de clasificación a un estado HTTP.</p>
+<p>Sin estado devuelve <code>True</code>: un fallo que ni siquiera llegó a tener
+respuesta se parece más a un problema de camino que a una petición
+inválida.</p>
+<p>Un 4xx desconocido, en cambio, devuelve <code>False</code>.  La familia entera
+significa «tu petición es el problema», y repetirla sin cambiarla da el
+mismo resultado — el 429 es la excepción, y está contemplada aparte.</p>
+<h2>Esquemas y prompts</h2>
+<h3><code>Schema</code></h3>
+<p>Un tipo de salida: su esquema y cómo validar lo que vuelve.</p>
+<pre data-lenguaje="python"><code><span class="p-n">Schema</span><span class="p-p">(</span><span class="p-o">*</span><span class="p-n">args</span><span class="p-p">,</span> <span class="p-o">**</span><span class="p-n">kwargs</span><span class="p-p">)</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dump</code></td>
+<td><code>dump(self, obj: Any) -&gt; Any</code></td>
+<td>Devuelve el objeto como datos JSON, para el journal.</td>
+</tr>
+<tr>
+<td><code>json_schema</code></td>
+<td><code>json_schema(self) -&gt; Mapping[str, Any]</code></td>
+<td>El JSON Schema que viaja al proveedor.</td>
+</tr>
+<tr>
+<td><code>validate</code></td>
+<td><code>validate(self, data: Any) -&gt; Any</code></td>
+<td>Convierte datos ya parseados en el objeto tipado.</td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>schema_for</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">schema_for</span><span class="p-p">(</span><span class="p-n">spec</span><span class="p-p">:</span> <span class="p-n">Any</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Schema</span>
+</code></pre>
+<p>Convierte lo que el usuario tenga a mano en un <code>Schema</code>.</p>
+<p>Acepta, por este orden: algo que ya cumple el protocolo, un modelo de
+Pydantic, un dataclass, o un JSON Schema como diccionario.</p>
+<h3><code>json_schema_for</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">json_schema_for</span><span class="p-p">(</span><span class="p-n">fn</span><span class="p-p">:</span> <span class="p-n">Callable</span><span class="p-p">[</span><span class="p-o">...</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">],</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">localns</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">dict</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">]</span>
+</code></pre>
+<p>Deriva el JSON Schema de los parámetros de una función tipada.</p>
+<h3><code>PromptTemplate</code></h3>
+<p>Un prompt con su versión.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>content</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td><code>str</code></td>
+<td><code>'1.0'</code></td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>variables</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>placeholders</code></td>
+<td>—</td>
+<td>Nombres de las variables que el template usa.</td>
+</tr>
+<tr>
+<td><code>render</code></td>
+<td><code>render(self, **values: Any) -&gt; str</code></td>
+<td>Interpola las variables.  Los argumentos ganan sobre los del template.</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>version</code> no es decoración: cuando una respuesta sale mal en producción, la
+primera pregunta es con qué prompt se generó, y un literal en el código no
+sabe contestarla.</p>
+<h3><code>PromptProvider</code></h3>
+<p>Cualquier fuente de prompts.</p>
+<pre data-lenguaje="python"><code><span class="p-n">PromptProvider</span><span class="p-p">(</span><span class="p-o">*</span><span class="p-n">args</span><span class="p-p">,</span> <span class="p-o">**</span><span class="p-n">kwargs</span><span class="p-p">)</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>exists</code></td>
+<td><code>exists(self, name: str) -&gt; bool</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>get</code></td>
+<td><code>get(self, name: str) -&gt; PromptTemplate</code></td>
+<td>Raises: <code>KeyError</code> si no existe.</td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>InMemoryPrompts</code></h3>
+<p>Prompts en un diccionario.  Para tests y para sobrescribir en local.</p>
+<pre data-lenguaje="python"><code><span class="p-n">InMemoryPrompts</span><span class="p-p">(</span><span class="p-n">prompts</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">PromptTemplate</span> <span class="p-o">|</span> <span class="p-nb">str</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>exists</code></td>
+<td><code>exists(self, name: str) -&gt; bool</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>get</code></td>
+<td><code>get(self, name: str) -&gt; PromptTemplate</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>register</code></td>
+<td><code>register(self, name: str, template: PromptTemplate | str) -&gt; None</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<h3><code>FilePrompts</code></h3>
+<p>Prompts en un fichero JSON o YAML.</p>
+<pre data-lenguaje="python"><code><span class="p-n">FilePrompts</span><span class="p-p">(</span><span class="p-n">path</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-n">Path</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>exists</code></td>
+<td><code>exists(self, name: str) -&gt; bool</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>get</code></td>
+<td><code>get(self, name: str) -&gt; PromptTemplate</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>reload</code></td>
+<td><code>reload(self) -&gt; None</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>JSON funciona sin dependencias.</strong> YAML necesita PyYAML, y por eso no es el
+camino por defecto: en la v0.4 lo era, y arrastraba una dependencia para todo
+el mundo por una comodidad de sintaxis.</p>
+<p>Carga perezosa y cacheada. <code>reload()</code> la invalida, que es lo que hace
+utilizable editar prompts sin reiniciar.</p>
+<h3><code>PromptRegistry</code></h3>
+<p>Encadena proveedores por prioridad: el primero que tenga el prompt, gana.</p>
+<pre data-lenguaje="python"><code><span class="p-n">PromptRegistry</span><span class="p-p">(</span><span class="p-o">*</span><span class="p-n">providers</span><span class="p-p">:</span> <span class="p-n">PromptProvider</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add</code></td>
+<td><code>add(self, provider: PromptProvider) -&gt; &quot;PromptRegistry&quot;</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>exists</code></td>
+<td><code>exists(self, name: str) -&gt; bool</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>get</code></td>
+<td><code>get(self, name: str) -&gt; PromptTemplate</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>prepend</code></td>
+<td><code>prepend(self, provider: PromptProvider) -&gt; &quot;PromptRegistry&quot;</code></td>
+<td>Lo pone delante de todo: es cómo se sobrescribe sin borrar.</td>
+</tr>
+</tbody>
+</table></div>
+<p>El orden importa y es el de registro, como un PATH. Así se sobrescribe un
+prompt en local anteponiendo un proveedor, sin editar el fichero que
+comparte todo el mundo.</p>
+<h3><code>fmt_dict</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">fmt_dict</span><span class="p-p">(</span><span class="p-n">data</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">],</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">max_value</span><span class="p-p">:</span> <span class="p-nb">int</span> <span class="p-o">=</span> <span class="p-mi">500</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">str</span>
+</code></pre>
+<p>Serializa un diccionario como líneas <code>clave: valor</code>.</p>
+<h3><code>fmt_list</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">fmt_list</span><span class="p-p">(</span><span class="p-n">items</span><span class="p-p">:</span> <span class="p-nb">list</span><span class="p-p">[</span><span class="p-n">Any</span><span class="p-p">],</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">prefix</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">'· '</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">str</span>
+</code></pre>
+<p>Serializa una lista como líneas con prefijo.</p>
+<h3><code>fmt_records</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">fmt_records</span><span class="p-p">(</span><span class="p-n">items</span><span class="p-p">:</span> <span class="p-nb">list</span><span class="p-p">[</span><span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">]],</span> <span class="p-n">template</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">str</span>
+</code></pre>
+<p>Serializa una lista de diccionarios con una plantilla por línea.</p>
+<h2>Proveedores y utilidades</h2>
+<h3><code>Provider</code></h3>
+<p>Traduce entre el vocabulario unificado y el dialecto de un proveedor.</p>
+<pre data-lenguaje="python"><code><span class="p-n">Provider</span><span class="p-p">(</span><span class="p-o">*</span><span class="p-n">args</span><span class="p-p">,</span> <span class="p-o">**</span><span class="p-n">kwargs</span><span class="p-p">)</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>from_wire</code></td>
+<td><code>from_wire(self, body: Mapping[str, Any]) -&gt; Response</code></td>
+<td>Del cuerpo nativo al vocabulario unificado.</td>
+</tr>
+<tr>
+<td><code>stream_from_wire</code></td>
+<td><code>stream_from_wire(self, chunks: Iterable[Mapping[str, Any]]) -&gt; Iterator[StreamEvent]</code></td>
+<td>De los fragmentos nativos al ciclo de eventos unificado.</td>
+</tr>
+<tr>
+<td><code>to_wire</code></td>
+<td><code>to_wire(self, request: Request) -&gt; Mapping[str, Any]</code></td>
+<td>Del vocabulario unificado al cuerpo que espera el proveedor.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Las tres operaciones son <strong>puras</strong>: no abren conexiones y no leen
+credenciales. Por eso el corpus dorado de normalización se puede ejecutar
+sin un servidor delante.</p>
+<h3><code>dumps</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">dumps</span><span class="p-p">(</span><span class="p-n">obj</span><span class="p-p">:</span> <span class="p-n">Any</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">str</span>
+</code></pre>
+<p>Serializa de forma determinista.</p>
+<p>Claves ordenadas y separadores fijos: dos objetos iguales producen la misma
+cadena byte a byte, en cualquier proceso y en cualquier ejecución.  Es lo
+que hace comparables los eventos entre ejecución y replay, y lo que permite
+que un prefijo de prompt sea estable frente a la caché del proveedor.</p>
+<h3><code>to_jsonable</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">to_jsonable</span><span class="p-p">(</span><span class="p-n">obj</span><span class="p-p">:</span> <span class="p-n">Any</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Any</span>
+</code></pre>
+<p>Convierte a estructuras JSON puras, recursivamente.</p>
+<p>Los <code>None</code> se omiten: reducen el tamaño del journal y evitan que añadir un
+campo opcional cambie la serialización de valores que no lo usan, lo que
+rompería la comparación de replay entre versiones.</p>
+<h3><code>b64</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">b64</span><span class="p-p">(</span><span class="p-n">data</span><span class="p-p">:</span> <span class="p-nb">bytes</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">str</span>
+</code></pre>
+<p>Codifica binario para los campos <code>data</code> de las partes de contenido.</p>
+<h3><code>__version__</code></h3>
+<p><code>__version__ = '1.0.0rc1'</code></p>
+<p>str(object='') -&gt; str str(bytes_or_buffer[, encoding[, errors]]) -&gt; str</p>
+<h2>Dobles de desarrollo</h2>
+<p><code>synaptum.testing</code> — Infraestructura, no una utilidad de test: es la vía principal para construir sin gastar.</p>
+<h3><code>FakeGateway</code></h3>
+<p><code>Gateway</code> guionizado.  Ejecuta de verdad las tools que se le registran.</p>
+<pre data-lenguaje="python"><code><span class="p-n">FakeGateway</span><span class="p-p">(</span><span class="p-o">*</span><span class="p-n">script</span><span class="p-p">:</span> <span class="p-n">ScriptItem</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-p">:</span> <span class="p-n">Sequence</span><span class="p-p">[</span><span class="p-n">Tool</span><span class="p-p">]</span> <span class="p-o">=</span> <span class="p-p">(),</span> <span class="p-n">chunk_size</span><span class="p-p">:</span> <span class="p-nb">int</span> <span class="p-o">=</span> <span class="p-mi">8</span><span class="p-p">,</span> <span class="p-n">deny_tools</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Decision</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>handshake</code></td>
+<td><code>async handshake(self, hello: Hello) -&gt; Welcome</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>invoke_model</code></td>
+<td><code>async invoke_model(self, request: Request, ctx: CallContext) -&gt; Response</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>invoke_tool</code></td>
+<td><code>async invoke_tool(self, call: ToolCall, ctx: CallContext, *, risk: Risk = &lt;Risk.READ: read&gt;, tool_ref: str | None = None) -&gt; ToolResult</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>stream_model</code></td>
+<td><code>stream_model(self, request: Request, ctx: CallContext) -&gt; AsyncIterator[StreamEvent]</code></td>
+<td>Emite la respuesta troceada, honrando la cancelación.</td>
+</tr>
+</tbody>
+</table></div>
+<p>El guion se consume en orden.  Cada elemento puede ser:</p>
+<ul>
+<li><code>Response</code> — se devuelve tal cual.</li>
+<li><code>str</code> — atajo de <code>says(...)</code>.</li>
+<li><code>BaseException</code> — se lanza.  Con un <code>ProviderError</code> se ejercita el
+camino de reintentos.</li>
+<li><code>Decision</code> — se lanza como <code>Denied</code>.  Es como se prueban las tres
+disposiciones sin montar un motor de políticas.</li>
+<li><code>callable(request)</code> — se llama y se trata su retorno como lo anterior.
+Sirve para responder según lo que el bucle acabe de enviar.</li>
+</ul>
+<h3><code>ReplayGateway</code></h3>
+<p><code>Gateway</code> que sirve respuestas grabadas, normalizadas de verdad.</p>
+<pre data-lenguaje="python"><code><span class="p-n">ReplayGateway</span><span class="p-p">(</span><span class="p-o">*</span><span class="p-n">bodies</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-n">Path</span><span class="p-p">,</span> <span class="p-n">provider</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">'openai-compatible'</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-p">:</span> <span class="p-n">Sequence</span><span class="p-p">[</span><span class="p-n">Tool</span><span class="p-p">]</span> <span class="p-o">=</span> <span class="p-p">(),</span> <span class="p-n">deny_tools</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Decision</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>handshake</code></td>
+<td><code>async handshake(self, hello: Hello) -&gt; Welcome</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>invoke_model</code></td>
+<td><code>async invoke_model(self, request: Request, ctx: CallContext) -&gt; Response</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>invoke_tool</code></td>
+<td><code>async invoke_tool(self, call: ToolCall, ctx: CallContext, *, risk: Risk = &lt;Risk.READ: read&gt;, tool_ref: str | None = None) -&gt; ToolResult</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>rewind</code></td>
+<td><code>rewind(self) -&gt; None</code></td>
+<td>Vuelve al primer cuerpo.  Útil para reanudar el mismo run dos veces.</td>
+</tr>
+<tr>
+<td><code>stream_model</code></td>
+<td><code>stream_model(self, request: Request, ctx: CallContext) -&gt; AsyncIterator[StreamEvent]</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Args:
+bodies: rutas a cuerpos grabados.  <code>.sse</code> se sirve como stream;
+cualquier otra extensión, como respuesta completa.
+provider: adaptador con el que normalizar.  Por defecto, el dialecto
+OpenAI-compatible, que es el que habla casi todo.
+tools: herramientas decoradas, que se ejecutan de verdad.
+deny_tools: denegaciones simuladas por nombre de herramienta.</p>
+<h3><code>says</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">says</span><span class="p-p">(</span><span class="p-n">text</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">usage</span><span class="p-p">:</span> <span class="p-n">Usage</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Response</span>
+</code></pre>
+<p>Respuesta de texto que cierra el turno.</p>
+<h3><code>calls</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">calls</span><span class="p-p">(</span><span class="p-n">name</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-nb">id</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">'call-1'</span><span class="p-p">,</span> <span class="p-n">usage</span><span class="p-p">:</span> <span class="p-n">Usage</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-o">**</span><span class="p-n">arguments</span><span class="p-p">:</span> <span class="p-n">Any</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Response</span>
+</code></pre>
+<p>Respuesta que pide una herramienta.</p>
+<h3><code>split_sse</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">split_sse</span><span class="p-p">(</span><span class="p-n">text</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">list</span><span class="p-p">[</span><span class="p-nb">dict</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">]]</span>
+</code></pre>
+<p>Separa los fragmentos de un cuerpo SSE.</p>
+<p>Vive aquí y no en el adaptador porque <strong>cómo llegan los fragmentos por el
+cable no es normalización</strong>: es transporte, y esa separación es lo que
+permite ejercitar la normalización con un fichero.</p>
+<p>El centinela <strong>termina</strong> el cuerpo; no se salta. Un gateway real llegó a
+mandar dos —reenviaba el del backend y añadía el suyo—, y la diferencia
+entre saltarlos y parar en el primero no era cosmética: todo lo que
+registraba la petición vivía pasado ese punto, así que el cliente correcto
+era justo el que no se facturaba. Se arregló allí, y por eso mismo conviene
+que esto no dependa de cuántos vengan.</p>
+<h3><code>DEFAULT_USAGE</code></h3>
+<p><code>DEFAULT_USAGE = Usage(input=100, output=20, reasoning=0, cache_read=0, cache_write=0, estimated=False)</code></p>
+<p>Contadores de tokens — H3.</p>
+<h2>Cliente MCP</h2>
+<p><code>synaptum.mcp</code> — Extra <code>[mcp]</code>. El núcleo no lo carga.</p>
+<h3><code>MCPTools</code></h3>
+<p>Las herramientas de un servidor MCP, listas para pasárselas a un <code>Agent</code>.</p>
+<pre data-lenguaje="python"><code><span class="p-n">MCPTools</span><span class="p-p">(</span><span class="p-n">session</span><span class="p-p">:</span> <span class="p-n">Any</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">prefix</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">''</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>connected</code></td>
+<td><code>connected(session: Any, *, prefix: str = '') -&gt; &quot;AsyncIterator[MCPTools]&quot;</code></td>
+<td>Sobre una sesión que ya existe — la abre y la cierra quien la creó.</td>
+</tr>
+<tr>
+<td><code>destructivas</code></td>
+<td>—</td>
+<td>Las que entran marcadas como destructivas.</td>
+</tr>
+<tr>
+<td><code>discover</code></td>
+<td><code>async discover(self) -&gt; list[MCPTool]</code></td>
+<td>Pregunta al servidor qué publica y lo adapta.</td>
+</tr>
+<tr>
+<td><code>stdio</code></td>
+<td><code>stdio(command: str, *args: str, prefix: str = '', env: Mapping[str, str] | None = None) -&gt; &quot;AsyncIterator[MCPTools]&quot;</code></td>
+<td>Arranca un servidor MCP por stdio y descubre sus herramientas.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Args:
+session: sesión MCP ya inicializada.
+prefix: prefijo para los nombres. Con dos servidores que publiquen
+<code>search</code>, el modelo no puede distinguirlos — y el que gana es el
+que se registró último, en silencio.</p>
+<h3><code>mcp_risk</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">mcp_risk</span><span class="p-p">(</span><span class="p-n">annotations</span><span class="p-p">:</span> <span class="p-n">Any</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Risk</span>
+</code></pre>
+<p>Traduce las pistas de una herramienta MCP a un nivel de riesgo.</p>
+<p>Los valores por defecto son los de la especificación MCP, no los nuestros:
+<strong>sin anotaciones, destructiva</strong>. Nuestro <code>@tool</code> usa <code>READ</code> por defecto
+porque quien escribe la función está delante y puede declarar; aquí el autor
+no está, y suponer en su lugar es suponer a favor.</p>
+
+<nav class="paginado" aria-label="Paginación"><a class="prev" href="07-limites.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">Qué no hace</span></a></nav>
+  </main>
+</div>
+<script>
+// Botón de copiar en cada bloque de código.
+//
+// Se añade desde JavaScript y no en el HTML a propósito: sin JS la página se
+// lee igual y el código sigue siendo seleccionable. Un botón que no funciona es
+// peor que no tenerlo.
+document.querySelectorAll('pre').forEach(function (bloque) {
+  var boton = document.createElement('button');
+  boton.className = 'copiar';
+  boton.type = 'button';
+  boton.setAttribute('aria-label', 'Copiar el código');
+  boton.textContent = 'Copiar';
+
+  boton.addEventListener('click', function () {
+    var codigo = bloque.querySelector('code');
+    var texto = codigo ? codigo.innerText : bloque.innerText;
+    // `clipboard` necesita contexto seguro; en file:// no existe, y entonces se
+    // dice en vez de fingir que copió.
+    if (!navigator.clipboard) {
+      boton.textContent = 'No disponible';
+      setTimeout(function () { boton.textContent = 'Copiar'; }, 1600);
+      return;
+    }
+    navigator.clipboard.writeText(texto).then(function () {
+      boton.textContent = 'Copiado';
+      boton.classList.add('hecho');
+      setTimeout(function () {
+        boton.textContent = 'Copiar';
+        boton.classList.remove('hecho');
+      }, 1600);
+    });
+  });
+
+  bloque.appendChild(boton);
+});
+</script>
+</body>
+</html>

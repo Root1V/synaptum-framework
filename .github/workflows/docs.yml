@@ -32,6 +32,11 @@ jobs:
         with:
           enable-cache: true
 
+      # La referencia se regenera del código antes de publicar: el sitio nunca
+      # sirve una referencia más vieja que el paquete.
+      - name: generar la referencia desde el código
+        run: uv run --frozen python scripts/render_reference.py
+
       - name: generar el HTML desde el Markdown
         run: uv run --frozen python scripts/render_docs.py
 

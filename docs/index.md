@@ -47,6 +47,7 @@ Falta `sesion`, y es lo primero que hay que entender: [**Conceptos**](01-concept
 | [Varios agentes](05-multiagente.md) | Cadena, paralelo, agente como herramienta |
 | [Probar](06-probar.md) | Construir agentes sin gastar en inferencia |
 | [Qué no hace](07-limites.md) | Los límites, dichos en voz alta |
+| [Referencia](08-referencia.md) | Cada símbolo público, **generado del código** |
 
 ## Ejecutar los ejemplos
 

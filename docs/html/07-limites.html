@@ -128,6 +128,43 @@ td code, th code { background: transparent; border: 0; padding: 0; color: var(--
 
 hr { border: 0; border-top: 1px solid var(--linea); margin: 2.8rem 0; }
 
+/* Copiar ─────────────────────────────────────────────────────────────────── */
+.copiar {
+  position: absolute; top: .45rem; right: .5rem; z-index: 2;
+  font: 600 .68rem/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  padding: .35rem .6rem; border-radius: .4rem; cursor: pointer;
+  color: var(--tenue); background: var(--papel); border: 1px solid var(--codigo-borde);
+  opacity: 0; transition: opacity .13s, color .13s, border-color .13s;
+}
+pre:hover .copiar, .copiar:focus-visible { opacity: 1; }
+.copiar:hover { color: var(--acento); border-color: var(--acento); }
+.copiar.hecho { color: var(--sx-cadena); border-color: var(--sx-cadena); opacity: 1; }
+/* Con el botón visible, la etiqueta del lenguaje estorbaría. */
+pre:hover[data-lenguaje]::after { opacity: 0; }
+pre[data-lenguaje]::after { transition: opacity .13s; }
+/* Sin puntero —táctil o teclado— el botón se queda visible: no hay hover. */
+@media (hover: none) { .copiar { opacity: 1; } pre[data-lenguaje]::after { display: none; } }
+
+/* Anterior / siguiente ───────────────────────────────────────────────────── */
+.paginado {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  margin: 4rem 0 0; padding-top: 2rem; border-top: 1px solid var(--linea);
+}
+.paginado a {
+  display: block; padding: .9rem 1.1rem; border: 1px solid var(--linea);
+  border-radius: .6rem; text-decoration: none; background: var(--papel);
+  transition: border-color .13s, background .13s;
+}
+.paginado a:hover { border-color: var(--acento); background: var(--acento-suave); }
+.paginado .siguiente { grid-column: 2; text-align: right; }
+.paginado .etiqueta { display: block; font-size: .74rem; letter-spacing: .06em;
+                      text-transform: uppercase; color: var(--etiqueta); margin-bottom: .2rem; }
+.paginado .nombre { color: var(--tinta); font-weight: 600; font-size: .98rem; }
+@media (max-width: 40rem) {
+  .paginado { grid-template-columns: 1fr; }
+  .paginado .siguiente { grid-column: 1; text-align: left; }
+}
+
 @media (max-width: 62rem) {
   .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
   nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
@@ -142,7 +179,7 @@ hr { border: 0; border-top: 1px solid var(--linea); margin: 2.8rem 0; }
   <nav aria-label="Secciones">
     <p class="marca"><a href="index.html">Synaptum</a></p>
     <p class="version">1.0.0rc1</p>
-    <ol><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html" aria-current="page">Qué no hace</a></li><li><a href="index.html">Empezar</a></li></ol>
+    <ol><li><a href="index.html">Empezar</a></li><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html" aria-current="page">Qué no hace</a></li><li><a href="08-referencia.html">Referencia</a></li></ol>
     <p class="fuente"><a href="../07-limites.md">Leer en Markdown&nbsp;↗</a></p>
   </nav>
   <main id="contenido">
@@ -190,7 +227,44 @@ y cuesta lo mismo.</p>
 resultado, <strong>nadie sabe si el efecto ocurrió</strong>. El replay levanta <code>UncertainEffect</code> en vez de elegir
 por ti. Es el framework negándose a adivinar, y es la conducta correcta aunque sea la incómoda.</p>
 
+<nav class="paginado" aria-label="Paginación"><a class="prev" href="06-probar.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">Probar</span></a><a class="siguiente" href="08-referencia.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">Referencia</span></a></nav>
   </main>
 </div>
+<script>
+// Botón de copiar en cada bloque de código.
+//
+// Se añade desde JavaScript y no en el HTML a propósito: sin JS la página se
+// lee igual y el código sigue siendo seleccionable. Un botón que no funciona es
+// peor que no tenerlo.
+document.querySelectorAll('pre').forEach(function (bloque) {
+  var boton = document.createElement('button');
+  boton.className = 'copiar';
+  boton.type = 'button';
+  boton.setAttribute('aria-label', 'Copiar el código');
+  boton.textContent = 'Copiar';
+
+  boton.addEventListener('click', function () {
+    var codigo = bloque.querySelector('code');
+    var texto = codigo ? codigo.innerText : bloque.innerText;
+    // `clipboard` necesita contexto seguro; en file:// no existe, y entonces se
+    // dice en vez de fingir que copió.
+    if (!navigator.clipboard) {
+      boton.textContent = 'No disponible';
+      setTimeout(function () { boton.textContent = 'Copiar'; }, 1600);
+      return;
+    }
+    navigator.clipboard.writeText(texto).then(function () {
+      boton.textContent = 'Copiado';
+      boton.classList.add('hecho');
+      setTimeout(function () {
+        boton.textContent = 'Copiar';
+        boton.classList.remove('hecho');
+      }, 1600);
+    });
+  });
+
+  bloque.appendChild(boton);
+});
+</script>
 </body>
 </html>

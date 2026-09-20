@@ -8,7 +8,8 @@ Las dos salidas son para dos lectores distintos y los dos importan: un agente le
 el `.md` —una página por tema, sin navegación que estorbe— y una persona lee el
 `.html`, que sí la necesita.
 
-    uv run python scripts/render_docs.py          # genera
+    uv run python scripts/render_reference.py     # la referencia, del código
+    uv run python scripts/render_docs.py          # el HTML, del Markdown
     uv run python scripts/render_docs.py --check  # ¿está al día?
 
 `markdown-it-py` vive en el grupo `dev`: es una herramienta de construcción, no
@@ -45,10 +46,49 @@ PLANTILLA = """<!doctype html>
   </nav>
   <main id="contenido">
 {cuerpo}
+{paginado}
   </main>
 </div>
+<script>{guion}</script>
 </body>
 </html>
+"""
+
+GUION = """
+// Botón de copiar en cada bloque de código.
+//
+// Se añade desde JavaScript y no en el HTML a propósito: sin JS la página se
+// lee igual y el código sigue siendo seleccionable. Un botón que no funciona es
+// peor que no tenerlo.
+document.querySelectorAll('pre').forEach(function (bloque) {
+  var boton = document.createElement('button');
+  boton.className = 'copiar';
+  boton.type = 'button';
+  boton.setAttribute('aria-label', 'Copiar el código');
+  boton.textContent = 'Copiar';
+
+  boton.addEventListener('click', function () {
+    var codigo = bloque.querySelector('code');
+    var texto = codigo ? codigo.innerText : bloque.innerText;
+    // `clipboard` necesita contexto seguro; en file:// no existe, y entonces se
+    // dice en vez de fingir que copió.
+    if (!navigator.clipboard) {
+      boton.textContent = 'No disponible';
+      setTimeout(function () { boton.textContent = 'Copiar'; }, 1600);
+      return;
+    }
+    navigator.clipboard.writeText(texto).then(function () {
+      boton.textContent = 'Copiado';
+      boton.classList.add('hecho');
+      setTimeout(function () {
+        boton.textContent = 'Copiar';
+        boton.classList.remove('hecho');
+      }, 1600);
+    });
+  });
+
+  bloque.appendChild(boton);
+});
 """
 
 ESTILO = """
@@ -175,6 +215,43 @@ td code, th code { background: transparent; border: 0; padding: 0; color: var(--
 
 hr { border: 0; border-top: 1px solid var(--linea); margin: 2.8rem 0; }
 
+/* Copiar ─────────────────────────────────────────────────────────────────── */
+.copiar {
+  position: absolute; top: .45rem; right: .5rem; z-index: 2;
+  font: 600 .68rem/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  padding: .35rem .6rem; border-radius: .4rem; cursor: pointer;
+  color: var(--tenue); background: var(--papel); border: 1px solid var(--codigo-borde);
+  opacity: 0; transition: opacity .13s, color .13s, border-color .13s;
+}
+pre:hover .copiar, .copiar:focus-visible { opacity: 1; }
+.copiar:hover { color: var(--acento); border-color: var(--acento); }
+.copiar.hecho { color: var(--sx-cadena); border-color: var(--sx-cadena); opacity: 1; }
+/* Con el botón visible, la etiqueta del lenguaje estorbaría. */
+pre:hover[data-lenguaje]::after { opacity: 0; }
+pre[data-lenguaje]::after { transition: opacity .13s; }
+/* Sin puntero —táctil o teclado— el botón se queda visible: no hay hover. */
+@media (hover: none) { .copiar { opacity: 1; } pre[data-lenguaje]::after { display: none; } }
+
+/* Anterior / siguiente ───────────────────────────────────────────────────── */
+.paginado {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  margin: 4rem 0 0; padding-top: 2rem; border-top: 1px solid var(--linea);
+}
+.paginado a {
+  display: block; padding: .9rem 1.1rem; border: 1px solid var(--linea);
+  border-radius: .6rem; text-decoration: none; background: var(--papel);
+  transition: border-color .13s, background .13s;
+}
+.paginado a:hover { border-color: var(--acento); background: var(--acento-suave); }
+.paginado .siguiente { grid-column: 2; text-align: right; }
+.paginado .etiqueta { display: block; font-size: .74rem; letter-spacing: .06em;
+                      text-transform: uppercase; color: var(--etiqueta); margin-bottom: .2rem; }
+.paginado .nombre { color: var(--tinta); font-weight: 600; font-size: .98rem; }
+@media (max-width: 40rem) {
+  .paginado { grid-template-columns: 1fr; }
+  .paginado .siguiente { grid-column: 1; text-align: left; }
+}
+
 @media (max-width: 62rem) {
   .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
   nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
@@ -185,7 +262,14 @@ hr { border: 0; border-top: 1px solid var(--linea); margin: 2.8rem 0; }
 
 
 def paginas() -> list[Path]:
-    return sorted(p for p in FUENTE.glob("*.md"))
+    """En orden de lectura: el índice primero, luego las numeradas.
+
+    Ordenar por nombre pondría `index.md` **después** de `07-`, así que
+    «Empezar» salía la última del menú y el paginado llevaba de la última página
+    al principio. Alfabético no es el orden en que se lee esto.
+    """
+    todas = sorted(FUENTE.glob("*.md"))
+    return [p for p in todas if p.stem == "index"] + [p for p in todas if p.stem != "index"]
 
 
 def titulo_de(md: Path) -> str:
@@ -260,11 +344,44 @@ def render(md: Path, todas: list[Path]) -> str:
     return PLANTILLA.format(
         titulo=html.escape(titulo_de(md)),
         estilo=ESTILO,
+        guion=GUION,
         indice=indice,
         cuerpo=cuerpo,
+        paginado=_paginado(md, todas),
         md=f"../{md.name}",
         version=html.escape(_version()),
     )
+
+
+def _paginado(md: Path, todas: list[Path]) -> str:
+    """Enlaces a la página anterior y la siguiente.
+
+    Se prefiere esto al scroll infinito, y no es cuestión de gusto: cargar
+    páginas al bajar rompe los enlaces profundos —nadie puede decir «mira esta
+    sección»—, rompe el `Cmd+F` del navegador, que solo busca lo ya cargado, y
+    rompe el botón atrás. Un feed no tiene final y da igual dónde estás; una
+    referencia técnica es lo contrario.
+    """
+    posicion = todas.index(md)
+    anterior = todas[posicion - 1] if posicion > 0 else None
+    siguiente = todas[posicion + 1] if posicion < len(todas) - 1 else None
+
+    if anterior is None and siguiente is None:
+        return ""
+
+    def enlace(destino: Path, clase: str, etiqueta: str) -> str:
+        return (
+            f'<a class="{clase}" href="{destino.stem}.html" rel="{clase}">'
+            f'<span class="etiqueta">{etiqueta}</span>'
+            f'<span class="nombre">{html.escape(titulo_de(destino))}</span></a>'
+        )
+
+    partes = []
+    if anterior is not None:
+        partes.append(enlace(anterior, "prev", "Anterior"))
+    if siguiente is not None:
+        partes.append(enlace(siguiente, "siguiente", "Siguiente"))
+    return '<nav class="paginado" aria-label="Paginación">' + "".join(partes) + "</nav>"
 
 
 def main() -> int:
