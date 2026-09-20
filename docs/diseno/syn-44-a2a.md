@@ -52,48 +52,64 @@ Lo que ninguna resuelve del todo es **la ventana entre enviar y registrar**: si 
 después del `SendMessage` y antes de escribir el `taskId`, nadie sabe si hay una tarea corriendo al
 otro lado.
 
-## La resolución que propongo
+## La resolución: convertir la apuesta en una consulta
 
-Tres identificadores, cada uno del lado que puede generarlo bien:
+La primera versión de este documento proponía reenviar con el mismo `messageId` y confiar en que el
+servidor deduplicara. **Aeon lo corrigió y tienen razón**: la especificación dice que `SendMessage`
+*puede* detectar duplicados, y «puede» no es algo sobre lo que construir durabilidad.
 
-| A2A | Lo pone | Qué le damos |
-|---|---|---|
-| `contextId` | **El cliente puede** | Nuestro `run_id`. Agrupa todas las delegaciones de un run |
-| `messageId` | **El cliente** | Derivado de `(run_id, step_id)`, determinista |
-| `taskId` | **El servidor** | Lo recibimos y lo guardamos en el paso |
-
-Y el ciclo queda así:
+Su observación es la que cambia el diseño: **`taskId` es del servidor y no lo tenemos, pero
+`contextId` lo pone el cliente.** Así que lo que hay que pedirle a A2A no es «acepta mi id», es
+**«lístame las tareas de este contexto»** — y eso ya existe:
 
 ```
-1. DelegateStep ATTEMPTED  →  journal  (DURABLE, antes de nada)
-2. SendMessage(contextId=run_id, messageId=det(run_id, step_id))
-3. taskId ← respuesta
-4. esperar / SubscribeToTask
-5. DelegateStep COMPLETED con result + usage + taskId  →  journal
+ListTasks(contextId, status?, pageSize?, pageToken?)
 ```
 
-**Al reanudar**, tres casos y ninguno inventado:
+### Un contexto por delegación
 
-- **Hay COMPLETED** → se salta. Como cualquier paso.
-- **No hay ni ATTEMPTED** → no se envió nada. Se envía.
-- **Hay ATTEMPTED sin COMPLETED** → *no se sabe* si la tarea existe al otro lado. Se reenvía **con
-  el mismo `messageId`**: la especificación dice que `SendMessage` *puede* detectar duplicados por
-  `messageId`. Si el servidor lo hace, devuelve la misma tarea y no se paga dos veces.
+`contextId` = `{run_id}/{step_id}` — que es exactamente nuestro `sub_run_id`. No es un apaño: A2A
+define `contextId` como la agrupación de una conversación, y una delegación **es** una conversación,
+posiblemente de varios turnos si el remoto pide entrada o autenticación.
 
-### Y lo que hay que decir en voz alta
+Un identificador, dos sistemas, y ninguno inventado para el otro.
 
-**«Puede detectar duplicados» no es una garantía.** Contra un servidor que no deduplique, un
-reintento es una segunda tarea — y una tarea puede haber movido dinero.
+### Reconciliar al reanudar
 
-Delegar **no es idempotente** y ya está declarado así, así que este caso cae en la máquina que ya
-existe: `UncertainEffect`. El bucle no adivina; levanta y deja que decida quien gobierna. Es
-incómodo y es correcto.
+```
+ListTasks(contextId = sub_run_id)
 
-Lo que **no** vamos a hacer es meter un contador de intento en el `messageId` para esquivarlo: lo
-haría no determinista, y entonces reanudar siempre generaría trabajo nuevo — justo lo que todo esto
-existe para evitar.
+  vacío            → no llegó a crearse nada. Enviar.
+  una tarea        → es la nuestra. GetTask / SubscribeToTask y continuar.
+  terminal         → tomar su resultado. No se paga otra vez.
+  varias           → anomalía. La no terminal más reciente, y si hay dos, UncertainEffect.
+```
 
----
+**Esto funciona contra un servidor que no deduplique**, porque ya no dependemos de que deduplique:
+preguntamos.
+
+### La escalera, y qué garantiza cada peldaño
+
+No todo servidor implementará `ListTasks`. La degradación tiene que ser explícita, no silenciosa:
+
+| Peldaño | Garantía |
+|---|---|
+| `ListTasks(contextId)` | **Exacta.** Sabemos si hay tarea y cuál |
+| `messageId` determinista | **Depende del servidor.** «Puede» deduplicar |
+| Ninguno de los dos | **Ninguna.** `UncertainEffect`, y decide quien gobierna |
+
+El `messageId` determinista se manda igual: no cuesta nada y en un servidor que deduplique cierra el
+hueco antes de llegar al tercer peldaño.
+
+### El hueco que queda, y de quién es
+
+Si morimos **entre** el `SendMessage` y que el servidor persista la tarea, `ListTasks` devuelve vacío
+y reenviamos — correcto. Si persistió, `ListTasks` la encuentra — correcto.
+
+Lo único que rompe esto es un servidor que **cree la tarea y no la persista antes de responder**, y
+esa es precisamente la mala práctica que la búsqueda encuentra una y otra vez (`TaskNotFoundError`
+sobre ids que el propio servidor acababa de emitir). No es un hueco de nuestro diseño: es un
+requisito que le pedimos al otro lado, y conviene decirlo así.
 
 ## Riesgo: un agente remoto es destructivo mientras no demuestre lo contrario
 
@@ -106,17 +122,46 @@ todavía: no solo no sabemos qué hace, es que **puede cambiar sin avisarnos**.
 Si A2A estandariza una extensión de riesgo, se lee. Mientras tanto, se puede declarar a mano al
 construir el delegado remoto — explícito y de quien asume la consecuencia.
 
-## La delegación remota **tiene** que cruzar la costura
+## Quién gobierna la llamada: una cuarta forma que no estaba en la lista
 
-Con un subagente en proceso, que la delegación no cruce el gateway es una limitación conocida: sus
-herramientas sí cruzan, así que el efecto destructivo se detiene igual.
+Propuse tres opciones —API advisoria, delegación como herramienta, o que el arnés haga la llamada— y
+me incliné por la tercera. **Aeon fue a mirar qué hace la industria y la respuesta es una cuarta**:
+un **proxy en el camino de datos**. El framework apunta su endpoint al gateway y **no cambia código**.
 
-**Con un agente remoto eso deja de ser cierto.** Sus herramientas cruzan *su* gateway, no el
-nuestro, y nosotros no sabemos cuál es ni qué política aplica. El efecto sale de nuestro perímetro
-en el momento del `SendMessage`.
+Es lo que hacen `agentgateway` (OSS, construido exactamente para esto) y el Agent Gateway de Google
+Cloud. Y resuelve mi propia objeción a la opción 1 mejor que la 3:
 
-Por tanto: **`SYN-44` depende de que la costura admita autorizar una delegación sin ejecutarla.** Es
-un cambio de contrato y va al canal de coordinación antes que el código.
+> El forward proxy es el único sitio del stack que ve todo el tráfico saliente de un agente, y el
+> único con el que el agente no puede discutir.
+
+**Un control en el framework es una petición. Un proxy en el camino es una frontera.** No se salta
+porque no hay otra ruta, no porque el bucle se porte bien. Es la misma distinción que me hizo
+rechazar la opción 1, aplicada al transporte en vez de a la API.
+
+Y es mucho más barato de lo que parecía: **un proxy no necesita un cliente A2A**. Entiende lo justo
+del JSON-RPC para saber destino y método, aplica política y reenvía. **El ciclo de vida de la tarea
+se queda de nuestro lado**, que es donde tiene que estar.
+
+### El reparto
+
+| | |
+|---|---|
+| **Nuestro** | La semántica: paso durable, reanudar sin repetir, consumo agregado, riesgo declarado, y **todo el ciclo de vida de la tarea** — polling, estados, artefactos |
+| **Del arnés** | El gobierno: egress, credenciales, identidad por salto, política, coste, auditoría, y **límites de radio** — profundidad y fan-out |
+
+Los límites de radio no los habíamos planteado. Tenemos `max_delegation_depth`, que para un ciclo
+dentro de un proceso; el fan-out de un agente que delega en cincuenta a la vez no lo para nadie
+todavía.
+
+### Un matiz que casi se nos pasa a los tres
+
+La delegación entre agentes suele ser **este-oeste** —contenedor a contenedor— y por eso **no cruza
+el perímetro**. Un cortafuegos de salida no la ve. Es el modo de fallo documentado: el tráfico entre
+agentes se escapa de los gateways porque nunca estuvo en su camino.
+
+Por eso el patrón es un **endpoint explícito al que se apunta**, no confiar en la topología de red.
+Dar por gobernada una llamada porque «sale por el proxy» es un error cuando esa llamada no cruza el
+perímetro, y entre contenedores normalmente no lo cruza.
 
 ## Lo que hay que construir, y lo que no
 
@@ -139,6 +184,12 @@ un cambio de contrato y va al canal de coordinación antes que el código.
 - El `contextId` entrante se usa como `run_id`, así que un run distribuido comparte diario si los
   contenedores comparten almacén.
 
+**Lo que resultó no ser nuestro**
+
+- **El gobierno de la llamada.** Va en el proxy del arnés (`A2A-002`), y es la tercera instancia del
+  mismo patrón que ya usan para la inferencia y para MCP saliente.
+- **Un cliente A2A para el camino gobernado.** Solo hace falta en modo autónomo, donde no hay proxy.
+
 **Lo que no se construye aquí**
 
 - Un registro de agentes. Descubrir quién existe es infraestructura, no framework.
@@ -160,23 +211,20 @@ Esa es la única razón por la que merece la pena implementarlo nosotros en vez 
 
 ## Preguntas abiertas antes de escribir código
 
-**Planteadas en el canal de coordinación el 2026-09-20. Sin empezar hasta tener respuesta**, porque
-de la primera depende que la mitad de esto sea nuestro o no.
+**Preguntadas en el canal el 2026-09-20. Aeon respondió el mismo día y las dos primeras están
+cerradas.**
 
-1. **¿De quién es la llamada remota?** Tres opciones sobre la mesa, y me inclino por la tercera
-   aunque vaya contra mi instinto:
-   - la costura gana un método que **autoriza sin ejecutar**;
-   - la delegación viaja como una llamada a herramienta más;
-   - **el arnés hace la llamada A2A**, porque una delegación remota es *egress* — lleva credencial,
-     sale de la red y tiene coste, que es exactamente lo que la costura de aplicación gobierna. Si
-     es esta, el cliente A2A solo nos hace falta en modo autónomo, y lo nuestro sigue siendo la
-     semántica: paso durable, reanudación sin repetir, consumo agregado, riesgo declarado.
+1. ~~¿De quién es la llamada remota?~~ **Del arnés, como proxy en el camino de datos** (`A2A-002`,
+   comprometido). Nosotros no cambiamos código de transporte: apuntamos a su endpoint.
 
-2. **El `taskId` lo asigna el otro lado.** Preguntado a quien lleva un año con Temporal, que resuelve
-   esta misma clase de problema. Si hay un patrón que funcione, se copia antes que inventar.
+2. ~~¿Cómo se reencuentra una tarea cuyo id pone el otro lado?~~ **`ListTasks(contextId)`**, con el
+   `contextId` = nuestro `sub_run_id`. Y un dato que Aeon dio y conviene no perder: **Temporal no
+   resuelve esto**. Su replay determinista cubre la decisión, no la Activity que hace el envío; el
+   hueco queda igual de abierto con Temporal que sin él.
 
-3. **¿Cliente, servidor, o los dos?** Para «cada agente en su contenedor» hacen falta los dos; el
-   cliente solo ya sirve para consumir agentes ajenos.
+3. **¿Cliente, servidor, o los dos?** Sigue abierta. Para «cada agente en su contenedor» hacen falta
+   los dos; el cliente solo ya sirve para consumir agentes ajenos.
 
-4. **¿Almacén compartido entre contenedores?** Si cada uno lleva el suyo, se pierde la propiedad que
-   justifica todo esto y quedamos en un cliente A2A más.
+4. **¿Almacén compartido entre contenedores?** Sigue abierta, y es la que decide si esto vale la
+   pena: si cada contenedor lleva su diario, una delegación remota interrumpida se repite entera y
+   quedamos en un cliente A2A más.
