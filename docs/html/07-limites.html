@@ -208,12 +208,17 @@ sustrato no es nuestro.</p>
 agentes. El stream de eventos es <strong>una sola cosa cediendo control</strong>, no N cosas hablando entre sí.</p>
 <p>Si necesitas agentes en procesos distintos comunicándose de forma asíncrona y persistente, eso es un
 arnés, y está bien que lo sea.</p>
-<h2>No compacta el contexto por ti</h2>
-<p><strong>Sí recorta</strong> la salida de una herramienta (<code>Limits.max_tool_chars</code>), pero eso es un tope, no
-compactación. No hay todavía ensamblador de contexto cache-first (<code>SYN-32</code>) ni compactación por
-niveles (<code>SYN-36</code>), así que el historial completo de un run largo se reenvía entero en cada turno.</p>
-<p>El prefijo estable <strong>sí</strong> está protegido: reanudar con otra configuración se rechaza en vez de
-mezclar dos agentes en un diario. Lo que falta es reducir el historial cuando crece.</p>
+<h2>No reduce el historial cuando crece</h2>
+<p>Dos piezas de economía de contexto <strong>sí</strong> existen, y conviene no confundirlas con la que falta:</p>
+<ul>
+<li>La salida de una herramienta se recorta antes de entrar en el contexto.</li>
+<li>El prefijo estable está protegido: reanudar con otra configuración se rechaza en vez de mezclar
+dos agentes en un mismo diario.</li>
+</ul>
+<p>Lo que <strong>no</strong> hay es compactación por niveles (<code>SYN-36</code>). En un run largo, el historial completo se
+reenvía en cada turno. Con caché de prefijo eso suele salir más barato que resumir —por eso la
+compactación va desactivada por defecto cuando llegue— pero hay un punto en el que deja de serlo, y
+hoy nadie lo detecta por ti.</p>
 <h2>No delega con contexto aislado</h2>
 <p><code>delegate()</code> es <code>SYN-41</code>. Se puede componer a mano —y funciona— con las tres consecuencias listadas
 en <a href="05-multiagente.html">Varios agentes</a>.</p>
