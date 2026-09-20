@@ -3,7 +3,7 @@ name = "mi-agente"
 version = "0.1.0"
 description = "Un agente construido con Synaptum"
 requires-python = ">=3.13"
-dependencies = ["synaptum>=1.0.0rc1"]
+dependencies = ["synaptum>=1.0.0rc2"]
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-asyncio>=0.24"]

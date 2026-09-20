@@ -81,7 +81,7 @@ async def main() -> None:
             calls("repo.buscar", patron="class Agent", extension=".py"),
             calls("repo.leer_fichero", ruta="pyproject.toml", lineas=6),
             says("El agente vive en `src/synaptum/agent/agent.py` y el paquete se "
-                 "llama synaptum, versión 1.0.0rc1, sin dependencias duras."),
+                 "llama synaptum, versión 1.0.0rc2, sin dependencias duras."),
         ]
 
         puerta = gateway(
