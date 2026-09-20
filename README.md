@@ -102,6 +102,9 @@ uv run python examples/agentes/01_triaje.py
 Que el mismo código sirva para las dos cosas no es comodidad: es la propiedad — el agente no sabe
 quién hay al otro lado de la costura.
 
+Están también **[en el sitio](https://root1v.github.io/synaptum-framework/ejemplos.html)**, una
+página por ejemplo, generadas de estos mismos ficheros.
+
 [**`examples/`**](https://github.com/Root1V/synaptum-framework/tree/main/examples) tiene dos pistas:
 doce ejemplos que van del agente más simple a delegar en uno que vive en otro contenedor, pasando
 por herramientas servidas por MCP, catálogos grandes y la economía del contexto, cada uno sobre un

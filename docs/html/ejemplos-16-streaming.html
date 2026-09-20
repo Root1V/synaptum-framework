@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>16 · Ver los tokens según llegan, y cortar a mitad · Synaptum</title>
+<style>
+/* Paleta ───────────────────────────────────────────────────────────────────
+   Los colores hacen un trabajo, no decoran: el acento marca lo navegable, el
+   ámbar marca lo que hay que leer despacio, y el código tiene su propia escala
+   para que la sintaxis se distinga sin gritar. Todo con contraste suficiente
+   en claro y en oscuro — una documentación que solo se ve bien en un tema es
+   una documentación que la mitad de la gente lee peor. */
+:root {
+  color-scheme: light dark;
+  --tinta: #16181d; --fondo: #fcfcfb; --papel: #ffffff;
+  --tenue: #5c6672; --linea: #e4e6ea; --linea-suave: #eef0f3;
+  --acento: #0a5ac4; --acento-suave: #eef4fd;
+  --aviso: #9a5b00; --aviso-borde: #e8a33d; --aviso-fondo: #fff8ec;
+  --codigo-fondo: #f7f8fa; --codigo-borde: #e6e9ee; --codigo-tinta: #2a2f3a;
+  --etiqueta: #8b94a0;
+  --sx-clave: #9226a8;   /* def, class, return, async  */
+  --sx-cadena: #0a6b3d;  /* "texto"                    */
+  --sx-func: #1a55c4;    /* nombres de función          */
+  --sx-tipo: #0b6d8c;    /* int, str, builtins          */
+  --sx-num: #a8471a;     /* 42, 0.5                     */
+  --sx-com: #6a7482;     /* # comentarios               */
+  --sx-dec: #a8471a;     /* @tool                       */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tinta: #e4e6ea; --fondo: #14161a; --papel: #191c21;
+    --tenue: #98a1ad; --linea: #2a2e35; --linea-suave: #23262c;
+    --acento: #6fa8f5; --acento-suave: #1a2433;
+    --aviso: #e7ab5a; --aviso-borde: #8a6a2f; --aviso-fondo: #221d14;
+    --codigo-fondo: #1b1e24; --codigo-borde: #2a2e35; --codigo-tinta: #d4d8de;
+    --etiqueta: #6e7682;
+    --sx-clave: #d79bec; --sx-cadena: #7ec99b; --sx-func: #7fb0f2;
+    --sx-tipo: #5fc0dd; --sx-num: #e0a07a; --sx-com: #79828f; --sx-dec: #e0a07a;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fondo); color: var(--tinta);
+  font: 17px/1.68 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased;
+}
+.saltar { position: absolute; left: -9999px; }
+.saltar:focus { left: 1rem; top: 1rem; background: var(--papel); padding: .5rem 1rem;
+                z-index: 9; border-radius: .4rem; border: 1px solid var(--acento); }
+.marco { display: grid; grid-template-columns: 17.5rem minmax(0, 1fr); gap: 3.5rem;
+         max-width: 70rem; margin: 0 auto; padding: 2.5rem 1.5rem 7rem; }
+
+/* Navegación ─────────────────────────────────────────────────────────────── */
+nav { position: sticky; top: 2.5rem; align-self: start; font-size: .92rem; }
+.marca { margin: 0; font-weight: 650; letter-spacing: -.015em; font-size: 1.12rem; }
+.marca a { color: var(--tinta); text-decoration: none; }
+.marca a::before {
+  content: ""; display: inline-block; width: .5rem; height: .5rem; margin-right: .5rem;
+  border-radius: 50%; background: var(--acento); vertical-align: .08em;
+}
+.version { margin: .15rem 0 1.5rem 1rem; color: var(--etiqueta); font-size: .78rem;
+           letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+nav ol { list-style: none; margin: 0; padding: 0; }
+nav li { margin: .08rem 0; }
+nav a { display: block; padding: .34rem .7rem; margin-left: -.7rem; border-radius: .45rem;
+        color: var(--tenue); text-decoration: none; border-left: 2px solid transparent;
+        transition: background .12s, color .12s; }
+nav a:hover { background: var(--linea-suave); color: var(--tinta); }
+nav a[aria-current] { color: var(--acento); font-weight: 600; background: var(--acento-suave);
+                      border-left-color: var(--acento); }
+nav .seccion { margin: .1rem 0 .3rem .9rem; border-left: 1px solid var(--linea);
+               padding-left: .35rem; font-size: .88rem; }
+nav .seccion a { padding: .24rem .6rem; }
+/* Plegada por defecto: sin esto, dieciséis ejemplos empujan el resto del menú
+   fuera de la pantalla en cualquier página. Se abre en la sección en la que
+   estás, que es cuando sirve. */
+nav .seccion.plegada { display: none; }
+.fuente { margin-top: 1.8rem; padding-top: 1rem; border-top: 1px solid var(--linea);
+          font-size: .82rem; }
+.fuente a { color: var(--tenue); text-decoration: none; }
+.fuente a:hover { color: var(--acento); text-decoration: underline; }
+
+/* Texto ──────────────────────────────────────────────────────────────────── */
+main { min-width: 0; }
+h1 { font-size: 2.25rem; line-height: 1.12; letter-spacing: -.028em; margin: 0 0 1.7rem;
+     font-weight: 700; }
+h2 { font-size: 1.36rem; letter-spacing: -.016em; margin: 3.2rem 0 1rem; font-weight: 650;
+     padding-top: 1.5rem; border-top: 1px solid var(--linea); }
+h3 { font-size: 1.07rem; margin: 2.1rem 0 .6rem; font-weight: 640; color: var(--tinta); }
+p, li { max-width: 41rem; }
+li { margin: .3rem 0; }
+strong { font-weight: 640; }
+a { color: var(--acento); text-decoration-thickness: 1px; text-underline-offset: .15em; }
+a:hover { text-decoration-thickness: 2px; }
+
+/* Código ─────────────────────────────────────────────────────────────────── */
+code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+       font-size: .87em; background: var(--codigo-fondo); color: var(--codigo-tinta);
+       padding: .13em .4em; border-radius: .3rem; border: 1px solid var(--codigo-borde); }
+pre { position: relative; background: var(--codigo-fondo); color: var(--codigo-tinta);
+      padding: 1.1rem 1.2rem; border-radius: .7rem; overflow-x: auto;
+      border: 1px solid var(--codigo-borde); margin: 1.3rem 0; }
+pre code { background: none; padding: 0; border: 0; font-size: .855rem; line-height: 1.62; }
+pre[data-lenguaje]::after {
+  content: attr(data-lenguaje); position: absolute; top: .55rem; right: .8rem;
+  font: 600 .66rem/1 ui-monospace, monospace; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--etiqueta); pointer-events: none;
+}
+.p-k, .p-kn, .p-kd, .p-kc, .p-ow { color: var(--sx-clave); font-weight: 600; }
+.p-s, .p-s1, .p-s2, .p-sd, .p-se, .p-sa, .p-si { color: var(--sx-cadena); }
+.p-nf, .p-fm { color: var(--sx-func); font-weight: 600; }
+.p-nb, .p-nc, .p-ne, .p-nn { color: var(--sx-tipo); }
+.p-m, .p-mi, .p-mf, .p-kt { color: var(--sx-num); }
+.p-c, .p-c1, .p-cm, .p-ch, .p-cs { color: var(--sx-com); font-style: italic; }
+.p-nd { color: var(--sx-dec); font-weight: 600; }
+.p-err { color: inherit; }
+
+/* Aviso ──────────────────────────────────────────────────────────────────── */
+blockquote { margin: 1.5rem 0; padding: .95rem 1.2rem; border-left: 3px solid var(--aviso-borde);
+             background: var(--aviso-fondo); border-radius: 0 .5rem .5rem 0; color: var(--tinta); }
+blockquote p { margin: .3rem 0; max-width: none; }
+blockquote strong { color: var(--aviso); }
+
+/* Tablas ─────────────────────────────────────────────────────────────────── */
+.tabla { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--linea);
+         border-radius: .6rem; background: var(--papel); }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th, td { text-align: left; padding: .6rem .9rem; border-bottom: 1px solid var(--linea-suave);
+         vertical-align: top; }
+thead th { font-weight: 640; background: var(--linea-suave); color: var(--tinta);
+           border-bottom: 1px solid var(--linea); }
+tbody tr:last-child td { border-bottom: 0; }
+td code, th code { background: transparent; border: 0; padding: 0; color: var(--sx-func); }
+
+hr { border: 0; border-top: 1px solid var(--linea); margin: 2.8rem 0; }
+
+/* Copiar ─────────────────────────────────────────────────────────────────── */
+.copiar {
+  position: absolute; top: .45rem; right: .5rem; z-index: 2;
+  font: 600 .68rem/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  padding: .35rem .6rem; border-radius: .4rem; cursor: pointer;
+  color: var(--tenue); background: var(--papel); border: 1px solid var(--codigo-borde);
+  opacity: 0; transition: opacity .13s, color .13s, border-color .13s;
+}
+pre:hover .copiar, .copiar:focus-visible { opacity: 1; }
+.copiar:hover { color: var(--acento); border-color: var(--acento); }
+.copiar.hecho { color: var(--sx-cadena); border-color: var(--sx-cadena); opacity: 1; }
+/* Con el botón visible, la etiqueta del lenguaje estorbaría. */
+pre:hover[data-lenguaje]::after { opacity: 0; }
+pre[data-lenguaje]::after { transition: opacity .13s; }
+/* Sin puntero —táctil o teclado— el botón se queda visible: no hay hover. */
+@media (hover: none) { .copiar { opacity: 1; } pre[data-lenguaje]::after { display: none; } }
+
+/* Anterior / siguiente ───────────────────────────────────────────────────── */
+.paginado {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  margin: 4rem 0 0; padding-top: 2rem; border-top: 1px solid var(--linea);
+}
+.paginado a {
+  display: block; padding: .9rem 1.1rem; border: 1px solid var(--linea);
+  border-radius: .6rem; text-decoration: none; background: var(--papel);
+  transition: border-color .13s, background .13s;
+}
+.paginado a:hover { border-color: var(--acento); background: var(--acento-suave); }
+.paginado .siguiente { grid-column: 2; text-align: right; }
+.paginado .etiqueta { display: block; font-size: .74rem; letter-spacing: .06em;
+                      text-transform: uppercase; color: var(--etiqueta); margin-bottom: .2rem; }
+.paginado .nombre { color: var(--tinta); font-weight: 600; font-size: .98rem; }
+@media (max-width: 40rem) {
+  .paginado { grid-template-columns: 1fr; }
+  .paginado .siguiente { grid-column: 1; text-align: left; }
+}
+
+@media (max-width: 62rem) {
+  .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
+  nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
+  nav ol { columns: 2; column-gap: 1.5rem; }
+  h1 { font-size: 1.85rem; }
+}
+</style>
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="marco">
+  <nav aria-label="Secciones">
+    <p class="marca"><a href="index.html">Synaptum</a></p>
+    <p class="version">1.0.0rc2</p>
+    <ol><li><a href="index.html">Empezar</a></li><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="08-referencia.html">Referencia</a></li><li><a href="ejemplos.html">Ejemplos</a><ol class="seccion"><li><a href="ejemplos-01-triaje.html">01 · Lo mínimo: un agente, una herramienta</a></li><li><a href="ejemplos-02-causa-raiz.html">02 · Varias herramientas y una respuesta tipada</a></li><li><a href="ejemplos-03-extraccion-acotada.html">03 · Un bucle acotado, y qué pasa cuando el modelo se equivoca</a></li><li><a href="ejemplos-04-agente-que-gasta.html">04 · Un agente que mueve dinero, y el runtime que lo frena</a></li><li><a href="ejemplos-05-cadena-de-agentes.html">05 · Varios agentes en cadena, cada uno con su contexto</a></li><li><a href="ejemplos-06-agentes-en-paralelo.html">06 · Varios agentes a la vez, y uno que decide</a></li><li><a href="ejemplos-07-agente-como-herramienta.html">07 · Un agente como herramienta de otro, y un supervisor que enruta</a></li><li><a href="ejemplos-08-herramientas-mcp.html">08 · Herramientas que no escribiste tú</a></li><li><a href="ejemplos-09-delegar.html">09 · Delegar como primitiva, no como patrón</a></li><li><a href="ejemplos-10-economia-del-contexto.html">10 · Lo que el modelo ve en cada turno, y lo que cuesta</a></li><li><a href="ejemplos-11-catalogo-diferido.html">11 · Un catálogo grande sin pagarlo en cada turno</a></li><li><a href="ejemplos-12-agente-remoto.html">12 · Un agente que vive en otro contenedor</a></li><li><a href="ejemplos-13-bucle.html">13 · El bucle entero, en un fichero</a></li><li><a href="ejemplos-14-durabilidad.html">14 · Matar el proceso a mitad y reanudar sin volver a pagar la inferencia</a></li><li><a href="ejemplos-15-aprobacion.html">15 · Un paso destructivo se detiene, alguien decide, y el run sigue donde estaba</a></li><li><a href="ejemplos-16-streaming.html" aria-current="page">16 · Ver los tokens según llegan, y cortar a mitad</a></li></ol></li></ol>
+    <p class="fuente"><a href="../ejemplos-16-streaming.md">Leer en Markdown&nbsp;↗</a></p>
+  </nav>
+  <main id="contenido">
+<h1>16 · Ver los tokens según llegan, y cortar a mitad</h1>
+<blockquote>
+<p><strong>Generada de <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/04_streaming.py"><code>examples/propiedades/04_streaming.py</code></a>.</strong> El fichero corre; esta página lo
+transcribe. Si los dos no coinciden, falla un test.</p>
+</blockquote>
+<p><code>agent.stream(...)</code> es el mismo bucle y el mismo journal que <code>agent.run(...)</code>:
+lo único que cambia es que los fragmentos del modelo se ceden intercalados entre
+la intención del paso y su resultado.</p>
+<pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/propiedades/04_streaming.py
+</code></pre>
+<pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
+
+<span class="p-kn">import</span><span class="p-w"> </span><span class="p-nn">asyncio</span>
+<span class="p-kn">import</span><span class="p-w"> </span><span class="p-nn">sys</span>
+<span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">typing</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">Annotated</span>
+
+<span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">synaptum</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">FinalStep</span><span class="p-p">,</span> <span class="p-n">Agent</span><span class="p-p">,</span> <span class="p-n">Phase</span><span class="p-p">,</span> <span class="p-n">Session</span><span class="p-p">,</span> <span class="p-n">StepEvent</span><span class="p-p">,</span> <span class="p-n">ToolStep</span><span class="p-p">,</span> <span class="p-n">tool</span>
+<span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">synaptum.testing</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">calls</span><span class="p-p">,</span> <span class="p-n">says</span>
+
+<span class="p-kn">import</span><span class="p-w"> </span><span class="p-nn">sys</span>
+<span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">pathlib</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">Path</span>
+
+<span class="p-n">sys</span><span class="p-o">.</span><span class="p-n">path</span><span class="p-o">.</span><span class="p-n">insert</span><span class="p-p">(</span><span class="p-mi">0</span><span class="p-p">,</span> <span class="p-nb">str</span><span class="p-p">(</span><span class="p-n">Path</span><span class="p-p">(</span><span class="p-vm">__file__</span><span class="p-p">)</span><span class="p-o">.</span><span class="p-n">resolve</span><span class="p-p">()</span><span class="p-o">.</span><span class="p-n">parent</span><span class="p-o">.</span><span class="p-n">parent</span><span class="p-p">))</span>
+
+<span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">comun</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">encabezado</span><span class="p-p">,</span> <span class="p-n">gateway</span><span class="p-p">,</span> <span class="p-n">nombre_del_modelo</span>
+
+<span class="p-nd">@tool</span>
+<span class="p-k">async</span> <span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">cotizacion</span><span class="p-p">(</span>
+    <span class="p-n">valor</span><span class="p-p">:</span> <span class="p-n">Annotated</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-s2">"Ticker del valor"</span><span class="p-p">],</span>
+<span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">str</span><span class="p-p">:</span>
+<span class="p-w">    </span><span class="p-sd">"""Devuelve la última cotización de un valor."""</span>
+    <span class="p-k">return</span> <span class="p-sa">f</span><span class="p-s2">"</span><span class="p-si">{</span><span class="p-n">valor</span><span class="p-si">}</span><span class="p-s2">: 187,34 USD (+1,2 %)"</span>
+
+<span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">responder</span><span class="p-p">(</span><span class="p-n">peticion</span><span class="p-p">):</span>
+    <span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">synaptum</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">Role</span>
+
+    <span class="p-k">if</span> <span class="p-nb">any</span><span class="p-p">(</span><span class="p-n">m</span><span class="p-o">.</span><span class="p-n">role</span> <span class="p-ow">is</span> <span class="p-n">Role</span><span class="p-o">.</span><span class="p-n">TOOL</span> <span class="p-k">for</span> <span class="p-n">m</span> <span class="p-ow">in</span> <span class="p-n">peticion</span><span class="p-o">.</span><span class="p-n">messages</span><span class="p-p">):</span>
+        <span class="p-k">return</span> <span class="p-n">says</span><span class="p-p">(</span>
+            <span class="p-s2">"La acción cotiza a 187,34 USD, con una subida del 1,2 </span><span class="p-si">% e</span><span class="p-s2">n la sesión. "</span>
+            <span class="p-s2">"El movimiento no es significativo por sí solo."</span>
+        <span class="p-p">)</span>
+    <span class="p-k">return</span> <span class="p-n">calls</span><span class="p-p">(</span><span class="p-s2">"cotizacion"</span><span class="p-p">,</span> <span class="p-n">valor</span><span class="p-o">=</span><span class="p-s2">"ACME"</span><span class="p-p">)</span>
+
+<span class="p-k">async</span> <span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">ver_llegar</span><span class="p-p">()</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span><span class="p-p">:</span>
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"  Los fragmentos se ceden dentro del paso que los produce:</span><span class="p-se">\n</span><span class="p-s2">"</span><span class="p-p">)</span>
+
+    <span class="p-n">agente</span> <span class="p-o">=</span> <span class="p-n">Agent</span><span class="p-p">(</span>
+        <span class="p-s2">"analista"</span><span class="p-p">,</span>
+        <span class="p-n">model</span><span class="p-o">=</span><span class="p-n">nombre_del_modelo</span><span class="p-p">(),</span>
+        <span class="p-n">instructions</span><span class="p-o">=</span><span class="p-s2">"Respondes sobre valores usando las herramientas."</span><span class="p-p">,</span>
+        <span class="p-n">tools</span><span class="p-o">=</span><span class="p-p">[</span><span class="p-n">cotizacion</span><span class="p-p">],</span>
+    <span class="p-p">)</span>
+    <span class="p-n">puerta</span> <span class="p-o">=</span> <span class="p-n">gateway</span><span class="p-p">([</span><span class="p-n">responder</span><span class="p-p">]</span> <span class="p-o">*</span> <span class="p-mi">4</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-o">=</span><span class="p-p">[</span><span class="p-n">cotizacion</span><span class="p-p">])</span>
+
+    <span class="p-k">async</span> <span class="p-k">for</span> <span class="p-n">evento</span> <span class="p-ow">in</span> <span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">stream</span><span class="p-p">(</span><span class="p-s2">"¿Cómo va ACME?"</span><span class="p-p">,</span> <span class="p-n">session</span><span class="p-o">=</span><span class="p-n">Session</span><span class="p-p">(</span><span class="p-s2">"ej-04"</span><span class="p-p">,</span> <span class="p-n">puerta</span><span class="p-p">)):</span>
+        <span class="p-k">match</span> <span class="p-n">evento</span><span class="p-p">:</span>
+            <span class="p-k">case</span> <span class="p-n">ToolStep</span><span class="p-p">(</span><span class="p-n">phase</span><span class="p-o">=</span><span class="p-n">Phase</span><span class="p-o">.</span><span class="p-n">ATTEMPTED</span><span class="p-p">,</span> <span class="p-n">call</span><span class="p-o">=</span><span class="p-n">llamada</span><span class="p-p">)</span> <span class="p-k">if</span> <span class="p-n">llamada</span><span class="p-p">:</span>
+                <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"</span><span class="p-se">\n</span><span class="p-s2">  · herramienta </span><span class="p-si">{</span><span class="p-n">llamada</span><span class="p-o">.</span><span class="p-n">name</span><span class="p-si">}</span><span class="p-s2">"</span><span class="p-p">,</span> <span class="p-n">flush</span><span class="p-o">=</span><span class="p-kc">True</span><span class="p-p">)</span>
+            <span class="p-k">case</span> <span class="p-n">FinalStep</span><span class="p-p">():</span>
+                <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"</span><span class="p-se">\n</span><span class="p-s2">"</span><span class="p-p">)</span>
+            <span class="p-k">case</span> <span class="p-n">StepEvent</span><span class="p-p">():</span>
+                <span class="p-k">pass</span>                      <span class="p-c1"># los pasos ya se ven por lo que emiten</span>
+            <span class="p-k">case</span><span class="p-w"> </span><span class="p-k">_</span> <span class="p-k">if</span> <span class="p-n">evento</span><span class="p-o">.</span><span class="p-n">kind</span> <span class="p-o">==</span> <span class="p-s2">"text_start"</span><span class="p-p">:</span>
+                <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"  "</span><span class="p-p">,</span> <span class="p-n">end</span><span class="p-o">=</span><span class="p-s2">""</span><span class="p-p">,</span> <span class="p-n">flush</span><span class="p-o">=</span><span class="p-kc">True</span><span class="p-p">)</span>
+            <span class="p-k">case</span><span class="p-w"> </span><span class="p-k">_</span> <span class="p-k">if</span> <span class="p-n">evento</span><span class="p-o">.</span><span class="p-n">kind</span> <span class="p-o">==</span> <span class="p-s2">"text_delta"</span><span class="p-p">:</span>
+                <span class="p-nb">print</span><span class="p-p">(</span><span class="p-n">evento</span><span class="p-o">.</span><span class="p-n">text</span><span class="p-p">,</span> <span class="p-n">end</span><span class="p-o">=</span><span class="p-s2">""</span><span class="p-p">,</span> <span class="p-n">flush</span><span class="p-o">=</span><span class="p-kc">True</span><span class="p-p">)</span>
+                <span class="p-k">await</span> <span class="p-n">asyncio</span><span class="p-o">.</span><span class="p-n">sleep</span><span class="p-p">(</span><span class="p-mf">0.02</span><span class="p-p">)</span>   <span class="p-c1"># solo para que se aprecie</span>
+            <span class="p-k">case</span><span class="p-w"> </span><span class="p-k">_</span> <span class="p-k">if</span> <span class="p-n">evento</span><span class="p-o">.</span><span class="p-n">kind</span> <span class="p-o">==</span> <span class="p-s2">"reasoning_delta"</span><span class="p-p">:</span>
+                <span class="p-n">sys</span><span class="p-o">.</span><span class="p-n">stdout</span><span class="p-o">.</span><span class="p-n">write</span><span class="p-p">(</span><span class="p-s2">"."</span><span class="p-p">)</span>       <span class="p-c1"># el razonamiento no es la respuesta</span>
+                <span class="p-n">sys</span><span class="p-o">.</span><span class="p-n">stdout</span><span class="p-o">.</span><span class="p-n">flush</span><span class="p-p">()</span>
+
+<span class="p-k">async</span> <span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">cortar_a_mitad</span><span class="p-p">()</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span><span class="p-p">:</span>
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"  Cortar es dejar de iterar — no hay evento de cancelación:</span><span class="p-se">\n</span><span class="p-s2">"</span><span class="p-p">)</span>
+
+    <span class="p-n">largo</span> <span class="p-o">=</span> <span class="p-p">(</span>
+        <span class="p-s2">"Una respuesta larga que nadie va a leer entera, porque el punto del "</span>
+        <span class="p-s2">"ejemplo es irse a mitad y comprobar que arriba se para."</span>
+    <span class="p-p">)</span>
+    <span class="p-n">agente</span> <span class="p-o">=</span> <span class="p-n">Agent</span><span class="p-p">(</span><span class="p-s2">"analista"</span><span class="p-p">,</span> <span class="p-n">model</span><span class="p-o">=</span><span class="p-n">nombre_del_modelo</span><span class="p-p">())</span>
+
+    <span class="p-c1"># Cuántos fragmentos habría si se drenara entero.  Es la referencia contra</span>
+    <span class="p-c1"># la que medir: «recibí pocos» no dice nada sin saber cuántos había.</span>
+    <span class="p-n">completo</span> <span class="p-o">=</span> <span class="p-n">gateway</span><span class="p-p">([</span><span class="p-k">lambda</span> <span class="p-n">_</span><span class="p-p">:</span> <span class="p-n">says</span><span class="p-p">(</span><span class="p-n">largo</span><span class="p-p">)])</span>
+    <span class="p-n">total</span> <span class="p-o">=</span> <span class="p-mi">0</span>
+    <span class="p-k">async</span> <span class="p-k">for</span> <span class="p-n">evento</span> <span class="p-ow">in</span> <span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">stream</span><span class="p-p">(</span><span class="p-s2">"largo"</span><span class="p-p">,</span> <span class="p-n">session</span><span class="p-o">=</span><span class="p-n">Session</span><span class="p-p">(</span><span class="p-s2">"ej-04-ref"</span><span class="p-p">,</span> <span class="p-n">completo</span><span class="p-p">)):</span>
+        <span class="p-n">total</span> <span class="p-o">+=</span> <span class="p-n">evento</span><span class="p-o">.</span><span class="p-n">kind</span> <span class="p-o">==</span> <span class="p-s2">"text_delta"</span>
+
+    <span class="p-n">puerta</span> <span class="p-o">=</span> <span class="p-n">gateway</span><span class="p-p">([</span><span class="p-k">lambda</span> <span class="p-n">_</span><span class="p-p">:</span> <span class="p-n">says</span><span class="p-p">(</span><span class="p-n">largo</span><span class="p-p">)])</span>
+    <span class="p-n">flujo</span> <span class="p-o">=</span> <span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">stream</span><span class="p-p">(</span><span class="p-s2">"cuéntame algo largo"</span><span class="p-p">,</span> <span class="p-n">session</span><span class="p-o">=</span><span class="p-n">Session</span><span class="p-p">(</span><span class="p-s2">"ej-04b"</span><span class="p-p">,</span> <span class="p-n">puerta</span><span class="p-p">))</span>
+    <span class="p-n">recibidos</span> <span class="p-o">=</span> <span class="p-mi">0</span>
+    <span class="p-k">async</span> <span class="p-k">for</span> <span class="p-n">evento</span> <span class="p-ow">in</span> <span class="p-n">flujo</span><span class="p-p">:</span>
+        <span class="p-k">if</span> <span class="p-n">evento</span><span class="p-o">.</span><span class="p-n">kind</span> <span class="p-o">==</span> <span class="p-s2">"text_delta"</span><span class="p-p">:</span>
+            <span class="p-n">recibidos</span> <span class="p-o">+=</span> <span class="p-mi">1</span>
+            <span class="p-k">if</span> <span class="p-n">recibidos</span> <span class="p-o">==</span> <span class="p-mi">3</span><span class="p-p">:</span>
+                <span class="p-k">break</span>
+    <span class="p-k">await</span> <span class="p-n">flujo</span><span class="p-o">.</span><span class="p-n">aclose</span><span class="p-p">()</span>
+
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"  recibidos </span><span class="p-si">{</span><span class="p-n">recibidos</span><span class="p-si">}</span><span class="p-s2"> de </span><span class="p-si">{</span><span class="p-n">total</span><span class="p-si">}</span><span class="p-s2"> fragmentos"</span><span class="p-p">)</span>
+    <span class="p-k">if</span> <span class="p-nb">getattr</span><span class="p-p">(</span><span class="p-n">puerta</span><span class="p-p">,</span> <span class="p-s2">"cancelled"</span><span class="p-p">,</span> <span class="p-kc">False</span><span class="p-p">):</span>
+        <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"  el proveedor produjo </span><span class="p-si">{</span><span class="p-n">puerta</span><span class="p-o">.</span><span class="p-n">chunks_emitted</span><span class="p-si">}</span><span class="p-s2"> y registró el cierre"</span><span class="p-p">)</span>
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"</span><span class="p-se">\n</span><span class="p-s2">  Un canal que se está cerrando no es sitio para mandar el aviso de"</span><span class="p-p">)</span>
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"  que se cierra. Cerrar el iterador cierra el cuerpo de la respuesta,"</span><span class="p-p">)</span>
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"  y eso es lo que de verdad para la generación arriba."</span><span class="p-p">)</span>
+
+<span class="p-k">async</span> <span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">main</span><span class="p-p">()</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span><span class="p-p">:</span>
+    <span class="p-n">encabezado</span><span class="p-p">(</span><span class="p-s2">"04 · Streaming"</span><span class="p-p">)</span>
+    <span class="p-k">await</span> <span class="p-n">ver_llegar</span><span class="p-p">()</span>
+    <span class="p-k">await</span> <span class="p-n">cortar_a_mitad</span><span class="p-p">()</span>
+
+<span class="p-k">if</span> <span class="p-vm">__name__</span> <span class="p-o">==</span> <span class="p-s2">"__main__"</span><span class="p-p">:</span>
+    <span class="p-n">asyncio</span><span class="p-o">.</span><span class="p-n">run</span><span class="p-p">(</span><span class="p-n">main</span><span class="p-p">())</span>
+</code></pre>
+
+<nav class="paginado" aria-label="Paginación"><a class="prev" href="ejemplos-15-aprobacion.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">15 · Un paso destructivo se detiene, alguien decide, y el run sigue donde estaba</span></a></nav>
+  </main>
+</div>
+<script>
+// Botón de copiar en cada bloque de código.
+//
+// Se añade desde JavaScript y no en el HTML a propósito: sin JS la página se
+// lee igual y el código sigue siendo seleccionable. Un botón que no funciona es
+// peor que no tenerlo.
+document.querySelectorAll('pre').forEach(function (bloque) {
+  var boton = document.createElement('button');
+  boton.className = 'copiar';
+  boton.type = 'button';
+  boton.setAttribute('aria-label', 'Copiar el código');
+  boton.textContent = 'Copiar';
+
+  boton.addEventListener('click', function () {
+    var codigo = bloque.querySelector('code');
+    var texto = codigo ? codigo.innerText : bloque.innerText;
+    // `clipboard` necesita contexto seguro; en file:// no existe, y entonces se
+    // dice en vez de fingir que copió.
+    if (!navigator.clipboard) {
+      boton.textContent = 'No disponible';
+      setTimeout(function () { boton.textContent = 'Copiar'; }, 1600);
+      return;
+    }
+    navigator.clipboard.writeText(texto).then(function () {
+      boton.textContent = 'Copiado';
+      boton.classList.add('hecho');
+      setTimeout(function () {
+        boton.textContent = 'Copiar';
+        boton.classList.remove('hecho');
+      }, 1600);
+    });
+  });
+
+  bloque.appendChild(boton);
+});
+</script>
+</body>
+</html>

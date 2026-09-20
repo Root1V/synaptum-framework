@@ -69,6 +69,13 @@ nav a { display: block; padding: .34rem .7rem; margin-left: -.7rem; border-radiu
 nav a:hover { background: var(--linea-suave); color: var(--tinta); }
 nav a[aria-current] { color: var(--acento); font-weight: 600; background: var(--acento-suave);
                       border-left-color: var(--acento); }
+nav .seccion { margin: .1rem 0 .3rem .9rem; border-left: 1px solid var(--linea);
+               padding-left: .35rem; font-size: .88rem; }
+nav .seccion a { padding: .24rem .6rem; }
+/* Plegada por defecto: sin esto, dieciséis ejemplos empujan el resto del menú
+   fuera de la pantalla en cualquier página. Se abre en la sección en la que
+   estás, que es cuando sirve. */
+nav .seccion.plegada { display: none; }
 .fuente { margin-top: 1.8rem; padding-top: 1rem; border-top: 1px solid var(--linea);
           font-size: .82rem; }
 .fuente a { color: var(--tenue); text-decoration: none; }
@@ -179,7 +186,7 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   <nav aria-label="Secciones">
     <p class="marca"><a href="index.html">Synaptum</a></p>
     <p class="version">1.0.0rc2</p>
-    <ol><li><a href="index.html">Empezar</a></li><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html" aria-current="page">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="08-referencia.html">Referencia</a></li></ol>
+    <ol><li><a href="index.html">Empezar</a></li><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html" aria-current="page">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="08-referencia.html">Referencia</a></li><li><a href="ejemplos.html">Ejemplos</a><ol class="seccion plegada"><li><a href="ejemplos-01-triaje.html">01 · Lo mínimo: un agente, una herramienta</a></li><li><a href="ejemplos-02-causa-raiz.html">02 · Varias herramientas y una respuesta tipada</a></li><li><a href="ejemplos-03-extraccion-acotada.html">03 · Un bucle acotado, y qué pasa cuando el modelo se equivoca</a></li><li><a href="ejemplos-04-agente-que-gasta.html">04 · Un agente que mueve dinero, y el runtime que lo frena</a></li><li><a href="ejemplos-05-cadena-de-agentes.html">05 · Varios agentes en cadena, cada uno con su contexto</a></li><li><a href="ejemplos-06-agentes-en-paralelo.html">06 · Varios agentes a la vez, y uno que decide</a></li><li><a href="ejemplos-07-agente-como-herramienta.html">07 · Un agente como herramienta de otro, y un supervisor que enruta</a></li><li><a href="ejemplos-08-herramientas-mcp.html">08 · Herramientas que no escribiste tú</a></li><li><a href="ejemplos-09-delegar.html">09 · Delegar como primitiva, no como patrón</a></li><li><a href="ejemplos-10-economia-del-contexto.html">10 · Lo que el modelo ve en cada turno, y lo que cuesta</a></li><li><a href="ejemplos-11-catalogo-diferido.html">11 · Un catálogo grande sin pagarlo en cada turno</a></li><li><a href="ejemplos-12-agente-remoto.html">12 · Un agente que vive en otro contenedor</a></li><li><a href="ejemplos-13-bucle.html">13 · El bucle entero, en un fichero</a></li><li><a href="ejemplos-14-durabilidad.html">14 · Matar el proceso a mitad y reanudar sin volver a pagar la inferencia</a></li><li><a href="ejemplos-15-aprobacion.html">15 · Un paso destructivo se detiene, alguien decide, y el run sigue donde estaba</a></li><li><a href="ejemplos-16-streaming.html">16 · Ver los tokens según llegan, y cortar a mitad</a></li></ol></li></ol>
     <p class="fuente"><a href="../06-probar.md">Leer en Markdown&nbsp;↗</a></p>
   </nav>
   <main id="contenido">

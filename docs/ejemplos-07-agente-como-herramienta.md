@@ -1,4 +1,7 @@
-"""07 · Un agente como herramienta de otro, y un supervisor que enruta.
+# 07 · Un agente como herramienta de otro, y un supervisor que enruta
+
+> **Generada de [`examples/agentes/07_agente_como_herramienta.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/07_agente_como_herramienta.py).** El fichero corre; esta página lo
+> transcribe. Si los dos no coinciden, falla un test.
 
 **Dominio: la mesa de entrada de tu portafolio.** Llega una petición en lenguaje
 natural y puede ser de tres sitios distintos: un incidente de Argus, un documento
@@ -10,9 +13,11 @@ framework para esto — un `@tool` es una función asíncrona, y un agente se
 ejecuta con `async for`. Pero tiene consecuencias que conviene entender antes de
 usarlo, y están al final del fichero.
 
-    uv run python examples/agentes/07_agente_como_herramienta.py
-"""
+```bash
+uv run python examples/agentes/07_agente_como_herramienta.py
+```
 
+```python
 from __future__ import annotations
 
 import asyncio
@@ -30,30 +35,30 @@ from comun import encabezado, gateway, nombre_del_modelo
 # Consumo de los especialistas, que hay que sumar a mano: desde fuera, una
 # llamada a un subagente parece una herramienta barata y no lo es.
 COSTE = Usage.zero()
+```
 
+## Herramientas de los especialistas
 
-# ── Herramientas de los especialistas ─────────────────────────────────────────
-
+```python
 @tool(idempotent=True)
 async def buscar_spans(consulta: Annotated[str, "Consulta sobre trazas"]) -> str:
     """Busca en las trazas de la plataforma de observabilidad."""
     return "chat.completions p95 6.4s · model.load 5.9s de esos · 412 spans"
-
 
 @tool(idempotent=True)
 async def clasificar_documento(ruta: Annotated[str, "Ruta del documento"]) -> str:
     """Clasifica un documento en una de las categorías soportadas."""
     return "tipo: boleta_de_pago · confianza 0.94 · 1 página · texto nativo (sin OCR)"
 
-
 @tool(risk=Risk.SOFT_WRITE)
 async def consultar_saldo(cuenta: Annotated[str, "Identificador de cuenta"]) -> str:
     """Saldo disponible de una cuenta del libro mayor."""
     return f"{cuenta}: 4.812.400µ disponibles · 150.000µ retenidos"
+```
 
+## Los especialistas, envueltos como herramientas
 
-# ── Los especialistas, envueltos como herramientas ────────────────────────────
-
+```python
 async def _ejecutar(agente: Agent, brief: str, run_id: str, puerta) -> str:
     """Corre un agente hasta el final y devuelve su salida.
 
@@ -66,7 +71,6 @@ async def _ejecutar(agente: Agent, brief: str, run_id: str, puerta) -> str:
             COSTE += paso.usage
             return str(paso.output)
     return "el especialista no devolvió nada"
-
 
 @tool
 async def especialista_observabilidad(
@@ -86,7 +90,6 @@ async def especialista_observabilidad(
     )
     return await _ejecutar(agente, pregunta, "sup-obs", puerta)
 
-
 @tool
 async def especialista_documentos(
     pregunta: Annotated[str, "La pregunta, tal cual, para el especialista"],
@@ -105,7 +108,6 @@ async def especialista_documentos(
     )
     return await _ejecutar(agente, pregunta, "sup-docs", puerta)
 
-
 @tool
 async def especialista_tesoreria(
     pregunta: Annotated[str, "La pregunta, tal cual, para el especialista"],
@@ -122,10 +124,11 @@ async def especialista_tesoreria(
         tools=[consultar_saldo],
     )
     return await _ejecutar(agente, pregunta, "sup-tes", puerta)
+```
 
+## El supervisor
 
-# ── El supervisor ─────────────────────────────────────────────────────────────
-
+```python
 async def main() -> None:
     encabezado("07 · Un agente como herramienta")
 
@@ -169,47 +172,55 @@ async def main() -> None:
                 print(f"  coste especialistas entrada={COSTE.input}")
                 print(f"  coste real         entrada={consumo_supervisor.input + COSTE.input}")
 
-
-# Cuándo usar esto, y cuándo no
-# ─────────────────────────────
-#
-# **A favor:** el supervisor no necesita conocer las herramientas de nadie. Sus
-# tres herramientas tienen una firma de una línea, mientras cada especialista
-# puede tener quince. Añadir un dominio es añadir una función, no reescribir un
-# prompt.
-#
-# **En contra, y es lo que nadie cuenta:**
-#
-# 1. **El coste desaparece de la vista.** `FinalStep.usage` del supervisor mide
-#    *sus* llamadas, no las de dentro. Aquí se suma a mano en `COSTE`, y por eso
-#    el ejemplo imprime las tres cifras: si solo miras la del supervisor, un
-#    sistema que gasta cinco veces más parece igual de barato.
-#
-#    **Esto ya está resuelto** si delegas como primitiva en vez de a mano:
-#    `Agent(delegates=[…])` transporta el consumo del subagente en el
-#    `DelegateStep` y lo suma al total del padre. Ver el ejemplo 09.
-#
-# 2. **Un subagente envuelto a mano no es un paso durable.** Si el proceso muere
-#    a mitad de un especialista, al reanudar la herramienta se reejecuta entera
-#    — el journal la ve como una llamada, no como un run con sus propios pasos.
-#    Para lectura da igual; para algo que mueva dinero, no.
-#
-#    **También resuelto delegando como primitiva**: el subagente tiene su propio
-#    diario y no se repite.
-#
-# 3. **El riesgo no se propaga.** `especialista_tesoreria` es `Risk.READ` por
-#    defecto aunque por dentro llame a algo que escribe, y aquí hay que
-#    declararlo a mano en el envoltorio.
-#
-#    **Delegando como primitiva sí se deriva**: el riesgo de delegar es el mayor
-#    de lo que el subagente puede hacer. Envolviendo a mano el framework no
-#    puede deducirlo —ve una función que devuelve `str`—; como delegado, sí ve
-#    sus herramientas.
-#
-# Los tres desaparecen con `Agent(delegates=[…])`, que es el ejemplo
-# [`09`](09_delegar.py). Este patrón sigue siendo el correcto cuando lo de
-# dentro **no es un `Agent`**: una API ajena, un servicio heredado, cualquier
-# cosa que no tenga un bucle que ceder.
-
 if __name__ == "__main__":
     asyncio.run(main())
+```
+
+## Lo que esto enseña
+
+Cuándo usar esto, y cuándo no
+─────────────────────────────
+
+**A favor:** el supervisor no necesita conocer las herramientas de nadie. Sus
+tres herramientas tienen una firma de una línea, mientras cada especialista
+puede tener quince. Añadir un dominio es añadir una función, no reescribir un
+prompt.
+
+**En contra, y es lo que nadie cuenta:**
+
+1. **El coste desaparece de la vista.** `FinalStep.usage` del supervisor mide
+```text
+*sus* llamadas, no las de dentro. Aquí se suma a mano en `COSTE`, y por eso
+el ejemplo imprime las tres cifras: si solo miras la del supervisor, un
+sistema que gasta cinco veces más parece igual de barato.
+
+**Esto ya está resuelto** si delegas como primitiva en vez de a mano:
+`Agent(delegates=[…])` transporta el consumo del subagente en el
+`DelegateStep` y lo suma al total del padre. Ver el ejemplo 09.
+```
+
+2. **Un subagente envuelto a mano no es un paso durable.** Si el proceso muere
+```text
+a mitad de un especialista, al reanudar la herramienta se reejecuta entera
+— el journal la ve como una llamada, no como un run con sus propios pasos.
+Para lectura da igual; para algo que mueva dinero, no.
+
+**También resuelto delegando como primitiva**: el subagente tiene su propio
+diario y no se repite.
+```
+
+3. **El riesgo no se propaga.** `especialista_tesoreria` es `Risk.READ` por
+```text
+defecto aunque por dentro llame a algo que escribe, y aquí hay que
+declararlo a mano en el envoltorio.
+
+**Delegando como primitiva sí se deriva**: el riesgo de delegar es el mayor
+de lo que el subagente puede hacer. Envolviendo a mano el framework no
+puede deducirlo —ve una función que devuelve `str`—; como delegado, sí ve
+sus herramientas.
+```
+
+Los tres desaparecen con `Agent(delegates=[…])`, que es el ejemplo
+[`09`](ejemplos-09-delegar.md). Este patrón sigue siendo el correcto cuando lo de
+dentro **no es un `Agent`**: una API ajena, un servicio heredado, cualquier
+cosa que no tenga un bucle que ceder.

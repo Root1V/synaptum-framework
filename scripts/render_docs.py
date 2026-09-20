@@ -156,6 +156,13 @@ nav a { display: block; padding: .34rem .7rem; margin-left: -.7rem; border-radiu
 nav a:hover { background: var(--linea-suave); color: var(--tinta); }
 nav a[aria-current] { color: var(--acento); font-weight: 600; background: var(--acento-suave);
                       border-left-color: var(--acento); }
+nav .seccion { margin: .1rem 0 .3rem .9rem; border-left: 1px solid var(--linea);
+               padding-left: .35rem; font-size: .88rem; }
+nav .seccion a { padding: .24rem .6rem; }
+/* Plegada por defecto: sin esto, dieciséis ejemplos empujan el resto del menú
+   fuera de la pantalla en cualquier página. Se abre en la sección en la que
+   estás, que es cuando sirve. */
+nav .seccion.plegada { display: none; }
 .fuente { margin-top: 1.8rem; padding-top: 1rem; border-top: 1px solid var(--linea);
           font-size: .82rem; }
 .fuente a { color: var(--tenue); text-decoration: none; }
@@ -268,7 +275,10 @@ def paginas() -> list[Path]:
     «Empezar» salía la última del menú y el paginado llevaba de la última página
     al principio. Alfabético no es el orden en que se lee esto.
     """
-    todas = sorted(FUENTE.glob("*.md"))
+    # Por `stem` y no por nombre: comparando `ejemplos.md` con
+    # `ejemplos-01-triaje.md` gana el guion al punto, así que el índice de la
+    # sección salía **después** de sus propias páginas.
+    todas = sorted(FUENTE.glob("*.md"), key=lambda p: p.stem)
     return [p for p in todas if p.stem == "index"] + [p for p in todas if p.stem != "index"]
 
 
@@ -332,14 +342,7 @@ def render(md: Path, todas: list[Path]) -> str:
         "</table>", "</table></div>"
     )
 
-    indice = "".join(
-        '<li><a href="{destino}"{actual}>{nombre}</a></li>'.format(
-            destino=f"{otra.stem}.html",
-            actual=' aria-current="page"' if otra == md else "",
-            nombre=html.escape(titulo_de(otra)),
-        )
-        for otra in todas
-    )
+    indice = _menu(md, todas)
 
     return PLANTILLA.format(
         titulo=html.escape(titulo_de(md)),
@@ -351,6 +354,49 @@ def render(md: Path, todas: list[Path]) -> str:
         md=f"../{md.name}",
         version=html.escape(_version()),
     )
+
+
+def _menu(md: Path, todas: list[Path]) -> str:
+    """El menú lateral, con las páginas de una sección anidadas bajo la suya.
+
+    Dieciséis ejemplos en la misma lista que las ocho páginas escritas
+    convertirían el menú en un listado donde no se distingue lo que hay que
+    leer de lo que hay que consultar. Una sección es un grupo, y se ve como tal.
+
+    El grupo se deduce del nombre —`ejemplos.md` es la portada de
+    `ejemplos-*.md`— y no de una tabla aparte: una tabla que hay que actualizar
+    a mano al añadir una página es una tabla que se queda corta.
+    """
+    def entrada(otra: Path) -> str:
+        return '<li><a href="{destino}"{actual}>{nombre}</a></li>'.format(
+            destino=f"{otra.stem}.html",
+            actual=' aria-current="page"' if otra == md else "",
+            nombre=html.escape(titulo_de(otra)),
+        )
+
+    portadas = {p.stem for p in todas}
+    piezas: list[str] = []
+    for otra in todas:
+        grupo = otra.stem.split("-")[0]
+        if grupo != otra.stem and grupo in portadas:
+            continue                     # va anidada, no en el primer nivel
+
+        hijas = [
+            h for h in todas
+            if h.stem != otra.stem and h.stem.split("-")[0] == otra.stem
+        ]
+        if not hijas:
+            piezas.append(entrada(otra))
+            continue
+
+        abierta = md == otra or md in hijas
+        piezas.append(
+            f"<li>{entrada(otra)[4:-5]}"
+            f'<ol class="seccion{"" if abierta else " plegada"}">'
+            + "".join(entrada(h) for h in hijas)
+            + "</ol></li>"
+        )
+    return "".join(piezas)
 
 
 def _paginado(md: Path, todas: list[Path]) -> str:
