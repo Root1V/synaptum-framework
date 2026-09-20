@@ -1,9 +1,10 @@
 """07 · Un agente como herramienta de otro, y un supervisor que enruta.
 
-**Dominio: la mesa de entrada de tu portafolio.** Llega una petición en lenguaje
-natural y puede ser de tres sitios distintos: un incidente de Argus, un documento
-para la plataforma documental, o un pago de Aerarium. Cada uno tiene su
-especialista, sus herramientas y su riesgo.
+**Dominio: una mesa de entrada que reparte entre varios sistemas.** Llega una
+petición en lenguaje natural y puede ser de tres sitios distintos: un incidente
+de observabilidad, un documento para extraer, o un pago. Cada uno tiene su
+especialista, sus herramientas y su riesgo — y esa es la situación de cualquier
+organización con más de un sistema en producción.
 
 El patrón: **envolver un agente en un `@tool`**. No hace falta nada del
 framework para esto — un `@tool` es una función asíncrona, y un agente se

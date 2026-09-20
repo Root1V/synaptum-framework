@@ -3,10 +3,11 @@
 > **Esto es un fichero que se ejecuta:** [`examples/agentes/07_agente_como_herramienta.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/07_agente_como_herramienta.py) ↗
 > Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
-**Dominio: la mesa de entrada de tu portafolio.** Llega una petición en lenguaje
-natural y puede ser de tres sitios distintos: un incidente de Argus, un documento
-para la plataforma documental, o un pago de Aerarium. Cada uno tiene su
-especialista, sus herramientas y su riesgo.
+**Dominio: una mesa de entrada que reparte entre varios sistemas.** Llega una
+petición en lenguaje natural y puede ser de tres sitios distintos: un incidente
+de observabilidad, un documento para extraer, o un pago. Cada uno tiene su
+especialista, sus herramientas y su riesgo — y esa es la situación de cualquier
+organización con más de un sistema en producción.
 
 El patrón: **envolver un agente en un `@tool`**. No hace falta nada del
 framework para esto — un `@tool` es una función asíncrona, y un agente se

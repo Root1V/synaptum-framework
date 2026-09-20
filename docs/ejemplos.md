@@ -27,8 +27,8 @@ Cada uno añade **una** idea sobre el anterior.
 | [04 · Un agente que mueve dinero, y el runtime que lo frena](ejemplos-04-agente-que-gasta.md) | Aerarium + Mercatus |
 | [05 · Varios agentes en cadena, cada uno con su contexto](ejemplos-05-cadena-de-agentes.md) | el pipeline de doblaje (Prosodia) |
 | [06 · Varios agentes a la vez, y uno que decide](ejemplos-06-agentes-en-paralelo.md) | Argus bajo tormenta |
-| [07 · Un agente como herramienta de otro, y un supervisor que enruta](ejemplos-07-agente-como-herramienta.md) | la mesa de entrada de tu portafolio |
-| [08 · Herramientas que no escribiste tú](ejemplos-08-herramientas-mcp.md) | cualquiera de tus repos |
+| [07 · Un agente como herramienta de otro, y un supervisor que enruta](ejemplos-07-agente-como-herramienta.md) | una mesa de entrada que reparte entre varios sistemas |
+| [08 · Herramientas que no escribiste tú](ejemplos-08-herramientas-mcp.md) | cualquier proyecto de GitHub |
 | [09 · Delegar como primitiva, no como patrón](ejemplos-09-delegar.md) | Aerarium |
 | [10 · Lo que el modelo ve en cada turno, y lo que cuesta](ejemplos-10-economia-del-contexto.md) | Argus |
 | [11 · Un catálogo grande sin pagarlo en cada turno](ejemplos-11-catalogo-diferido.md) | Prometheus |

@@ -16,8 +16,9 @@ se ejecuta, y un test falla si dejan de corresponder.
 
 ## Construir agentes
 
-Cada uno añade **una** idea sobre el anterior, y todos están sobre un proyecto real de este
-portafolio, no sobre un dominio inventado.
+Cada uno añade **una** idea sobre el anterior, y todos están sobre un sistema real —observabilidad,
+banca agéntica, inferencia autoalojada, doblaje de vídeo— y no sobre un dominio inventado. Un
+ejemplo con `foo` y `bar` enseña la sintaxis y esconde la decisión.
 
 | | Qué añade | Dominio |
 |---|---|---|
@@ -27,8 +28,8 @@ portafolio, no sobre un dominio inventado.
 | [`04_agente_que_gasta.py`](agentes/04_agente_que_gasta.py) | `risk`, denegación y **aprobación humana** con el run suspendido en disco | Aerarium · tesorería |
 | [`05_cadena_de_agentes.py`](agentes/05_cadena_de_agentes.py) | Dos agentes en cadena, cada uno con su contexto | [Prosodia](https://github.com/Root1V/ai-video-dubbing-pipeline) · doblaje |
 | [`06_agentes_en_paralelo.py`](agentes/06_agentes_en_paralelo.py) | Fan-out con `asyncio.gather` y un sintetizador | Argus bajo tormenta |
-| [`07_agente_como_herramienta.py`](agentes/07_agente_como_herramienta.py) | Un supervisor que enruta a especialistas | Mesa de entrada del portafolio |
-| [`08_herramientas_mcp.py`](agentes/08_herramientas_mcp.py) | Herramientas de un **servidor MCP**, y qué cambia cuando no las escribiste tú | Cualquier repo · servidor incluido |
+| [`07_agente_como_herramienta.py`](agentes/07_agente_como_herramienta.py) | Un supervisor que enruta a especialistas | Mesa de entrada de varios sistemas |
+| [`08_herramientas_mcp.py`](agentes/08_herramientas_mcp.py) | Herramientas de un **servidor MCP**, y qué cambia cuando no las escribiste tú | Cualquier proyecto de GitHub · servidor incluido |
 | [`09_delegar.py`](agentes/09_delegar.py) | `delegates=`: delegar como **primitiva** — coste que sube, riesgo que se deriva, paso durable | Aerarium · cierre de mes |
 | [`10_economia_del_contexto.py`](agentes/10_economia_del_contexto.py) | `max_tool_chars`, prefijo estable y `economy()`: qué ve el modelo y qué cuesta | Argus · depurar con logs |
 | [`11_catalogo_diferido.py`](agentes/11_catalogo_diferido.py) | `deferred()`: veinte herramientas sin inflar el prefijo | Prometheus · consola del operador |
