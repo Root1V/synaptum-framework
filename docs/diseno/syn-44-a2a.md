@@ -160,8 +160,23 @@ Esa es la única razón por la que merece la pena implementarlo nosotros en vez 
 
 ## Preguntas abiertas antes de escribir código
 
-1. **¿La costura admitirá autorizar sin ejecutar?** Bloquea el resto. Va al canal.
-2. **¿Cliente, servidor, o los dos?** Para «cada agente en su contenedor» hacen falta los dos, pero
-   el cliente solo ya sirve para consumir agentes ajenos.
-3. **¿Almacén compartido entre contenedores?** Si cada uno lleva el suyo, se pierde la propiedad que
+**Planteadas en el canal de coordinación el 2026-09-20. Sin empezar hasta tener respuesta**, porque
+de la primera depende que la mitad de esto sea nuestro o no.
+
+1. **¿De quién es la llamada remota?** Tres opciones sobre la mesa, y me inclino por la tercera
+   aunque vaya contra mi instinto:
+   - la costura gana un método que **autoriza sin ejecutar**;
+   - la delegación viaja como una llamada a herramienta más;
+   - **el arnés hace la llamada A2A**, porque una delegación remota es *egress* — lleva credencial,
+     sale de la red y tiene coste, que es exactamente lo que la costura de aplicación gobierna. Si
+     es esta, el cliente A2A solo nos hace falta en modo autónomo, y lo nuestro sigue siendo la
+     semántica: paso durable, reanudación sin repetir, consumo agregado, riesgo declarado.
+
+2. **El `taskId` lo asigna el otro lado.** Preguntado a quien lleva un año con Temporal, que resuelve
+   esta misma clase de problema. Si hay un patrón que funcione, se copia antes que inventar.
+
+3. **¿Cliente, servidor, o los dos?** Para «cada agente en su contenedor» hacen falta los dos; el
+   cliente solo ya sirve para consumir agentes ajenos.
+
+4. **¿Almacén compartido entre contenedores?** Si cada uno lleva el suyo, se pierde la propiedad que
    justifica todo esto y quedamos en un cliente A2A más.
