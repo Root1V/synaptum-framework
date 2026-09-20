@@ -321,6 +321,11 @@ como <code>Denied</code> con <code>terminate_run</code>.</p>
 <td><code>str</code></td>
 <td><code>''</code></td>
 </tr>
+<tr>
+<td><code>_depth</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+</tr>
 </tbody>
 </table></div>
 <div class="tabla"><table>
@@ -336,6 +341,11 @@ como <code>Denied</code> con <code>terminate_run</code>.</p>
 <td><code>definition</code></td>
 <td>—</td>
 <td>Lo que el modelo ve: un nombre, cuándo usarlo, y un hueco para el brief.</td>
+</tr>
+<tr>
+<td><code>execute</code></td>
+<td><code>async execute(self, brief: str, session: Any, run_id: str) -&gt; tuple[Any, Any]</code></td>
+<td>Corre el subagente y devuelve <code>(resultado, consumo)</code>.</td>
 </tr>
 <tr>
 <td><code>name</code></td>
@@ -3367,6 +3377,379 @@ que se registró último, en silencio.</p>
 <strong>sin anotaciones, destructiva</strong>. Nuestro <code>@tool</code> usa <code>READ</code> por defecto
 porque quien escribe la función está delante y puede declarar; aquí el autor
 no está, y suponer en su lugar es suponer a favor.</p>
+<h2>Agentes remotos (A2A)</h2>
+<p><code>synaptum.a2a</code> — Solo biblioteca estándar. En el camino gobernado la llamada sale por el proxy del arnés.</p>
+<h3><code>RemoteDelegate</code></h3>
+<p>Un agente remoto, tal como lo ve quien delega.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>risk</code></td>
+<td><code>Risk</code></td>
+<td><code>&lt;Risk.DESTRUCTIVE: 'destructive'&gt;</code></td>
+</tr>
+<tr>
+<td><code>poll_every</code></td>
+<td><code>float</code></td>
+<td><code>1.0</code></td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td><code>float</code></td>
+<td><code>600.0</code></td>
+</tr>
+<tr>
+<td><code>headers</code></td>
+<td><code>Any</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>_depth</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>definition</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>execute</code></td>
+<td><code>async execute(self, brief: str, session: Any, run_id: str) -&gt; tuple[Any, Usage]</code></td>
+<td>Manda el brief, espera, y devuelve el resultado.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Args:
+name: con qué nombre lo ve el modelo.
+url: el agente, o <strong>el proxy que lo gobierna</strong>. En el camino gobernado
+es lo segundo: el framework apunta al endpoint del arnés y no cambia
+nada más.
+description: cuándo usarlo. Si falta se toma de su tarjeta.
+risk: <strong>hay que declararlo</strong>. Sin declaración, destructivo — ver abajo.
+poll_every: segundos entre consultas mientras la tarea trabaja.
+timeout: tope total de espera.</p>
+<h3><code>A2AClient</code></h3>
+<p>Los cuatro métodos que hacen falta para delegar.</p>
+<pre data-lenguaje="python"><code><span class="p-n">A2AClient</span><span class="p-p">(</span><span class="p-n">base_url</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">headers</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-nb">str</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">timeout</span><span class="p-p">:</span> <span class="p-nb">float</span> <span class="p-o">=</span> <span class="p-mf">120.0</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>agent_card</code></td>
+<td><code>async agent_card(self) -&gt; AgentCard</code></td>
+<td>Lee <code>/.well-known/agent-card.json</code>.</td>
+</tr>
+<tr>
+<td><code>cancel_task</code></td>
+<td><code>async cancel_task(self, task_id: str) -&gt; Task</code></td>
+<td>Cancelar es lo que hacemos al cerrar el iterador, también por red.</td>
+</tr>
+<tr>
+<td><code>get_task</code></td>
+<td><code>async get_task(self, task_id: str) -&gt; Task</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>list_tasks</code></td>
+<td><code>async list_tasks(self, *, context_id: str) -&gt; list[Task]</code></td>
+<td>Las tareas de un contexto.</td>
+</tr>
+<tr>
+<td><code>send_message</code></td>
+<td><code>async send_message(self, brief: str, *, context_id: str, message_id: str, task_id: str | None = None) -&gt; Task</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Args:
+base_url: raíz del agente remoto, o del proxy que lo gobierna.
+headers: cabeceras extra — lo que pida el <code>securitySchemes</code> de su tarjeta.
+timeout: segundos por lectura. Un agente puede tardar mucho en el primer
+byte y eso no es un fallo.</p>
+<h3><code>AgentCard</code></h3>
+<p>Lo que un agente publica en <code>/.well-known/agent-card.json</code>.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>url</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>skills</code></td>
+<td><code>tuple[Mapping[str, Any], ...]</code></td>
+<td><code>()</code></td>
+</tr>
+<tr>
+<td><code>capabilities</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+<tr>
+<td><code>security_schemes</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>push_notifications</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>streaming</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Declara <strong>qué sabe hacer</strong>, no <strong>qué puede romper</strong>: no hay campo de riesgo
+en la especificación. De ahí que un agente remoto entre como destructivo
+mientras alguien no diga lo contrario.</p>
+<h3><code>Task</code></h3>
+<p>Una unidad de trabajo al otro lado.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>task_id</code></td>
+<td><code>str</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
+<td><code>context_id</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>state</code></td>
+<td><code>TaskState</code></td>
+<td><code>&lt;TaskState.SUBMITTED: 'submitted'&gt;</code></td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>artifacts</code></td>
+<td><code>tuple[Artifact, ...]</code></td>
+<td><code>()</code></td>
+</tr>
+<tr>
+<td><code>raw</code></td>
+<td><code>Mapping[str, Any]</code></td>
+<td><em>(fábrica)</em></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>esperando</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>result</code></td>
+<td>—</td>
+<td>Lo que vuelve al agente que delegó.</td>
+</tr>
+<tr>
+<td><code>terminal</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>task_id</code> lo asigna <strong>el servidor</strong> y no podemos aportarlo — es el hecho
+que decide todo nuestro diseño de reanudación. <code>context_id</code> sí lo ponemos
+nosotros, y es por donde se reencuentra.</p>
+<h3><code>TaskState</code></h3>
+<p>Los ocho estados de una tarea A2A.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Valor</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TaskState.SUBMITTED</code></td>
+<td><code>'submitted'</code></td>
+</tr>
+<tr>
+<td><code>TaskState.WORKING</code></td>
+<td><code>'working'</code></td>
+</tr>
+<tr>
+<td><code>TaskState.COMPLETED</code></td>
+<td><code>'completed'</code></td>
+</tr>
+<tr>
+<td><code>TaskState.FAILED</code></td>
+<td><code>'failed'</code></td>
+</tr>
+<tr>
+<td><code>TaskState.CANCELED</code></td>
+<td><code>'canceled'</code></td>
+</tr>
+<tr>
+<td><code>TaskState.REJECTED</code></td>
+<td><code>'rejected'</code></td>
+</tr>
+<tr>
+<td><code>TaskState.INPUT_REQUIRED</code></td>
+<td><code>'input_required'</code></td>
+</tr>
+<tr>
+<td><code>TaskState.AUTH_REQUIRED</code></td>
+<td><code>'auth_required'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Se distinguen tres clases, y la distinción es la que decide qué hace el
+bucle: los <strong>terminales</strong> no aceptan más mensajes, los que <strong>esperan a
+alguien</strong> sí, y el resto siguen su curso.</p>
+<h3><code>Artifact</code></h3>
+<p>Un entregable producido por una tarea.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Tipo</th>
+<th>Por defecto</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>artifact_id</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
+<td><code>parts</code></td>
+<td><code>tuple[Mapping[str, Any], ...]</code></td>
+<td><code>()</code></td>
+</tr>
+</tbody>
+</table></div>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Distinto de un mensaje: un mensaje es conversación, un artefacto es
+resultado.</p>
+<h3><code>TERMINALES</code></h3>
+<p><code>TERMINALES = frozenset({&lt;TaskState.CANCELED: 'canceled'&gt;, &lt;TaskState.COMPLETED: 'completed'&gt;, &lt;TaskState.FAILED: 'failed'&gt;, &lt;TaskState.REJECTED: 'rejected'&gt;})</code></p>
+<p>Build an immutable unordered collection of unique elements.</p>
+<h3><code>ESPERANDO</code></h3>
+<p><code>ESPERANDO = frozenset({&lt;TaskState.AUTH_REQUIRED: 'auth_required'&gt;, &lt;TaskState.INPUT_REQUIRED: 'input_required'&gt;})</code></p>
+<p>Build an immutable unordered collection of unique elements.</p>
 
 <nav class="paginado" aria-label="Paginación"><a class="prev" href="07-limites.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">Qué no hace</span></a></nav>
   </main>

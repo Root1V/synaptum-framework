@@ -115,6 +115,29 @@ class Delegate:
     def risk(self) -> Risk:
         return delegate_risk(self.agent)
 
+    async def execute(self, brief: str, session: Any, run_id: str) -> tuple[Any, Any]:
+        """Corre el subagente y devuelve ``(resultado, consumo)``.
+
+        **Es el único punto que sabe dónde vive el subagente.** Aquí, en este
+        proceso; en un delegado remoto, al otro lado de una red. Todo lo demás
+        —el paso durable, la reanudación, el consumo agregado, el riesgo
+        declarado— es idéntico en los dos casos, y por eso está fuera de aquí.
+        """
+        from ..core.types import Usage
+        from .agent import Session
+
+        salida: Any = None
+        consumo = Usage.zero()
+        hija = Session(run_id, session.gateway, session.checkpointer)
+
+        async for paso in self.agent._loop(brief, hija, stream=False, depth=self._depth):
+            if paso.kind == "final":
+                salida, consumo = paso.output, paso.usage
+        return salida, consumo
+
+    _depth: int = 0
+    """Profundidad que se le pasa al subagente.  Lo rellena el bucle."""
+
     @property
     def definition(self) -> ToolDefinition:
         """Lo que el modelo ve: un nombre, cuándo usarlo, y un hueco para el brief."""
