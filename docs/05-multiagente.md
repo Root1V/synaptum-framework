@@ -1,19 +1,57 @@
 # Varios agentes
 
-**`delegate()` no existe todavía** — es `SYN-41`. El tipo `DelegateStep` está escrito y nada lo
-emite.
+Tres formas, y la primera ya es una primitiva del bucle.
 
-Eso **no impide** construir sistemas multi-agente hoy: el bucle de un agente es un generador
-asíncrono de verdad, así que orquestar varios es código asyncio normal. Lo que `SYN-41` añadirá es
-que la delegación quede **en el journal** como un paso propio, con su consumo atribuido y su punto de
-reanudación.
+## Delegar a un subagente
 
-La regla que sí se puede seguir desde el primer día:
+```python
+analista = Agent("analista", model=..., instructions="Analizas valores.", tools=[cotizacion])
+mesa = Agent("mesa", model=..., instructions="Enrutas al especialista.", delegates=[analista])
+```
 
-> **Entre agentes viaja el resultado, nunca el historial.**
+El subagente se presenta al modelo como **una herramienta de un solo parámetro**: el brief. El
+catálogo del padre no crece con el del hijo, y eso es lo que hace barato delegar — el analista puede
+tener quince herramientas y la mesa ve una firma de una línea.
 
-Duplicar el contexto de un agente en otro se paga dos veces, y hace que el segundo herede los errores
-del primero sin poder distinguirlos de sus datos.
+Al subagente le llega **el brief y nada más**: no ve la conversación del padre. De vuelta suben el
+resultado y el **consumo agregado**. Su historial se queda en su propio diario, donde se audita sin
+pagarlo en cada turno.
+
+### Qué cierra respecto a componerlos a mano
+
+**El coste deja de ser invisible.** El `usage` del `FinalStep` del padre incluye lo que gastó el
+subagente, porque el `DelegateStep` lo transporta. Antes había que sumarlo a mano, y un sistema que
+gastaba cinco veces más parecía igual de barato.
+
+**Un subagente es un paso durable.** Tiene su propio `run_id`, derivado del padre:
+`{run_id}/{step_id}`. Si el proceso muere a mitad, al reanudar **no se reejecuta**:
+
+```
+1ª vuelta  modelo ×3 · herramienta del hijo ×1   ← muere aquí
+2ª vuelta  modelo ×1 · herramienta del hijo ×0   ← solo lo que faltaba
+```
+
+**El riesgo se deriva.** `delegate_risk` es el mayor de las herramientas del subagente, y de los
+suyos. Aquí sí se puede derivar —quien delega no sabe qué tiene el otro, pero el framework sí— al
+contrario que en `@tool`, donde ninguna anotación puede saber que una función que devuelve `str`
+mueve dinero.
+
+> **Hasta dónde llega eso hoy.** El riesgo **se declara** —el modelo lo ve, el arnés lo ve en el
+> handshake— pero la delegación **no cruza la costura**: el bucle arranca al subagente sin
+> preguntar. Las herramientas del subagente sí cruzan, así que un efecto destructivo se detiene
+> igual; lo que se pierde es detenerlo *antes* de pagar la inferencia del hijo. Denegar la
+> delegación en sí exigiría un método de la costura que autorice sin ejecutar, y eso es un cambio de
+> contrato.
+
+**Los ciclos se paran.** `Limits.max_delegation_depth` (3 por defecto). `max_steps` no lo cubre:
+cada nivel tiene su propio contador, así que dos agentes que se deleguen mutuamente no terminarían
+nunca.
+
+### Lo que sigue siendo válido componer a mano
+
+Delegar sirve cuando **el modelo decide** a quién llamar. Cuando el orden lo decides tú —una cadena
+fija, un fan-out— componer con asyncio sigue siendo lo correcto y más simple. Las dos formas están
+abajo.
 
 ## Cadena — uno detrás de otro
 

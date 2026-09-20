@@ -219,9 +219,12 @@ dos agentes en un mismo diario.</li>
 reenvía en cada turno. Con caché de prefijo eso suele salir más barato que resumir —por eso la
 compactación va desactivada por defecto cuando llegue— pero hay un punto en el que deja de serlo, y
 hoy nadie lo detecta por ti.</p>
-<h2>No delega con contexto aislado</h2>
-<p><code>delegate()</code> es <code>SYN-41</code>. Se puede componer a mano —y funciona— con las tres consecuencias listadas
-en <a href="05-multiagente.html">Varios agentes</a>.</p>
+<h2>No deniega una delegación antes de que empiece</h2>
+<p>Delegar <strong>sí</strong> existe, con contexto aislado, consumo agregado y reanudación. Lo que falta es que la
+delegación cruce la costura: el bucle arranca al subagente sin preguntar al gateway.</p>
+<p>Las herramientas del subagente sí cruzan, así que un efecto destructivo se detiene igual. Lo que se
+pierde es detenerlo <em>antes</em> de pagar la inferencia del hijo. Cerrarlo exige un método de la costura
+que autorice sin ejecutar, y eso es un cambio de contrato acordado entre varios proyectos.</p>
 <h2>No emite trazas todavía</h2>
 <p><code>SYN-37</code>. Las convenciones GenAI de OpenTelemetry están en el plan; hoy no hay spans.</p>
 <h2>No reintenta lo que no debe</h2>
