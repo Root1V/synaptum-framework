@@ -1521,6 +1521,41 @@ Codifica binario para los campos ``data`` de las partes de contenido.
 
 str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
 
+## Sin agrupar
+
+Exportados y todavía sin sitio en esta página. Que aparezcan aquí es un aviso para quien mantiene la referencia, no para quien la lee.
+
+### `deferred`
+
+```python
+def deferred(herramientas: Sequence[Tool], *, max_resultados: int = 5) -> list[Tool]
+```
+
+Convierte un catálogo grande en **dos** herramientas de prefijo fijo.
+
+Args:
+    herramientas: el catálogo entero, decorado con ``@tool``.
+    max_resultados: cuántas devuelve una búsqueda. Más no ayuda: el modelo
+        elige peor cuantas más ve, que es medio problema que esto resuelve.
+
+Returns:
+    ``[buscar_herramientas, usar_herramienta]``, listas para ``Agent(tools=…)``.
+
+Ejemplo::
+
+agente = Agent("a", model=…, tools=deferred(las_cuarenta))
+
+### `merece_la_pena`
+
+```python
+def merece_la_pena(herramientas: Sequence[Any]) -> bool
+```
+
+¿Vale la pena diferir este catálogo?
+
+Está expuesto a propósito: es mejor que alguien pueda preguntar a que lo
+descubra midiendo su factura.
+
 ## Dobles de desarrollo
 
 `synaptum.testing` — Infraestructura, no una utilidad de test: es la vía principal para construir sin gastar.

@@ -107,7 +107,7 @@ from .prompts import (
 )
 from .providers import Provider
 from .schema import Schema, schema_for
-from .tools import Tool, json_schema_for, tool
+from .tools import Tool, deferred, json_schema_for, merece_la_pena, tool
 
 __version__ = "1.0.0rc1"
 __all__ = [
@@ -130,6 +130,8 @@ __all__ = [
     "Tool",
     "tool",
     "json_schema_for",
+    "deferred",
+    "merece_la_pena",
     "Provider",
     "PromptTemplate",
     "PromptProvider",
