@@ -10,6 +10,10 @@ real — las herramientas se ejecutan, el journal se escribe, el consumo se mide
 uv run python examples/agentes/01_triaje.py
 ```
 
+También están **[en la documentación](https://root1v.github.io/synaptum-framework/ejemplos.html)**,
+una página por ejemplo. Esas páginas se **generan de estos ficheros**: la fuente sigue siendo lo que
+se ejecuta, y un test falla si dejan de corresponder.
+
 ## Construir agentes
 
 Cada uno añade **una** idea sobre el anterior, y todos están sobre un proyecto real de este

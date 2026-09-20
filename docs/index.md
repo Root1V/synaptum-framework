@@ -48,6 +48,7 @@ Falta `sesion`, y es lo primero que hay que entender: [**Conceptos**](01-concept
 | [Probar](06-probar.md) | Construir agentes sin gastar en inferencia |
 | [Qué no hace](07-limites.md) | Los límites, dichos en voz alta |
 | [Referencia](08-referencia.md) | Cada símbolo público, **generado del código** |
+| [Ejemplos](ejemplos.md) | Dieciséis ficheros que se ejecutan, **generados de `examples/`** |
 
 ## Empezar un proyecto
 
@@ -59,8 +60,9 @@ Corre sin configurar nada, y trae los tests que enseñan a probar un agente sin 
 
 ## Ejecutar los ejemplos
 
-Doce ejemplos ejecutables en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples).
-Corren **sin configurar nada**: las respuestas van guionizadas y todo lo demás es real.
+Dieciséis, y están **[aquí dentro](ejemplos.md)**: doce que van del agente más simple a delegar en
+uno que vive en otro contenedor, y cuatro que enseñan qué garantiza el runtime debajo. Corren **sin
+configurar nada** — las respuestas van guionizadas y todo lo demás es real.
 
 ```bash
 uv run python examples/agentes/01_triaje.py

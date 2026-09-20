@@ -97,12 +97,22 @@ def test_every_symbol_the_docs_name_actually_exists(pagina: Path):
 
 
 def test_every_page_is_linked_from_the_index():
-    """Una página que no se enlaza no existe para quien lee."""
-    indice = (DOCS / "index.md").read_text(encoding="utf-8")
-    huerfanas = [
-        p.name for p in paginas() if p.name != "index.md" and f"({p.name})" not in indice
-    ]
-    assert not huerfanas, f"páginas sin enlazar desde el índice: {huerfanas}"
+    """Una página que no se enlaza no existe para quien lee.
+
+    Una página de sección —`ejemplos-04-…`— cuenta como enlazada desde la
+    portada de su sección: pedir que las dieciséis estén en `index.md` haría de
+    la portada un listado, que es justo lo que la sección evita.
+    """
+    huerfanas = []
+    for pagina in paginas():
+        if pagina.name == "index.md":
+            continue
+        grupo = pagina.stem.split("-")[0]
+        portada = DOCS / f"{grupo}.md"
+        desde = portada if grupo != pagina.stem and portada.exists() else DOCS / "index.md"
+        if f"({pagina.name})" not in desde.read_text(encoding="utf-8"):
+            huerfanas.append(f"{pagina.name} (no la enlaza {desde.name})")
+    assert not huerfanas, f"páginas sin enlazar: {huerfanas}"
 
 
 def _fuentes_que_pueden_caducar() -> list[Path]:
@@ -180,6 +190,22 @@ def test_the_reference_matches_the_code():
             "docs/08-referencia.md no corresponde al código actual. "
             "Regenera con: uv run python scripts/render_reference.py"
         )
+
+
+def test_the_example_pages_match_the_examples():
+    """Las páginas de la sección Ejemplos se generan de `examples/`.
+
+    Copiar un ejemplo a una página crea dos originales que envejecen por
+    separado, y el que envejece es el que nadie ejecuta. Aquí la fuente es el
+    fichero que corre.
+
+    Si falla: `uv run python scripts/render_examples.py`
+    """
+    resultado = subprocess.run(
+        [sys.executable, "scripts/render_examples.py", "--check"],
+        cwd=RAIZ, capture_output=True, text=True,
+    )
+    assert resultado.returncode == 0, resultado.stdout + resultado.stderr
 
 
 def test_every_public_symbol_appears_in_the_reference():

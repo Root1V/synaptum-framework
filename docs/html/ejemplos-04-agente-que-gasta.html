@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 · Un agente que mueve dinero, y el runtime que lo frena · Synaptum</title>
+<style>
+/* Paleta ───────────────────────────────────────────────────────────────────
+   Los colores hacen un trabajo, no decoran: el acento marca lo navegable, el
+   ámbar marca lo que hay que leer despacio, y el código tiene su propia escala
+   para que la sintaxis se distinga sin gritar. Todo con contraste suficiente
+   en claro y en oscuro — una documentación que solo se ve bien en un tema es
+   una documentación que la mitad de la gente lee peor. */
+:root {
+  color-scheme: light dark;
+  --tinta: #16181d; --fondo: #fcfcfb; --papel: #ffffff;
+  --tenue: #5c6672; --linea: #e4e6ea; --linea-suave: #eef0f3;
+  --acento: #0a5ac4; --acento-suave: #eef4fd;
+  --aviso: #9a5b00; --aviso-borde: #e8a33d; --aviso-fondo: #fff8ec;
+  --codigo-fondo: #f7f8fa; --codigo-borde: #e6e9ee; --codigo-tinta: #2a2f3a;
+  --etiqueta: #8b94a0;
+  --sx-clave: #9226a8;   /* def, class, return, async  */
+  --sx-cadena: #0a6b3d;  /* "texto"                    */
+  --sx-func: #1a55c4;    /* nombres de función          */
+  --sx-tipo: #0b6d8c;    /* int, str, builtins          */
+  --sx-num: #a8471a;     /* 42, 0.5                     */
+  --sx-com: #6a7482;     /* # comentarios               */
+  --sx-dec: #a8471a;     /* @tool                       */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tinta: #e4e6ea; --fondo: #14161a; --papel: #191c21;
+    --tenue: #98a1ad; --linea: #2a2e35; --linea-suave: #23262c;
+    --acento: #6fa8f5; --acento-suave: #1a2433;
+    --aviso: #e7ab5a; --aviso-borde: #8a6a2f; --aviso-fondo: #221d14;
+    --codigo-fondo: #1b1e24; --codigo-borde: #2a2e35; --codigo-tinta: #d4d8de;
+    --etiqueta: #6e7682;
+    --sx-clave: #d79bec; --sx-cadena: #7ec99b; --sx-func: #7fb0f2;
+    --sx-tipo: #5fc0dd; --sx-num: #e0a07a; --sx-com: #79828f; --sx-dec: #e0a07a;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--fondo); color: var(--tinta);
+  font: 17px/1.68 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased;
+}
+.saltar { position: absolute; left: -9999px; }
+.saltar:focus { left: 1rem; top: 1rem; background: var(--papel); padding: .5rem 1rem;
+                z-index: 9; border-radius: .4rem; border: 1px solid var(--acento); }
+.marco { display: grid; grid-template-columns: 17.5rem minmax(0, 1fr); gap: 3.5rem;
+         max-width: 70rem; margin: 0 auto; padding: 2.5rem 1.5rem 7rem; }
+
+/* Navegación ─────────────────────────────────────────────────────────────── */
+nav { position: sticky; top: 2.5rem; align-self: start; font-size: .92rem; }
+.marca { margin: 0; font-weight: 650; letter-spacing: -.015em; font-size: 1.12rem; }
+.marca a { color: var(--tinta); text-decoration: none; }
+.marca a::before {
+  content: ""; display: inline-block; width: .5rem; height: .5rem; margin-right: .5rem;
+  border-radius: 50%; background: var(--acento); vertical-align: .08em;
+}
+.version { margin: .15rem 0 1.5rem 1rem; color: var(--etiqueta); font-size: .78rem;
+           letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+nav ol { list-style: none; margin: 0; padding: 0; }
+nav li { margin: .08rem 0; }
+nav a { display: block; padding: .34rem .7rem; margin-left: -.7rem; border-radius: .45rem;
+        color: var(--tenue); text-decoration: none; border-left: 2px solid transparent;
+        transition: background .12s, color .12s; }
+nav a:hover { background: var(--linea-suave); color: var(--tinta); }
+nav a[aria-current] { color: var(--acento); font-weight: 600; background: var(--acento-suave);
+                      border-left-color: var(--acento); }
+nav .seccion { margin: .1rem 0 .3rem .9rem; border-left: 1px solid var(--linea);
+               padding-left: .35rem; font-size: .88rem; }
+nav .seccion a { padding: .24rem .6rem; }
+/* Plegada por defecto: sin esto, dieciséis ejemplos empujan el resto del menú
+   fuera de la pantalla en cualquier página. Se abre en la sección en la que
+   estás, que es cuando sirve. */
+nav .seccion.plegada { display: none; }
+.fuente { margin-top: 1.8rem; padding-top: 1rem; border-top: 1px solid var(--linea);
+          font-size: .82rem; }
+.fuente a { color: var(--tenue); text-decoration: none; }
+.fuente a:hover { color: var(--acento); text-decoration: underline; }
+
+/* Texto ──────────────────────────────────────────────────────────────────── */
+main { min-width: 0; }
+h1 { font-size: 2.25rem; line-height: 1.12; letter-spacing: -.028em; margin: 0 0 1.7rem;
+     font-weight: 700; }
+h2 { font-size: 1.36rem; letter-spacing: -.016em; margin: 3.2rem 0 1rem; font-weight: 650;
+     padding-top: 1.5rem; border-top: 1px solid var(--linea); }
+h3 { font-size: 1.07rem; margin: 2.1rem 0 .6rem; font-weight: 640; color: var(--tinta); }
+p, li { max-width: 41rem; }
+li { margin: .3rem 0; }
+strong { font-weight: 640; }
+a { color: var(--acento); text-decoration-thickness: 1px; text-underline-offset: .15em; }
+a:hover { text-decoration-thickness: 2px; }
+
+/* Código ─────────────────────────────────────────────────────────────────── */
+code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+       font-size: .87em; background: var(--codigo-fondo); color: var(--codigo-tinta);
+       padding: .13em .4em; border-radius: .3rem; border: 1px solid var(--codigo-borde); }
+pre { position: relative; background: var(--codigo-fondo); color: var(--codigo-tinta);
+      padding: 1.1rem 1.2rem; border-radius: .7rem; overflow-x: auto;
+      border: 1px solid var(--codigo-borde); margin: 1.3rem 0; }
+pre code { background: none; padding: 0; border: 0; font-size: .855rem; line-height: 1.62; }
+pre[data-lenguaje]::after {
+  content: attr(data-lenguaje); position: absolute; top: .55rem; right: .8rem;
+  font: 600 .66rem/1 ui-monospace, monospace; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--etiqueta); pointer-events: none;
+}
+.p-k, .p-kn, .p-kd, .p-kc, .p-ow { color: var(--sx-clave); font-weight: 600; }
+.p-s, .p-s1, .p-s2, .p-sd, .p-se, .p-sa, .p-si { color: var(--sx-cadena); }
+.p-nf, .p-fm { color: var(--sx-func); font-weight: 600; }
+.p-nb, .p-nc, .p-ne, .p-nn { color: var(--sx-tipo); }
+.p-m, .p-mi, .p-mf, .p-kt { color: var(--sx-num); }
+.p-c, .p-c1, .p-cm, .p-ch, .p-cs { color: var(--sx-com); font-style: italic; }
+.p-nd { color: var(--sx-dec); font-weight: 600; }
+.p-err { color: inherit; }
+
+/* Aviso ──────────────────────────────────────────────────────────────────── */
+blockquote { margin: 1.5rem 0; padding: .95rem 1.2rem; border-left: 3px solid var(--aviso-borde);
+             background: var(--aviso-fondo); border-radius: 0 .5rem .5rem 0; color: var(--tinta); }
+blockquote p { margin: .3rem 0; max-width: none; }
+blockquote strong { color: var(--aviso); }
+
+/* Tablas ─────────────────────────────────────────────────────────────────── */
+.tabla { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--linea);
+         border-radius: .6rem; background: var(--papel); }
+table { border-collapse: collapse; width: 100%; font-size: .93rem; }
+th, td { text-align: left; padding: .6rem .9rem; border-bottom: 1px solid var(--linea-suave);
+         vertical-align: top; }
+thead th { font-weight: 640; background: var(--linea-suave); color: var(--tinta);
+           border-bottom: 1px solid var(--linea); }
+tbody tr:last-child td { border-bottom: 0; }
+td code, th code { background: transparent; border: 0; padding: 0; color: var(--sx-func); }
+
+hr { border: 0; border-top: 1px solid var(--linea); margin: 2.8rem 0; }
+
+/* Copiar ─────────────────────────────────────────────────────────────────── */
+.copiar {
+  position: absolute; top: .45rem; right: .5rem; z-index: 2;
+  font: 600 .68rem/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  padding: .35rem .6rem; border-radius: .4rem; cursor: pointer;
+  color: var(--tenue); background: var(--papel); border: 1px solid var(--codigo-borde);
+  opacity: 0; transition: opacity .13s, color .13s, border-color .13s;
+}
+pre:hover .copiar, .copiar:focus-visible { opacity: 1; }
+.copiar:hover { color: var(--acento); border-color: var(--acento); }
+.copiar.hecho { color: var(--sx-cadena); border-color: var(--sx-cadena); opacity: 1; }
+/* Con el botón visible, la etiqueta del lenguaje estorbaría. */
+pre:hover[data-lenguaje]::after { opacity: 0; }
+pre[data-lenguaje]::after { transition: opacity .13s; }
+/* Sin puntero —táctil o teclado— el botón se queda visible: no hay hover. */
+@media (hover: none) { .copiar { opacity: 1; } pre[data-lenguaje]::after { display: none; } }
+
+/* Anterior / siguiente ───────────────────────────────────────────────────── */
+.paginado {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  margin: 4rem 0 0; padding-top: 2rem; border-top: 1px solid var(--linea);
+}
+.paginado a {
+  display: block; padding: .9rem 1.1rem; border: 1px solid var(--linea);
+  border-radius: .6rem; text-decoration: none; background: var(--papel);
+  transition: border-color .13s, background .13s;
+}
+.paginado a:hover { border-color: var(--acento); background: var(--acento-suave); }
+.paginado .siguiente { grid-column: 2; text-align: right; }
+.paginado .etiqueta { display: block; font-size: .74rem; letter-spacing: .06em;
+                      text-transform: uppercase; color: var(--etiqueta); margin-bottom: .2rem; }
+.paginado .nombre { color: var(--tinta); font-weight: 600; font-size: .98rem; }
+@media (max-width: 40rem) {
+  .paginado { grid-template-columns: 1fr; }
+  .paginado .siguiente { grid-column: 1; text-align: left; }
+}
+
+@media (max-width: 62rem) {
+  .marco { grid-template-columns: 1fr; gap: 1.5rem; padding-top: 1.5rem; }
+  nav { position: static; border-bottom: 1px solid var(--linea); padding-bottom: 1rem; }
+  nav ol { columns: 2; column-gap: 1.5rem; }
+  h1 { font-size: 1.85rem; }
+}
+</style>
+</head>
+<body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<div class="marco">
+  <nav aria-label="Secciones">
+    <p class="marca"><a href="index.html">Synaptum</a></p>
+    <p class="version">1.0.0rc2</p>
+    <ol><li><a href="index.html">Empezar</a></li><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="08-referencia.html">Referencia</a></li><li><a href="ejemplos.html">Ejemplos</a><ol class="seccion"><li><a href="ejemplos-01-triaje.html">01 · Lo mínimo: un agente, una herramienta</a></li><li><a href="ejemplos-02-causa-raiz.html">02 · Varias herramientas y una respuesta tipada</a></li><li><a href="ejemplos-03-extraccion-acotada.html">03 · Un bucle acotado, y qué pasa cuando el modelo se equivoca</a></li><li><a href="ejemplos-04-agente-que-gasta.html" aria-current="page">04 · Un agente que mueve dinero, y el runtime que lo frena</a></li><li><a href="ejemplos-05-cadena-de-agentes.html">05 · Varios agentes en cadena, cada uno con su contexto</a></li><li><a href="ejemplos-06-agentes-en-paralelo.html">06 · Varios agentes a la vez, y uno que decide</a></li><li><a href="ejemplos-07-agente-como-herramienta.html">07 · Un agente como herramienta de otro, y un supervisor que enruta</a></li><li><a href="ejemplos-08-herramientas-mcp.html">08 · Herramientas que no escribiste tú</a></li><li><a href="ejemplos-09-delegar.html">09 · Delegar como primitiva, no como patrón</a></li><li><a href="ejemplos-10-economia-del-contexto.html">10 · Lo que el modelo ve en cada turno, y lo que cuesta</a></li><li><a href="ejemplos-11-catalogo-diferido.html">11 · Un catálogo grande sin pagarlo en cada turno</a></li><li><a href="ejemplos-12-agente-remoto.html">12 · Un agente que vive en otro contenedor</a></li><li><a href="ejemplos-13-bucle.html">13 · El bucle entero, en un fichero</a></li><li><a href="ejemplos-14-durabilidad.html">14 · Matar el proceso a mitad y reanudar sin volver a pagar la inferencia</a></li><li><a href="ejemplos-15-aprobacion.html">15 · Un paso destructivo se detiene, alguien decide, y el run sigue donde estaba</a></li><li><a href="ejemplos-16-streaming.html">16 · Ver los tokens según llegan, y cortar a mitad</a></li></ol></li></ol>
+    <p class="fuente"><a href="../ejemplos-04-agente-que-gasta.md">Leer en Markdown&nbsp;↗</a></p>
+  </nav>
+  <main id="contenido">
+<h1>04 · Un agente que mueve dinero, y el runtime que lo frena</h1>
+<blockquote>
+<p><strong>Generada de <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/04_agente_que_gasta.py"><code>examples/agentes/04_agente_que_gasta.py</code></a>.</strong> El fichero corre; esta página lo
+transcribe. Si los dos no coinciden, falla un test.</p>
+</blockquote>
+<p><strong>Dominio: Aerarium + Mercatus</strong> — el tesoro y el mercado. Un agente descubre un
+servicio, paga una décima de céntimo por una llamada, y <strong>hay que poder decirle
+que no en el momento en que se pasa de lo que su dueño autorizó</strong>.</p>
+<p>Aquí es donde un framework de agentes deja de ser un bucle bonito. Tres piezas:</p>
+<ul>
+<li><strong><code>risk</code> se declara, no se deduce.</strong> Ninguna anotación puede saber que una
+función que devuelve <code>str</code> mueve dinero. El framework <strong>declara</strong>; quien
+gobierna <strong>decide</strong>.</li>
+<li><strong>La decisión se toma fuera del proceso.</strong> Una comprobación dentro del código
+gobernado es advisoria: la cumple un bucle correcto y se la salta uno con un
+fallo. Aquí se simula con una política local, y el gateway <strong>avisa de que no
+aplica nada</strong>.</li>
+<li><strong>El run sobrevive a la espera.</strong> Cuando hace falta una persona, el run se
+suspende en disco y se reanuda cuando alguien decide — sin repetir lo pagado
+y sin volver a preguntar.</li>
+</ul>
+<pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/agentes/04_agente_que_gasta.py
+</code></pre>
+<pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
+
+<span class="p-kn">import</span><span class="p-w"> </span><span class="p-nn">asyncio</span>
+<span class="p-kn">import</span><span class="p-w"> </span><span class="p-nn">sys</span>
+<span class="p-kn">import</span><span class="p-w"> </span><span class="p-nn">tempfile</span>
+<span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">pathlib</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">Path</span>
+<span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">typing</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">Annotated</span>
+
+<span class="p-n">sys</span><span class="p-o">.</span><span class="p-n">path</span><span class="p-o">.</span><span class="p-n">insert</span><span class="p-p">(</span><span class="p-mi">0</span><span class="p-p">,</span> <span class="p-nb">str</span><span class="p-p">(</span><span class="p-n">Path</span><span class="p-p">(</span><span class="p-vm">__file__</span><span class="p-p">)</span><span class="p-o">.</span><span class="p-n">resolve</span><span class="p-p">()</span><span class="p-o">.</span><span class="p-n">parent</span><span class="p-o">.</span><span class="p-n">parent</span><span class="p-p">))</span>
+
+<span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">synaptum</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-p">(</span>
+    <span class="p-n">ALLOW</span><span class="p-p">,</span>
+    <span class="p-n">Agent</span><span class="p-p">,</span>
+    <span class="p-n">ApprovalStep</span><span class="p-p">,</span>
+    <span class="p-n">Decision</span><span class="p-p">,</span>
+    <span class="p-n">Disposition</span><span class="p-p">,</span>
+    <span class="p-n">FinalStep</span><span class="p-p">,</span>
+    <span class="p-n">Risk</span><span class="p-p">,</span>
+    <span class="p-n">Session</span><span class="p-p">,</span>
+    <span class="p-n">SqliteCheckpointer</span><span class="p-p">,</span>
+    <span class="p-n">ToolStep</span><span class="p-p">,</span>
+    <span class="p-n">tool</span><span class="p-p">,</span>
+<span class="p-p">)</span>
+<span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">synaptum.testing</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">calls</span><span class="p-p">,</span> <span class="p-n">says</span>
+
+<span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">comun</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">encabezado</span><span class="p-p">,</span> <span class="p-n">gateway</span><span class="p-p">,</span> <span class="p-n">nombre_del_modelo</span>
+</code></pre>
+<h2>El libro mayor, en micro-unidades</h2>
+<p>Aerarium lleva el ledger en 10⁻⁶ para que una llamada de $0.001 liquide de
+verdad. Aquí se imita con enteros por el mismo motivo: un float no es un saldo.</p>
+<pre data-lenguaje="python"><code><span class="p-n">RETENCIONES</span><span class="p-p">:</span> <span class="p-nb">list</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">]</span> <span class="p-o">=</span> <span class="p-p">[]</span>
+<span class="p-n">PAGOS</span><span class="p-p">:</span> <span class="p-nb">list</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">]</span> <span class="p-o">=</span> <span class="p-p">[]</span>
+<span class="p-n">SALDO_MICROS</span> <span class="p-o">=</span> <span class="p-mi">5_000_000</span>          <span class="p-c1"># 5,00 USD</span>
+
+<span class="p-c1"># Dos listas y no una, y la distinción es todo el dominio: **una retención no es</span>
+<span class="p-c1"># un pago.** Caduca sola a los 15 minutos y no mueve nada; una captura sí. La</span>
+<span class="p-c1"># primera versión de este ejemplo las metía en la misma lista y afirmaba «no</span>
+<span class="p-c1"># hubo efecto» mirando su longitud — contra un modelo real que decidió reservar</span>
+<span class="p-c1"># antes de capturar, eso daba un fallo que no era tal.</span>
+
+<span class="p-nd">@tool</span><span class="p-p">(</span><span class="p-n">idempotent</span><span class="p-o">=</span><span class="p-kc">True</span><span class="p-p">)</span>
+<span class="p-k">async</span> <span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">catalogo</span><span class="p-p">(</span>
+    <span class="p-n">capacidad</span><span class="p-p">:</span> <span class="p-n">Annotated</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-s2">"Qué se busca, por ejemplo 'transcripción'"</span><span class="p-p">],</span>
+<span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">str</span><span class="p-p">:</span>
+<span class="p-w">    </span><span class="p-sd">"""Servicios del mercado que ofrecen una capacidad, con su precio por llamada."""</span>
+    <span class="p-k">return</span> <span class="p-p">(</span>
+        <span class="p-s2">"servicio                precio/llamada</span><span class="p-se">\n</span><span class="p-s2">"</span>
+        <span class="p-s2">"whisper-api-x402        $0.0008</span><span class="p-se">\n</span><span class="p-s2">"</span>
+        <span class="p-s2">"deepgram-mandate        $0.0021</span><span class="p-se">\n</span><span class="p-s2">"</span>
+        <span class="p-s2">"transcribe-mega         $1.9500"</span>
+    <span class="p-p">)</span>
+
+<span class="p-nd">@tool</span><span class="p-p">(</span><span class="p-n">risk</span><span class="p-o">=</span><span class="p-n">Risk</span><span class="p-o">.</span><span class="p-n">SOFT_WRITE</span><span class="p-p">)</span>
+<span class="p-k">async</span> <span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">reservar</span><span class="p-p">(</span>
+    <span class="p-n">servicio</span><span class="p-p">:</span> <span class="p-n">Annotated</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-s2">"Servicio del catálogo"</span><span class="p-p">],</span>
+    <span class="p-n">micros</span><span class="p-p">:</span> <span class="p-n">Annotated</span><span class="p-p">[</span><span class="p-nb">int</span><span class="p-p">,</span> <span class="p-s2">"Importe a retener, en micro-unidades"</span><span class="p-p">],</span>
+<span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">str</span><span class="p-p">:</span>
+<span class="p-w">    </span><span class="p-sd">"""Retiene fondos sin moverlos — el `hold` de una autorización."""</span>
+    <span class="p-n">RETENCIONES</span><span class="p-o">.</span><span class="p-n">append</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"hold </span><span class="p-si">{</span><span class="p-n">micros</span><span class="p-si">}</span><span class="p-s2">µ → </span><span class="p-si">{</span><span class="p-n">servicio</span><span class="p-si">}</span><span class="p-s2">"</span><span class="p-p">)</span>
+    <span class="p-k">return</span> <span class="p-sa">f</span><span class="p-s2">"Retenidos </span><span class="p-si">{</span><span class="p-n">micros</span><span class="p-si">}</span><span class="p-s2">µ para </span><span class="p-si">{</span><span class="p-n">servicio</span><span class="p-si">}</span><span class="p-s2">. Caduca en 15 minutos."</span>
+
+<span class="p-nd">@tool</span><span class="p-p">(</span><span class="p-n">risk</span><span class="p-o">=</span><span class="p-n">Risk</span><span class="p-o">.</span><span class="p-n">DESTRUCTIVE</span><span class="p-p">)</span>
+<span class="p-k">async</span> <span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">capturar</span><span class="p-p">(</span>
+    <span class="p-n">servicio</span><span class="p-p">:</span> <span class="p-n">Annotated</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-s2">"Servicio del catálogo"</span><span class="p-p">],</span>
+    <span class="p-n">micros</span><span class="p-p">:</span> <span class="p-n">Annotated</span><span class="p-p">[</span><span class="p-nb">int</span><span class="p-p">,</span> <span class="p-s2">"Importe a capturar, en micro-unidades"</span><span class="p-p">],</span>
+<span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">str</span><span class="p-p">:</span>
+<span class="p-w">    </span><span class="p-sd">"""Convierte una retención en un pago. **Esto sí mueve dinero.**"""</span>
+    <span class="p-n">PAGOS</span><span class="p-o">.</span><span class="p-n">append</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"capture </span><span class="p-si">{</span><span class="p-n">micros</span><span class="p-si">}</span><span class="p-s2">µ → </span><span class="p-si">{</span><span class="p-n">servicio</span><span class="p-si">}</span><span class="p-s2">"</span><span class="p-p">)</span>
+    <span class="p-k">return</span> <span class="p-sa">f</span><span class="p-s2">"Pagados </span><span class="p-si">{</span><span class="p-n">micros</span><span class="p-si">}</span><span class="p-s2">µ a </span><span class="p-si">{</span><span class="p-n">servicio</span><span class="p-si">}</span><span class="p-s2">."</span>
+
+<span class="p-c1"># `reservar` es SOFT_WRITE y `capturar` es DESTRUCTIVE, y esa diferencia es todo</span>
+<span class="p-c1"># el ejemplo: retener se deshace solo al caducar, pagar no. Quien calla obtiene</span>
+<span class="p-c1"># `risk=READ` e `idempotent=False` — permisivo en riesgo, conservador en</span>
+<span class="p-c1"># durabilidad: la clase más inocua y la garantía más cara.</span>
+</code></pre>
+<h2>La política</h2>
+<p>En producción esto vive en el arnés, fuera del proceso, y por eso puede
+aplicar. Aquí es una función local que <strong>solo enseña la forma</strong> de la decisión.
+Medio céntimo. Deliberadamente por debajo de <strong>cualquier</strong> servicio del
+catálogo: así la aprobación no depende de qué elija el modelo.</p>
+<p>La primera versión de este ejemplo ponía el tope en 0,10 USD y afirmaba que el
+pago quedaría detenido. Con el doble se cumplía siempre; contra un modelo real
+falló, porque eligió el servicio barato y pasó por debajo del tope. El ejemplo
+afirmaba una conducta del modelo creyendo que afirmaba una de la política.</p>
+<pre data-lenguaje="python"><code><span class="p-n">TOPE_SIN_APROBACION</span> <span class="p-o">=</span> <span class="p-mi">500</span>         <span class="p-c1"># 0,0005 USD</span>
+
+<span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">politica_del_dueño</span><span class="p-p">(</span><span class="p-n">check</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Decision</span><span class="p-p">:</span>
+<span class="p-w">    </span><span class="p-sd">"""Lo que el dueño del agente autorizó, expresado como código."""</span>
+    <span class="p-k">if</span> <span class="p-n">check</span><span class="p-o">.</span><span class="p-n">kind</span> <span class="p-o">!=</span> <span class="p-s2">"tool"</span><span class="p-p">:</span>
+        <span class="p-k">return</span> <span class="p-n">ALLOW</span>
+    <span class="p-k">if</span> <span class="p-n">check</span><span class="p-o">.</span><span class="p-n">name</span> <span class="p-o">!=</span> <span class="p-s2">"capturar"</span><span class="p-p">:</span>
+        <span class="p-k">return</span> <span class="p-n">ALLOW</span>
+
+    <span class="p-n">importe</span> <span class="p-o">=</span> <span class="p-nb">int</span><span class="p-p">(</span><span class="p-n">check</span><span class="p-o">.</span><span class="p-n">arguments</span><span class="p-o">.</span><span class="p-n">get</span><span class="p-p">(</span><span class="p-s2">"micros"</span><span class="p-p">,</span> <span class="p-mi">0</span><span class="p-p">))</span>
+    <span class="p-k">if</span> <span class="p-n">importe</span> <span class="p-o">&gt;</span> <span class="p-n">SALDO_MICROS</span><span class="p-p">:</span>
+        <span class="p-k">return</span> <span class="p-n">Decision</span><span class="p-p">(</span>
+            <span class="p-n">disposition</span><span class="p-o">=</span><span class="p-n">Disposition</span><span class="p-o">.</span><span class="p-n">TERMINATE_RUN</span><span class="p-p">,</span>
+            <span class="p-n">reason_code</span><span class="p-o">=</span><span class="p-s2">"insufficient_funds"</span><span class="p-p">,</span>
+            <span class="p-n">message</span><span class="p-o">=</span><span class="p-sa">f</span><span class="p-s2">"</span><span class="p-si">{</span><span class="p-n">importe</span><span class="p-si">}</span><span class="p-s2">µ supera el saldo de </span><span class="p-si">{</span><span class="p-n">SALDO_MICROS</span><span class="p-si">}</span><span class="p-s2">µ."</span><span class="p-p">,</span>
+        <span class="p-p">)</span>
+    <span class="p-k">if</span> <span class="p-n">importe</span> <span class="p-o">&gt;</span> <span class="p-n">TOPE_SIN_APROBACION</span><span class="p-p">:</span>
+        <span class="p-k">return</span> <span class="p-n">Decision</span><span class="p-p">(</span>
+            <span class="p-n">disposition</span><span class="p-o">=</span><span class="p-n">Disposition</span><span class="p-o">.</span><span class="p-n">REQUIRE_APPROVAL</span><span class="p-p">,</span>
+            <span class="p-n">reason_code</span><span class="p-o">=</span><span class="p-s2">"above_delegated_cap"</span><span class="p-p">,</span>
+            <span class="p-n">message</span><span class="p-o">=</span><span class="p-sa">f</span><span class="p-s2">"</span><span class="p-si">{</span><span class="p-n">importe</span><span class="p-si">}</span><span class="p-s2">µ pasa del tope delegado de </span><span class="p-si">{</span><span class="p-n">TOPE_SIN_APROBACION</span><span class="p-si">}</span><span class="p-s2">µ."</span><span class="p-p">,</span>
+        <span class="p-p">)</span>
+    <span class="p-k">return</span> <span class="p-n">ALLOW</span>
+
+<span class="p-c1"># Tres disposiciones distintas para tres situaciones distintas, y la diferencia</span>
+<span class="p-c1"># importa: sin fondos **no hay nada que aprobar** y el run termina; pasarse del</span>
+<span class="p-c1"># tope delegado es exactamente lo que una persona puede resolver.</span>
+
+<span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">responder</span><span class="p-p">(</span><span class="p-n">peticion</span><span class="p-p">):</span>
+<span class="p-w">    </span><span class="p-sd">"""Doble que imita a un modelo que decide gastar de más."""</span>
+    <span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">synaptum</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">Role</span>
+
+    <span class="p-n">turnos</span> <span class="p-o">=</span> <span class="p-nb">sum</span><span class="p-p">(</span><span class="p-mi">1</span> <span class="p-k">for</span> <span class="p-n">m</span> <span class="p-ow">in</span> <span class="p-n">peticion</span><span class="p-o">.</span><span class="p-n">messages</span> <span class="p-k">if</span> <span class="p-n">m</span><span class="p-o">.</span><span class="p-n">role</span> <span class="p-ow">is</span> <span class="p-n">Role</span><span class="p-o">.</span><span class="p-n">TOOL</span><span class="p-p">)</span>
+    <span class="p-k">if</span> <span class="p-n">turnos</span> <span class="p-o">==</span> <span class="p-mi">0</span><span class="p-p">:</span>
+        <span class="p-k">return</span> <span class="p-n">calls</span><span class="p-p">(</span><span class="p-s2">"catalogo"</span><span class="p-p">,</span> <span class="p-n">capacidad</span><span class="p-o">=</span><span class="p-s2">"transcripción"</span><span class="p-p">)</span>
+    <span class="p-k">if</span> <span class="p-n">turnos</span> <span class="p-o">==</span> <span class="p-mi">1</span><span class="p-p">:</span>
+        <span class="p-k">return</span> <span class="p-n">calls</span><span class="p-p">(</span><span class="p-s2">"capturar"</span><span class="p-p">,</span> <span class="p-n">servicio</span><span class="p-o">=</span><span class="p-s2">"whisper-api-x402"</span><span class="p-p">,</span> <span class="p-n">micros</span><span class="p-o">=</span><span class="p-mi">800</span><span class="p-p">)</span>
+    <span class="p-k">return</span> <span class="p-n">says</span><span class="p-p">(</span><span class="p-s2">"Transcripción contratada con whisper-api-x402 por 800µ."</span><span class="p-p">)</span>
+
+<span class="p-k">async</span> <span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">main</span><span class="p-p">()</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span><span class="p-p">:</span>
+    <span class="p-n">encabezado</span><span class="p-p">(</span><span class="p-s2">"04 · Un agente que gasta"</span><span class="p-p">)</span>
+
+    <span class="p-n">almacen</span> <span class="p-o">=</span> <span class="p-n">Path</span><span class="p-p">(</span><span class="p-n">tempfile</span><span class="p-o">.</span><span class="p-n">mkdtemp</span><span class="p-p">())</span> <span class="p-o">/</span> <span class="p-s2">"tesoro.db"</span>
+    <span class="p-n">herramientas</span> <span class="p-o">=</span> <span class="p-p">[</span><span class="p-n">catalogo</span><span class="p-p">,</span> <span class="p-n">reservar</span><span class="p-p">,</span> <span class="p-n">capturar</span><span class="p-p">]</span>
+    <span class="p-n">agente</span> <span class="p-o">=</span> <span class="p-n">Agent</span><span class="p-p">(</span>
+        <span class="p-s2">"comprador"</span><span class="p-p">,</span>
+        <span class="p-n">model</span><span class="p-o">=</span><span class="p-n">nombre_del_modelo</span><span class="p-p">(),</span>
+        <span class="p-n">instructions</span><span class="p-o">=</span><span class="p-p">(</span>
+            <span class="p-s2">"Contratas servicios del mercado con el presupuesto del dueño. "</span>
+            <span class="p-s2">"Consulta el catálogo, elige el más barato que sirva, y **paga con "</span>
+            <span class="p-s2">"`capturar`**: sin pagar no hay servicio contratado. Los importes van "</span>
+            <span class="p-s2">"en micro-unidades: $0.0008 son 800."</span>
+        <span class="p-p">),</span>
+        <span class="p-n">tools</span><span class="p-o">=</span><span class="p-n">herramientas</span><span class="p-p">,</span>
+    <span class="p-p">)</span>
+    <span class="p-n">tarea</span> <span class="p-o">=</span> <span class="p-s2">"Necesito transcribir un audio. Contrata y paga el servicio más barato."</span>
+
+    <span class="p-c1"># ── 1ª vuelta: el agente se pasa del tope y el run se detiene ─────────────</span>
+
+    <span class="p-n">detenido</span> <span class="p-o">=</span> <span class="p-n">Decision</span><span class="p-p">(</span>
+        <span class="p-n">disposition</span><span class="p-o">=</span><span class="p-n">Disposition</span><span class="p-o">.</span><span class="p-n">REQUIRE_APPROVAL</span><span class="p-p">,</span>
+        <span class="p-n">reason_code</span><span class="p-o">=</span><span class="p-s2">"above_delegated_cap"</span><span class="p-p">,</span>
+        <span class="p-n">message</span><span class="p-o">=</span><span class="p-sa">f</span><span class="p-s2">"el importe pasa del tope delegado de </span><span class="p-si">{</span><span class="p-n">TOPE_SIN_APROBACION</span><span class="p-si">}</span><span class="p-s2">µ."</span><span class="p-p">,</span>
+    <span class="p-p">)</span>
+    <span class="p-n">puerta</span> <span class="p-o">=</span> <span class="p-n">gateway</span><span class="p-p">(</span>
+        <span class="p-p">[</span><span class="p-n">responder</span><span class="p-p">]</span> <span class="p-o">*</span> <span class="p-mi">6</span><span class="p-p">,</span>
+        <span class="p-n">tools</span><span class="p-o">=</span><span class="p-n">herramientas</span><span class="p-p">,</span>
+        <span class="p-n">policy</span><span class="p-o">=</span><span class="p-n">politica_del_dueño</span><span class="p-p">,</span>
+        <span class="p-n">deny_tools</span><span class="p-o">=</span><span class="p-p">{</span><span class="p-s2">"capturar"</span><span class="p-p">:</span> <span class="p-n">detenido</span><span class="p-p">},</span>
+    <span class="p-p">)</span>
+    <span class="p-n">checkpointer</span> <span class="p-o">=</span> <span class="p-n">SqliteCheckpointer</span><span class="p-p">(</span><span class="p-n">almacen</span><span class="p-p">)</span>
+
+    <span class="p-n">detenciones</span> <span class="p-o">=</span> <span class="p-p">[]</span>
+    <span class="p-k">async</span> <span class="p-k">for</span> <span class="p-n">paso</span> <span class="p-ow">in</span> <span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">run</span><span class="p-p">(</span><span class="p-n">tarea</span><span class="p-p">,</span> <span class="p-n">session</span><span class="p-o">=</span><span class="p-n">Session</span><span class="p-p">(</span><span class="p-s2">"compra-1"</span><span class="p-p">,</span> <span class="p-n">puerta</span><span class="p-p">,</span> <span class="p-n">checkpointer</span><span class="p-p">)):</span>
+        <span class="p-k">match</span> <span class="p-n">paso</span><span class="p-p">:</span>
+            <span class="p-k">case</span> <span class="p-n">ToolStep</span><span class="p-p">(</span><span class="p-n">decision</span><span class="p-o">=</span><span class="p-n">veredicto</span><span class="p-p">)</span> <span class="p-k">if</span> <span class="p-n">veredicto</span> <span class="p-ow">is</span> <span class="p-ow">not</span> <span class="p-kc">None</span><span class="p-p">:</span>
+                <span class="p-n">detenciones</span><span class="p-o">.</span><span class="p-n">append</span><span class="p-p">(</span><span class="p-n">veredicto</span><span class="p-p">)</span>
+                <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"  ✋ </span><span class="p-si">{</span><span class="p-n">veredicto</span><span class="p-o">.</span><span class="p-n">reason_code</span><span class="p-si">}</span><span class="p-s2">: </span><span class="p-si">{</span><span class="p-n">veredicto</span><span class="p-o">.</span><span class="p-n">message</span><span class="p-si">}</span><span class="p-s2">"</span><span class="p-p">)</span>
+            <span class="p-k">case</span> <span class="p-n">ApprovalStep</span><span class="p-p">(</span><span class="p-n">subject</span><span class="p-o">=</span><span class="p-n">asunto</span><span class="p-p">):</span>
+                <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"  ⏸  run suspendido · </span><span class="p-si">{</span><span class="p-n">asunto</span><span class="p-si">}</span><span class="p-s2">"</span><span class="p-p">)</span>
+
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"     retenciones: </span><span class="p-si">{</span><span class="p-nb">len</span><span class="p-p">(</span><span class="p-n">RETENCIONES</span><span class="p-p">)</span><span class="p-si">}</span><span class="p-s2"> · pagos: </span><span class="p-si">{</span><span class="p-nb">len</span><span class="p-p">(</span><span class="p-n">PAGOS</span><span class="p-p">)</span><span class="p-si">}</span><span class="p-s2">"</span><span class="p-p">)</span>
+
+    <span class="p-c1"># Lo que el framework garantiza: si se intentó el paso peligroso, no ocurrió.</span>
+    <span class="p-k">assert</span> <span class="p-ow">not</span> <span class="p-n">PAGOS</span><span class="p-p">,</span> <span class="p-s2">"se movió dinero pese a la denegación"</span>
+
+    <span class="p-k">if</span> <span class="p-ow">not</span> <span class="p-n">detenciones</span><span class="p-p">:</span>
+        <span class="p-c1"># Que un modelo pequeño no llegue a intentar el pago **no es un fallo**:</span>
+        <span class="p-c1"># es el modelo siendo cauto o despistado. El ejemplo lo dice en vez de</span>
+        <span class="p-c1"># reventar, porque afirmar aquí sería afirmar una conducta del modelo.</span>
+        <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"</span><span class="p-se">\n</span><span class="p-s2">  ⚠ el modelo no llegó a intentar el pago, así que la política no"</span><span class="p-p">)</span>
+        <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"    tuvo nada que denegar. Con el doble sí ocurre; vuelve a probar"</span><span class="p-p">)</span>
+        <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"    o usa un modelo con mejor seguimiento de instrucciones."</span><span class="p-p">)</span>
+        <span class="p-k">return</span>
+
+    <span class="p-n">estado</span> <span class="p-o">=</span> <span class="p-k">await</span> <span class="p-n">checkpointer</span><span class="p-o">.</span><span class="p-n">load</span><span class="p-p">(</span><span class="p-s2">"compra-1"</span><span class="p-p">)</span>
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"     journal: </span><span class="p-si">{</span><span class="p-n">estado</span><span class="p-o">.</span><span class="p-n">next_seq</span><span class="p-si">}</span><span class="p-s2"> eventos en disco"</span><span class="p-p">)</span>
+
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"</span><span class="p-se">\n</span><span class="p-s2">  … el dueño mira la petición y la aprueba …</span><span class="p-se">\n</span><span class="p-s2">"</span><span class="p-p">)</span>
+
+    <span class="p-c1"># ── 2ª vuelta: otro proceso, mismo run_id ────────────────────────────────</span>
+    <span class="p-c1">#</span>
+    <span class="p-c1"># El agente no vuelve a consultar el catálogo: eso ya se pagó. Solo ocurre</span>
+    <span class="p-c1"># lo que no llegó a ocurrir.</span>
+
+    <span class="p-n">otra_puerta</span> <span class="p-o">=</span> <span class="p-n">gateway</span><span class="p-p">([</span><span class="p-n">responder</span><span class="p-p">]</span> <span class="p-o">*</span> <span class="p-mi">6</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-o">=</span><span class="p-n">herramientas</span><span class="p-p">)</span>
+    <span class="p-n">salida</span> <span class="p-o">=</span> <span class="p-kc">None</span>
+    <span class="p-k">async</span> <span class="p-k">for</span> <span class="p-n">paso</span> <span class="p-ow">in</span> <span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">run</span><span class="p-p">(</span>
+        <span class="p-n">tarea</span><span class="p-p">,</span> <span class="p-n">session</span><span class="p-o">=</span><span class="p-n">Session</span><span class="p-p">(</span><span class="p-s2">"compra-1"</span><span class="p-p">,</span> <span class="p-n">otra_puerta</span><span class="p-p">,</span> <span class="p-n">SqliteCheckpointer</span><span class="p-p">(</span><span class="p-n">almacen</span><span class="p-p">))</span>
+    <span class="p-p">):</span>
+        <span class="p-k">if</span> <span class="p-nb">isinstance</span><span class="p-p">(</span><span class="p-n">paso</span><span class="p-p">,</span> <span class="p-n">FinalStep</span><span class="p-p">):</span>
+            <span class="p-n">salida</span> <span class="p-o">=</span> <span class="p-n">paso</span><span class="p-o">.</span><span class="p-n">output</span>
+
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"  ▶  reanudado · llamadas al modelo: </span><span class="p-si">{</span><span class="p-n">otra_puerta</span><span class="p-o">.</span><span class="p-n">model_calls</span><span class="p-si">}</span><span class="p-s2">"</span><span class="p-p">)</span>
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"     </span><span class="p-si">{</span><span class="p-n">salida</span><span class="p-si">}</span><span class="p-s2">"</span><span class="p-p">)</span>
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"     pagos: </span><span class="p-si">{</span><span class="p-n">PAGOS</span><span class="p-si">}</span><span class="p-s2">"</span><span class="p-p">)</span>
+    <span class="p-k">assert</span> <span class="p-nb">len</span><span class="p-p">(</span><span class="p-n">PAGOS</span><span class="p-p">)</span> <span class="p-o">==</span> <span class="p-mi">1</span><span class="p-p">,</span> <span class="p-s2">"el pago se ordenó más de una vez"</span>
+    <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"     ✓ el pago ocurrió exactamente una vez"</span><span class="p-p">)</span>
+
+<span class="p-k">if</span> <span class="p-vm">__name__</span> <span class="p-o">==</span> <span class="p-s2">"__main__"</span><span class="p-p">:</span>
+    <span class="p-n">asyncio</span><span class="p-o">.</span><span class="p-n">run</span><span class="p-p">(</span><span class="p-n">main</span><span class="p-p">())</span>
+</code></pre>
+<h2>Lo que esto enseña</h2>
+<p>El fallo que esto evita, y que solo aparece cuando la durabilidad es de verdad:
+un <code>require_approval</code> deja la herramienta con intención y sin resultado. Al
+reanudar, eso se parece a «no se sabe si se ejecutó» — pero <strong>aquí sí se
+sabe</strong>: se denegó <em>antes</em> de ejecutar. Por eso la denegación se registra como
+desenlace del paso y no como silencio.</p>
+
+<nav class="paginado" aria-label="Paginación"><a class="prev" href="ejemplos-03-extraccion-acotada.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">03 · Un bucle acotado, y qué pasa cuando el modelo se equivoca</span></a><a class="siguiente" href="ejemplos-05-cadena-de-agentes.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">05 · Varios agentes en cadena, cada uno con su contexto</span></a></nav>
+  </main>
+</div>
+<script>
+// Botón de copiar en cada bloque de código.
+//
+// Se añade desde JavaScript y no en el HTML a propósito: sin JS la página se
+// lee igual y el código sigue siendo seleccionable. Un botón que no funciona es
+// peor que no tenerlo.
+document.querySelectorAll('pre').forEach(function (bloque) {
+  var boton = document.createElement('button');
+  boton.className = 'copiar';
+  boton.type = 'button';
+  boton.setAttribute('aria-label', 'Copiar el código');
+  boton.textContent = 'Copiar';
+
+  boton.addEventListener('click', function () {
+    var codigo = bloque.querySelector('code');
+    var texto = codigo ? codigo.innerText : bloque.innerText;
+    // `clipboard` necesita contexto seguro; en file:// no existe, y entonces se
+    // dice en vez de fingir que copió.
+    if (!navigator.clipboard) {
+      boton.textContent = 'No disponible';
+      setTimeout(function () { boton.textContent = 'Copiar'; }, 1600);
+      return;
+    }
+    navigator.clipboard.writeText(texto).then(function () {
+      boton.textContent = 'Copiado';
+      boton.classList.add('hecho');
+      setTimeout(function () {
+        boton.textContent = 'Copiar';
+        boton.classList.remove('hecho');
+      }, 1600);
+    });
+  });
+
+  bloque.appendChild(boton);
+});
+</script>
+</body>
+</html>

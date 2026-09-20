@@ -1,4 +1,7 @@
-"""08 · Herramientas que no escribiste tú.
+# 08 · Herramientas que no escribiste tú
+
+> **Generada de [`examples/agentes/08_herramientas_mcp.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/08_herramientas_mcp.py).** El fichero corre; esta página lo
+> transcribe. Si los dos no coinciden, falla un test.
 
 **Dominio: cualquiera de tus repos.** Hasta aquí cada herramienta era una función
 con `@tool`. En una aplicación real, buena parte de lo que un agente necesita ya
@@ -12,9 +15,11 @@ Lo que este ejemplo enseña de verdad no es cómo conectarse —son cuatro líne
 sino **qué significa que la herramienta sea ajena**. Eso está al final y es la
 parte que importa.
 
-    uv run python examples/agentes/08_herramientas_mcp.py
-"""
+```bash
+uv run python examples/agentes/08_herramientas_mcp.py
+```
 
+```python
 from __future__ import annotations
 
 import asyncio
@@ -30,13 +35,14 @@ from synaptum.testing import calls, says
 from comun import encabezado, gateway, nombre_del_modelo
 
 SERVIDOR = Path(__file__).parent / "servidor_mcp" / "repo.py"
+```
 
+## Una política que decide sobre lo que no escribió
 
-# ── Una política que decide sobre lo que no escribió ──────────────────────────
-#
-# Aquí es donde `risk` deja de ser documentación. El servidor **insinúa**;
-# Synaptum **declara**; esto **decide**.
+Aquí es donde `risk` deja de ser documentación. El servidor **insinúa**;
+Synaptum **declara**; esto **decide**.
 
+```python
 def solo_lectura_sin_supervision(check) -> Decision:
     """Deja pasar lo que lee; detiene lo demás para que alguien lo mire."""
     if check.kind != "tool" or check.risk is Risk.READ:
@@ -49,7 +55,6 @@ def solo_lectura_sin_supervision(check) -> Decision:
             f"lectura (riesgo {check.risk.value}). Necesita una persona."
         ),
     )
-
 
 async def main() -> None:
     encabezado("08 · Herramientas MCP")
@@ -106,37 +111,39 @@ async def main() -> None:
 
     print("\n  (el servidor se cerró al salir del `async with`)")
 
-
-# Qué cambia cuando la herramienta es ajena
-# ─────────────────────────────────────────
-#
-# **1 · El riesgo lo insinúa quien no manda.** MCP trae `readOnlyHint`,
-# `destructiveHint` e `idempotentHint`, y su propia especificación dice que un
-# cliente **no debe fiarse de ellas** para decidir seguridad: un servidor
-# equivocado —o malicioso— puede declarar inocua una herramienta que borra.
-#
-# Por eso la traducción es conservadora y **ausencia no es inofensivo**: MCP
-# define `destructiveHint` con defecto verdadero, así que una herramienta sin
-# anotar entra como `Risk.DESTRUCTIVE`. Produce más avisos de los que uno espera, y
-# es lo correcto — la alternativa es que algo ajeno y sin declarar se ejecute
-# sin que nadie lo mire.
-#
-# Nuestro `@tool` usa `Risk.READ` por defecto porque **el autor está delante** y puede
-# declarar. Aquí no está.
-#
-# **2 · Los errores llegan sin explicación.** Una tool local que revienta
-# devuelve su excepción al modelo, que suele corregir. Un servidor MCP no filtra
-# sus internos: llega «Error executing tool X» y nada más. El modelo sabe *que*
-# falló y casi nunca *por qué*.
-#
-# **3 · Los nombres chocan.** Dos servidores que publiquen `search` no son
-# distinguibles para el modelo, y gana el último registrado, en silencio. Por eso
-# aquí va `prefix="repo."`.
-#
-# **4 · El esquema es de otro.** Si el servidor cambia el suyo, tu agente empieza
-# a mandar argumentos que ya no encajan — sin que nada en tu repositorio haya
-# cambiado. Es el mismo problema que `@tool` resuelve derivando el esquema de la
-# firma, y con MCP vuelve, porque la firma vive en otro sitio.
-
 if __name__ == "__main__":
     asyncio.run(main())
+```
+
+## Lo que esto enseña
+
+Qué cambia cuando la herramienta es ajena
+─────────────────────────────────────────
+
+**1 · El riesgo lo insinúa quien no manda.** MCP trae `readOnlyHint`,
+`destructiveHint` e `idempotentHint`, y su propia especificación dice que un
+cliente **no debe fiarse de ellas** para decidir seguridad: un servidor
+equivocado —o malicioso— puede declarar inocua una herramienta que borra.
+
+Por eso la traducción es conservadora y **ausencia no es inofensivo**: MCP
+define `destructiveHint` con defecto verdadero, así que una herramienta sin
+anotar entra como `Risk.DESTRUCTIVE`. Produce más avisos de los que uno espera, y
+es lo correcto — la alternativa es que algo ajeno y sin declarar se ejecute
+sin que nadie lo mire.
+
+Nuestro `@tool` usa `Risk.READ` por defecto porque **el autor está delante** y puede
+declarar. Aquí no está.
+
+**2 · Los errores llegan sin explicación.** Una tool local que revienta
+devuelve su excepción al modelo, que suele corregir. Un servidor MCP no filtra
+sus internos: llega «Error executing tool X» y nada más. El modelo sabe *que*
+falló y casi nunca *por qué*.
+
+**3 · Los nombres chocan.** Dos servidores que publiquen `search` no son
+distinguibles para el modelo, y gana el último registrado, en silencio. Por eso
+aquí va `prefix="repo."`.
+
+**4 · El esquema es de otro.** Si el servidor cambia el suyo, tu agente empieza
+a mandar argumentos que ya no encajan — sin que nada en tu repositorio haya
+cambiado. Es el mismo problema que `@tool` resuelve derivando el esquema de la
+firma, y con MCP vuelve, porque la firma vive en otro sitio.

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Qué no hace · Synaptum</title>
+<title>Ejemplos · Synaptum</title>
 <style>
 /* Paleta ───────────────────────────────────────────────────────────────────
    Los colores hacen un trabajo, no decoran: el acento marca lo navegable, el
@@ -186,64 +186,115 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   <nav aria-label="Secciones">
     <p class="marca"><a href="index.html">Synaptum</a></p>
     <p class="version">1.0.0rc2</p>
-    <ol><li><a href="index.html">Empezar</a></li><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html" aria-current="page">Qué no hace</a></li><li><a href="08-referencia.html">Referencia</a></li><li><a href="ejemplos.html">Ejemplos</a><ol class="seccion plegada"><li><a href="ejemplos-01-triaje.html">01 · Lo mínimo: un agente, una herramienta</a></li><li><a href="ejemplos-02-causa-raiz.html">02 · Varias herramientas y una respuesta tipada</a></li><li><a href="ejemplos-03-extraccion-acotada.html">03 · Un bucle acotado, y qué pasa cuando el modelo se equivoca</a></li><li><a href="ejemplos-04-agente-que-gasta.html">04 · Un agente que mueve dinero, y el runtime que lo frena</a></li><li><a href="ejemplos-05-cadena-de-agentes.html">05 · Varios agentes en cadena, cada uno con su contexto</a></li><li><a href="ejemplos-06-agentes-en-paralelo.html">06 · Varios agentes a la vez, y uno que decide</a></li><li><a href="ejemplos-07-agente-como-herramienta.html">07 · Un agente como herramienta de otro, y un supervisor que enruta</a></li><li><a href="ejemplos-08-herramientas-mcp.html">08 · Herramientas que no escribiste tú</a></li><li><a href="ejemplos-09-delegar.html">09 · Delegar como primitiva, no como patrón</a></li><li><a href="ejemplos-10-economia-del-contexto.html">10 · Lo que el modelo ve en cada turno, y lo que cuesta</a></li><li><a href="ejemplos-11-catalogo-diferido.html">11 · Un catálogo grande sin pagarlo en cada turno</a></li><li><a href="ejemplos-12-agente-remoto.html">12 · Un agente que vive en otro contenedor</a></li><li><a href="ejemplos-13-bucle.html">13 · El bucle entero, en un fichero</a></li><li><a href="ejemplos-14-durabilidad.html">14 · Matar el proceso a mitad y reanudar sin volver a pagar la inferencia</a></li><li><a href="ejemplos-15-aprobacion.html">15 · Un paso destructivo se detiene, alguien decide, y el run sigue donde estaba</a></li><li><a href="ejemplos-16-streaming.html">16 · Ver los tokens según llegan, y cortar a mitad</a></li></ol></li></ol>
-    <p class="fuente"><a href="../07-limites.md">Leer en Markdown&nbsp;↗</a></p>
+    <ol><li><a href="index.html">Empezar</a></li><li><a href="01-conceptos.html">Conceptos</a></li><li><a href="02-herramientas.html">Herramientas</a></li><li><a href="03-durabilidad.html">Durabilidad</a></li><li><a href="04-modelos.html">Modelos</a></li><li><a href="05-multiagente.html">Varios agentes</a></li><li><a href="06-probar.html">Probar</a></li><li><a href="07-limites.html">Qué no hace</a></li><li><a href="08-referencia.html">Referencia</a></li><li><a href="ejemplos.html" aria-current="page">Ejemplos</a><ol class="seccion"><li><a href="ejemplos-01-triaje.html">01 · Lo mínimo: un agente, una herramienta</a></li><li><a href="ejemplos-02-causa-raiz.html">02 · Varias herramientas y una respuesta tipada</a></li><li><a href="ejemplos-03-extraccion-acotada.html">03 · Un bucle acotado, y qué pasa cuando el modelo se equivoca</a></li><li><a href="ejemplos-04-agente-que-gasta.html">04 · Un agente que mueve dinero, y el runtime que lo frena</a></li><li><a href="ejemplos-05-cadena-de-agentes.html">05 · Varios agentes en cadena, cada uno con su contexto</a></li><li><a href="ejemplos-06-agentes-en-paralelo.html">06 · Varios agentes a la vez, y uno que decide</a></li><li><a href="ejemplos-07-agente-como-herramienta.html">07 · Un agente como herramienta de otro, y un supervisor que enruta</a></li><li><a href="ejemplos-08-herramientas-mcp.html">08 · Herramientas que no escribiste tú</a></li><li><a href="ejemplos-09-delegar.html">09 · Delegar como primitiva, no como patrón</a></li><li><a href="ejemplos-10-economia-del-contexto.html">10 · Lo que el modelo ve en cada turno, y lo que cuesta</a></li><li><a href="ejemplos-11-catalogo-diferido.html">11 · Un catálogo grande sin pagarlo en cada turno</a></li><li><a href="ejemplos-12-agente-remoto.html">12 · Un agente que vive en otro contenedor</a></li><li><a href="ejemplos-13-bucle.html">13 · El bucle entero, en un fichero</a></li><li><a href="ejemplos-14-durabilidad.html">14 · Matar el proceso a mitad y reanudar sin volver a pagar la inferencia</a></li><li><a href="ejemplos-15-aprobacion.html">15 · Un paso destructivo se detiene, alguien decide, y el run sigue donde estaba</a></li><li><a href="ejemplos-16-streaming.html">16 · Ver los tokens según llegan, y cortar a mitad</a></li></ol></li></ol>
+    <p class="fuente"><a href="../ejemplos.md">Leer en Markdown&nbsp;↗</a></p>
   </nav>
   <main id="contenido">
-<h1>Qué no hace</h1>
-<p>Dicho en voz alta, porque un framework que no dice dónde acaba deja que le supongan el resto.</p>
-<h2>No aplica política</h2>
+<h1>Ejemplos</h1>
+<p><strong>Dieciséis ficheros que se ejecutan.</strong> Corren sin inferencia y sin configurar nada: las
+respuestas van guionizadas y todo lo demás es real — las herramientas se ejecutan, el
+journal se escribe, el consumo se mide. Con dos variables de entorno, <strong>el mismo fichero
+sin tocar</strong> habla con un modelo de verdad.</p>
+<p>Cada uno está sobre un proyecto real, no sobre un dominio inventado, porque un ejemplo con
+<code>foo</code> y <code>bar</code> enseña la sintaxis y esconde la decisión.</p>
+<pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/agentes/01_triaje.py
+</code></pre>
+<h2>Construir agentes</h2>
+<p>Cada uno añade <strong>una</strong> idea sobre el anterior.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th></th>
+<th>Dominio</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="ejemplos-01-triaje.html">01 · Lo mínimo: un agente, una herramienta</a></td>
+<td>Argus</td>
+</tr>
+<tr>
+<td><a href="ejemplos-02-causa-raiz.html">02 · Varias herramientas y una respuesta tipada</a></td>
+<td>Argus</td>
+</tr>
+<tr>
+<td><a href="ejemplos-03-extraccion-acotada.html">03 · Un bucle acotado, y qué pasa cuando el modelo se equivoca</a></td>
+<td>la plataforma de inteligencia documental</td>
+</tr>
+<tr>
+<td><a href="ejemplos-04-agente-que-gasta.html">04 · Un agente que mueve dinero, y el runtime que lo frena</a></td>
+<td>Aerarium + Mercatus</td>
+</tr>
+<tr>
+<td><a href="ejemplos-05-cadena-de-agentes.html">05 · Varios agentes en cadena, cada uno con su contexto</a></td>
+<td>el pipeline de doblaje</td>
+</tr>
+<tr>
+<td><a href="ejemplos-06-agentes-en-paralelo.html">06 · Varios agentes a la vez, y uno que decide</a></td>
+<td>Argus bajo tormenta</td>
+</tr>
+<tr>
+<td><a href="ejemplos-07-agente-como-herramienta.html">07 · Un agente como herramienta de otro, y un supervisor que enruta</a></td>
+<td>la mesa de entrada de tu portafolio</td>
+</tr>
+<tr>
+<td><a href="ejemplos-08-herramientas-mcp.html">08 · Herramientas que no escribiste tú</a></td>
+<td>cualquiera de tus repos</td>
+</tr>
+<tr>
+<td><a href="ejemplos-09-delegar.html">09 · Delegar como primitiva, no como patrón</a></td>
+<td>Aerarium</td>
+</tr>
+<tr>
+<td><a href="ejemplos-10-economia-del-contexto.html">10 · Lo que el modelo ve en cada turno, y lo que cuesta</a></td>
+<td>Argus</td>
+</tr>
+<tr>
+<td><a href="ejemplos-11-catalogo-diferido.html">11 · Un catálogo grande sin pagarlo en cada turno</a></td>
+<td>Prometheus</td>
+</tr>
+<tr>
+<td><a href="ejemplos-12-agente-remoto.html">12 · Un agente que vive en otro contenedor</a></td>
+<td>el pipeline de doblaje</td>
+</tr>
+</tbody>
+</table></div>
+<h2>Qué garantiza el runtime</h2>
+<p>Estos no enseñan a escribir un agente: enseñan qué hay debajo cuando ya lo has
+escrito.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th></th>
+<th>Dominio</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="ejemplos-13-bucle.html">13 · El bucle entero, en un fichero</a></td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="ejemplos-14-durabilidad.html">14 · Matar el proceso a mitad y reanudar sin volver a pagar la inferencia</a></td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="ejemplos-15-aprobacion.html">15 · Un paso destructivo se detiene, alguien decide, y el run sigue donde estaba</a></td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="ejemplos-16-streaming.html">16 · Ver los tokens según llegan, y cortar a mitad</a></td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h2>Lo que estos ejemplos no enseñan</h2>
 <p><code>LocalGateway</code> <strong>no aplica nada</strong>. Corre dentro del proceso que gobernaría, así que sus
-comprobaciones son advisorias: las cumple un bucle correcto y se las salta uno con un fallo — o uno
-comprometido. Es la misma razón por la que un sandbox no se implementa como una función que el código
-encerrado decide llamar.</p>
-<p>Marca cada decisión con <code>enforced=False</code> y su informe lleva una cabecera diciéndolo, porque un
-informe que no lo dice acaba pegado en un ticket como si fuera una auditoría.</p>
-<p><strong>Que un run pase por aquí sin denegaciones no dice nada</strong> sobre si pasaría por un gateway real.</p>
-<h2>No guarda secretos ni gobierna credenciales</h2>
-<p><code>HttpModel</code> tiene la clave en la memoria del proceso y llama a quien le digan. En el camino gobernado
-la llamada al modelo <strong>no ocurre en este proceso</strong>.</p>
-<h2>No decide cuánto puede gastar un run</h2>
-<p><code>Limits</code> es <strong>corrección, no política</strong>: evita que un bucle mal formado no termine nunca. Los topes
-de gasto pertenecen al arnés y llegan por la costura como una denegación.</p>
-<h2>No elige dónde se persiste</h2>
-<p><code>Checkpointer</code> es un protocolo. Traemos dos implementaciones de referencia —memoria y SQLite— y
-ninguna es para producción a escala. La retención, el cifrado y el borrado son del sustrato, y el
-sustrato no es nuestro.</p>
-<h2>No es un bus de mensajes</h2>
-<p>El motor es <code>await</code>, no una cola. No hay broker, ni suscriptores, ni entrega garantizada entre
-agentes. El stream de eventos es <strong>una sola cosa cediendo control</strong>, no N cosas hablando entre sí.</p>
-<p>Si necesitas agentes en procesos distintos comunicándose de forma asíncrona y persistente, eso es un
-arnés, y está bien que lo sea.</p>
-<h2>No reduce el historial cuando crece</h2>
-<p>Dos piezas de economía de contexto <strong>sí</strong> existen, y conviene no confundirlas con la que falta:</p>
-<ul>
-<li>La salida de una herramienta se recorta antes de entrar en el contexto.</li>
-<li>El prefijo estable está protegido: reanudar con otra configuración se rechaza en vez de mezclar
-dos agentes en un mismo diario.</li>
-</ul>
-<p>Lo que <strong>no</strong> hay es compactación por niveles (<code>SYN-36</code>). En un run largo, el historial completo se
-reenvía en cada turno. Con caché de prefijo eso suele salir más barato que resumir —por eso la
-compactación va desactivada por defecto cuando llegue— pero hay un punto en el que deja de serlo, y
-hoy nadie lo detecta por ti.</p>
-<h2>No deniega una delegación antes de que empiece</h2>
-<p>Delegar <strong>sí</strong> existe, con contexto aislado, consumo agregado y reanudación. Lo que falta es que la
-delegación cruce la costura: el bucle arranca al subagente sin preguntar al gateway.</p>
-<p>Las herramientas del subagente sí cruzan, así que un efecto destructivo se detiene igual. Lo que se
-pierde es detenerlo <em>antes</em> de pagar la inferencia del hijo. Cerrarlo exige un método de la costura
-que autorice sin ejecutar, y eso es un cambio de contrato acordado entre varios proyectos.</p>
-<h2>No emite trazas todavía</h2>
-<p><code>SYN-37</code>. Las convenciones GenAI de OpenTelemetry están en el plan; hoy no hay spans.</p>
-<h2>No reintenta lo que no debe</h2>
-<p>Y esto es un «no hace» deliberado, no una carencia: <strong>cualquier 4xx salvo 429 no se reintenta.</strong> La
-familia entera significa «tu petición es el problema»: repetirla sin cambiarla da el mismo resultado
-y cuesta lo mismo.</p>
-<h2>No adivina cuando no sabe</h2>
-<p>Si el proceso muere justo después de lanzar una herramienta no idempotente y antes de registrar el
-resultado, <strong>nadie sabe si el efecto ocurrió</strong>. El replay levanta <code>UncertainEffect</code> en vez de elegir
-por ti. Es el framework negándose a adivinar, y es la conducta correcta aunque sea la incómoda.</p>
+comprobaciones son advisorias: las cumple un bucle correcto y se las salta uno con un
+fallo. Que el <code>04</code> deniegue un pago aquí no dice nada sobre si lo denegaría en producción
+— para eso la decisión tiene que tomarse fuera del proceso, que es lo que hace un arnés.</p>
 
-<nav class="paginado" aria-label="Paginación"><a class="prev" href="06-probar.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">Probar</span></a><a class="siguiente" href="08-referencia.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">Referencia</span></a></nav>
+<nav class="paginado" aria-label="Paginación"><a class="prev" href="08-referencia.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">Referencia</span></a><a class="siguiente" href="ejemplos-01-triaje.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">01 · Lo mínimo: un agente, una herramienta</span></a></nav>
   </main>
 </div>
 <script>

@@ -11,7 +11,9 @@ on:
     branches: [main]
     paths:
       - docs/**
+      - examples/**             # la sección Ejemplos se genera de ahí
       - scripts/render_docs.py
+      - scripts/render_examples.py
       - .github/workflows/docs.yml
       - pyproject.toml          # la versión sale en la barra lateral
   workflow_dispatch:
@@ -36,6 +38,11 @@ jobs:
       # sirve una referencia más vieja que el paquete.
       - name: generar la referencia desde el código
         run: uv run --frozen python scripts/render_reference.py
+
+      # Y la sección de ejemplos, de los ficheros que se ejecutan. Por el mismo
+      # motivo: el sitio no sirve un ejemplo más viejo que el que corre.
+      - name: generar la sección de ejemplos desde examples/
+        run: uv run --frozen python scripts/render_examples.py
 
       - name: generar el HTML desde el Markdown
         run: uv run --frozen python scripts/render_docs.py
