@@ -43,7 +43,13 @@ import time
 from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Mapping, Sequence
 
-from ..core.errors import Denied, LimitExceeded, ProviderError, SynaptumError
+from ..core.errors import (
+    ConfigurationError,
+    Denied,
+    LimitExceeded,
+    ProviderError,
+    SynaptumError,
+)
 from ..core.events import (
     ApprovalStep,
     Disposition,
@@ -55,7 +61,7 @@ from ..core.events import (
     make_step_id,
 )
 from ..core.errors import NoObjectGeneratedError
-from ..core.protocols import CallContext, Checkpointer, Gateway
+from ..core.protocols import CallContext, Checkpointer, Gateway, RunState
 from ..core.types import (
     Message,
     Request,
@@ -71,6 +77,7 @@ from ..core.types import (
 )
 from ..schema.protocol import Schema, schema_for
 from ..context.cap import DEFAULT_MAX_CHARS, cap_tool_output
+from ..context.prefix import describe_prefix_change, prefix_fingerprint
 from ..run.journal import Journal, MemoryCheckpointer, Replay
 
 __all__ = ["Limits", "Session", "Agent"]
@@ -229,6 +236,10 @@ class Agent:
             # Un run que ya terminó devuelve lo que pasó, no lo intenta otra vez.
             yield self._rehydrate(closed)
             return
+
+        # El prefijo estable del run: se fija en el primer paso y no cambia.
+        # Al reanudar se comprueba contra el que quedó en el journal.
+        self._check_prefix(state, replay)
 
         messages: list[Message] = [Message.user(task)]
         total = Usage.zero()
@@ -550,6 +561,46 @@ class Agent:
             return max(0.0, min(pedida, self.limits.max_retry_wait))
         base = min(self.limits.retry_base * (2 ** intento), self.limits.max_retry_wait)
         return base * (0.5 + random.random() / 2)
+
+    def _check_prefix(self, state: RunState, replay: Replay) -> None:
+        """Reanudar con otra configuración no es reanudar: es otro run.
+
+        Se compara la petición del primer paso de modelo —que el journal guarda
+        entera— contra la que produciría este agente ahora. Si el prefijo estable
+        difiere, la primera mitad del run la ejecutó una configuración y la
+        segunda otra, y el journal lo registraría como uno solo: una auditoría
+        devolvería una historia que ninguna configuración produjo nunca.
+
+        Que además tire la caché del proveedor es lo de menos, y es lo único que
+        se nota sin buscarlo.
+        """
+        primera = next(
+            (
+                e.request
+                for e in state.events
+                if isinstance(e, ModelStep) and e.phase is Phase.ATTEMPTED and e.request
+            ),
+            None,
+        )
+        if primera is None:      # run nuevo: no hay nada con lo que comparar
+            return
+
+        ahora = Request(
+            model=self.model,
+            system=self.instructions,
+            tools=self.tools,
+            response_format=self._format,
+        )
+        if prefix_fingerprint(primera) == prefix_fingerprint(ahora):
+            return
+
+        raise ConfigurationError(
+            f"El run '{state.run_id}' se creó con otra configuración y reanudarlo "
+            f"con esta mezclaría dos agentes en un mismo diario "
+            f"({describe_prefix_change(primera, ahora)}). "
+            "Reanudar es continuar ese run; una configuración distinta es otro "
+            "run — usa un run_id nuevo."
+        )
 
     def _ctx(self, session: Session, step_id: str) -> CallContext:
         return CallContext(run_id=session.run_id, step_id=step_id)

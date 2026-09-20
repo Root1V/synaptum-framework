@@ -6,5 +6,6 @@ correcto sea carísimo.
 """
 
 from .cap import cap_tool_output
+from .prefix import describe_prefix_change, prefix_fingerprint
 
-__all__ = ["cap_tool_output"]
+__all__ = ["cap_tool_output", "prefix_fingerprint", "describe_prefix_change"]

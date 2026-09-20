@@ -44,8 +44,8 @@ arnés, y está bien que lo sea.
 compactación. No hay todavía ensamblador de contexto cache-first (`SYN-32`) ni compactación por
 niveles (`SYN-36`), así que el historial completo de un run largo se reenvía entero en cada turno.
 
-El `cache_read` que verás subir entre turnos ocurre porque el prefijo resulta estable, no porque
-nada lo garantice: cambiar una herramienta a mitad de sesión lo invalida en silencio.
+El prefijo estable **sí** está protegido: reanudar con otra configuración se rechaza en vez de
+mezclar dos agentes en un diario. Lo que falta es reducir el historial cuando crece.
 
 ## No delega con contexto aislado
 
