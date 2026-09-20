@@ -113,6 +113,55 @@ journal lo registra como uno solo: una auditoría de «qué hizo el agente» dev
 
 Reordenar herramientas cuenta como cambio, porque por el cable lo es.
 
+## Qué costó un run, y por qué
+
+`Usage` dice **cuánto**. El informe de economía dice **por qué**, que es lo único accionable:
+
+```python
+from synaptum import economy
+
+informe = economy(await store.load("run-1"))
+print(informe.report())
+```
+
+```
+Run run-1 · 2 turnos
+  caché      43% de la entrada servida de caché
+  crecimiento +57 tokens de entrada por turno
+  prefijo    estable durante todo el run
+  total      entrada=411 salida=378 caché=177
+```
+
+Se calcula **del journal**, así que funciona sobre un run terminado, sobre uno reanudado y sin tener
+el agente delante. Un informe que solo se pudiera sacar mientras el run corre no serviría para lo
+único que hace falta: mirar ayer.
+
+### Lo que cada cifra responde
+
+**El acierto de caché** se calcula sobre los totales, no como media de los turnos: una media pesaría
+igual un turno de 50 tokens que uno de 50.000. Y si nadie lo midió dice **sin medir**, no `0 %` —
+confundirlas manda a alguien a arreglar lo que no está roto.
+
+**Las reescrituras de prefijo deberían ser cero.** Reanudar con otra configuración ya está
+prohibido, pero **dentro** de un run el prefijo puede romperse solo: unas instrucciones con la fecha
+dentro lo reescriben en cada turno, y el síntoma es una caché que nunca arranca.
+
+```
+  ⚠ prefijo  reescrito 1 vez — cada una tira toda la caché posterior
+      · 000001-model: instrucciones de sistema: cambiaron
+```
+
+**El crecimiento** dice cuánto sube la entrada por turno. Es la pendiente entre el primero y el
+último, no una regresión: con cinco puntos, una regresión da una cifra más precisa y no más cierta.
+
+### Lo que no hace
+
+**No exporta nada.** Los nombres de atributo, las unidades y el transporte son de la instrumentación
+(`SYN-37`), y esa forma la fija la plataforma de observabilidad que los consuma.
+
+**No habla de dinero.** Los tokens se saben; los precios no, y convertirlos con una tarifa inventada
+daría una cifra con aspecto de exacta.
+
 ## Streaming
 
 ```python

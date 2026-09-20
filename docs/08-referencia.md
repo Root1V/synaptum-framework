@@ -145,6 +145,10 @@ ToolChoice(mode: "Literal['auto', 'none', 'required', 'named']" = 'auto', name: 
 | `mode` | `Literal['auto', 'none', 'required', 'named']` | `'auto'` |
 | `name` | `str \| None` | `None` |
 
+## Economía de contexto
+
+Qué ve el modelo y qué costó. `Usage` dice cuánto; esto dice por qué.
+
 ### `cap_tool_output`
 
 ```python
@@ -160,6 +164,50 @@ Args:
 Returns:
     Un ``ToolResult`` nuevo si hubo que recortar; **el mismo objeto** si no
     —así quien compare por identidad puede saber si se tocó algo.
+
+### `economy`
+
+```python
+def economy(state: RunState) -> ContextEconomy
+```
+
+Calcula el informe de un run a partir de su journal.
+
+Empareja cada intención de modelo con su resultado: la petición vive en
+``ATTEMPTED`` —es donde está el prefijo— y el consumo en ``COMPLETED``.
+Un turno sin resultado no se cuenta: se intentó y no se sabe qué costó.
+
+### `ContextEconomy`
+
+El informe de un run.
+
+| Campo | Tipo | Por defecto |
+|---|---|---|
+| `run_id` | `str` | **obligatorio** |
+| `turns` | `tuple[TurnEconomy, ...]` | `()` |
+| `prefix_changes` | `tuple[str, ...]` | *(fábrica)* |
+
+| Miembro | Firma | |
+|---|---|---|
+| `cache_hit_ratio` | — | Acierto de caché del run entero. |
+| `input_growth` | — | Cuánto crece la entrada por turno, en tokens. |
+| `prefix_rewrites` | — | Cuántas veces cambió el prefijo estable dentro del run. |
+| `report` | `report(self) -> str` | El informe en texto, para leerlo en un terminal o pegarlo en un ticket. |
+| `total` | — | Suma de todos los turnos.  ``None`` en un contador se propaga. |
+
+### `TurnEconomy`
+
+Un turno: una llamada al modelo y lo que costó.
+
+| Campo | Tipo | Por defecto |
+|---|---|---|
+| `step_id` | `str` | **obligatorio** |
+| `usage` | `Usage` | **obligatorio** |
+| `prefix_rewritten` | `bool` | **obligatorio** |
+
+| Miembro | Firma | |
+|---|---|---|
+| `cache_hit_ratio` | — | Fracción de la entrada servida desde caché, o ``None`` si no se midió. |
 
 ## Lo que cede el bucle
 

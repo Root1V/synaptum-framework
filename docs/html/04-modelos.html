@@ -277,6 +277,39 @@ hace daño es que la primera mitad del run la ejecutó una configuración y la s
 journal lo registra como uno solo: una auditoría de «qué hizo el agente» devuelve una historia que
 <strong>ninguna configuración produjo nunca</strong>.</p>
 <p>Reordenar herramientas cuenta como cambio, porque por el cable lo es.</p>
+<h2>Qué costó un run, y por qué</h2>
+<p><code>Usage</code> dice <strong>cuánto</strong>. El informe de economía dice <strong>por qué</strong>, que es lo único accionable:</p>
+<pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">synaptum</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">economy</span>
+
+<span class="p-n">informe</span> <span class="p-o">=</span> <span class="p-n">economy</span><span class="p-p">(</span><span class="p-k">await</span> <span class="p-n">store</span><span class="p-o">.</span><span class="p-n">load</span><span class="p-p">(</span><span class="p-s2">"run-1"</span><span class="p-p">))</span>
+<span class="p-nb">print</span><span class="p-p">(</span><span class="p-n">informe</span><span class="p-o">.</span><span class="p-n">report</span><span class="p-p">())</span>
+</code></pre>
+<pre><code>Run run-1 · 2 turnos
+  caché      43% de la entrada servida de caché
+  crecimiento +57 tokens de entrada por turno
+  prefijo    estable durante todo el run
+  total      entrada=411 salida=378 caché=177
+</code></pre>
+<p>Se calcula <strong>del journal</strong>, así que funciona sobre un run terminado, sobre uno reanudado y sin tener
+el agente delante. Un informe que solo se pudiera sacar mientras el run corre no serviría para lo
+único que hace falta: mirar ayer.</p>
+<h3>Lo que cada cifra responde</h3>
+<p><strong>El acierto de caché</strong> se calcula sobre los totales, no como media de los turnos: una media pesaría
+igual un turno de 50 tokens que uno de 50.000. Y si nadie lo midió dice <strong>sin medir</strong>, no <code>0 %</code> —
+confundirlas manda a alguien a arreglar lo que no está roto.</p>
+<p><strong>Las reescrituras de prefijo deberían ser cero.</strong> Reanudar con otra configuración ya está
+prohibido, pero <strong>dentro</strong> de un run el prefijo puede romperse solo: unas instrucciones con la fecha
+dentro lo reescriben en cada turno, y el síntoma es una caché que nunca arranca.</p>
+<pre><code>  ⚠ prefijo  reescrito 1 vez — cada una tira toda la caché posterior
+      · 000001-model: instrucciones de sistema: cambiaron
+</code></pre>
+<p><strong>El crecimiento</strong> dice cuánto sube la entrada por turno. Es la pendiente entre el primero y el
+último, no una regresión: con cinco puntos, una regresión da una cifra más precisa y no más cierta.</p>
+<h3>Lo que no hace</h3>
+<p><strong>No exporta nada.</strong> Los nombres de atributo, las unidades y el transporte son de la instrumentación
+(<code>SYN-37</code>), y esa forma la fija la plataforma de observabilidad que los consuma.</p>
+<p><strong>No habla de dinero.</strong> Los tokens se saben; los precios no, y convertirlos con una tarifa inventada
+daría una cifra con aspecto de exacta.</p>
 <h2>Streaming</h2>
 <pre data-lenguaje="python"><code><span class="p-k">async</span> <span class="p-k">for</span> <span class="p-n">evento</span> <span class="p-ow">in</span> <span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">stream</span><span class="p-p">(</span><span class="p-n">tarea</span><span class="p-p">,</span> <span class="p-n">session</span><span class="p-o">=</span><span class="p-n">sesion</span><span class="p-p">):</span>
     <span class="p-k">if</span> <span class="p-n">evento</span><span class="p-o">.</span><span class="p-n">kind</span> <span class="p-o">==</span> <span class="p-s2">"text_delta"</span><span class="p-p">:</span>

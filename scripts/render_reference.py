@@ -33,8 +33,12 @@ GRUPOS: list[tuple[str, str, tuple[str, ...]]] = [
     (
         "Escribir un agente",
         "Lo que se toca en el primer fichero.",
-        ("Agent", "Session", "Limits", "tool", "Tool", "Risk", "ToolDefinition", "ToolChoice",
-         "cap_tool_output"),
+        ("Agent", "Session", "Limits", "tool", "Tool", "Risk", "ToolDefinition", "ToolChoice"),
+    ),
+    (
+        "Economía de contexto",
+        "Qué ve el modelo y qué costó. `Usage` dice cuánto; esto dice por qué.",
+        ("cap_tool_output", "economy", "ContextEconomy", "TurnEconomy"),
     ),
     (
         "Lo que cede el bucle",
