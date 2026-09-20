@@ -86,7 +86,7 @@ Un tipo que no sabemos traducir **falla al decorar**, no al invocar.
 ## Probarlo
 
 ```bash
-uv run python examples/01_agente.py
+uv run python examples/agentes/01_triaje.py
 ```
 
 Corre **sin inferencia**: las respuestas van guionizadas, y el resto es real —las herramientas se
@@ -96,15 +96,16 @@ variables y **el mismo fichero sin tocar**:
 ```bash
 export SYNAPTUM_BASE_URL=http://localhost:8080/v1
 export SYNAPTUM_MODEL=qwen3-0.6b
-uv run python examples/01_agente.py
+uv run python examples/agentes/01_triaje.py
 ```
 
 Que el mismo código sirva para las dos cosas no es comodidad: es la propiedad — el agente no sabe
 quién hay al otro lado de la costura.
 
 [**`examples/`**](https://github.com/Root1V/synaptum-framework/tree/main/examples) tiene dos pistas:
-ocho ejemplos que van del agente más simple a tres formas de multi-agente y a herramientas servidas
-por MCP, cada uno sobre un dominio real; y cuatro que enseñan qué garantiza el runtime debajo.
+doce ejemplos que van del agente más simple a delegar en uno que vive en otro contenedor, pasando
+por herramientas servidas por MCP, catálogos grandes y la economía del contexto, cada uno sobre un
+dominio real; y cuatro que enseñan qué garantiza el runtime debajo.
 
 ## Sin dependencias
 

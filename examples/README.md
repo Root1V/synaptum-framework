@@ -25,6 +25,10 @@ portafolio, no sobre un dominio inventado.
 | [`06_agentes_en_paralelo.py`](agentes/06_agentes_en_paralelo.py) | Fan-out con `asyncio.gather` y un sintetizador | Argus bajo tormenta |
 | [`07_agente_como_herramienta.py`](agentes/07_agente_como_herramienta.py) | Un supervisor que enruta a especialistas | Mesa de entrada del portafolio |
 | [`08_herramientas_mcp.py`](agentes/08_herramientas_mcp.py) | Herramientas de un **servidor MCP**, y qué cambia cuando no las escribiste tú | Cualquier repo · servidor incluido |
+| [`09_delegar.py`](agentes/09_delegar.py) | `delegates=`: delegar como **primitiva** — coste que sube, riesgo que se deriva, paso durable | Aerarium · cierre de mes |
+| [`10_economia_del_contexto.py`](agentes/10_economia_del_contexto.py) | `max_tool_chars`, prefijo estable y `economy()`: qué ve el modelo y qué cuesta | Argus · depurar con logs |
+| [`11_catalogo_diferido.py`](agentes/11_catalogo_diferido.py) | `deferred()`: veinte herramientas sin inflar el prefijo | Prometheus · consola del operador |
+| [`12_agente_remoto.py`](agentes/12_agente_remoto.py) | `RemoteDelegate`: un agente en **otro contenedor**, por A2A | Pipeline de doblaje · revisor ajeno |
 
 ### Sobre MCP
 
@@ -42,19 +46,25 @@ nombres chocan entre servidores, y el esquema puede cambiar debajo sin que tu re
 
 ### Sobre multi-agente, dicho antes de que lo descubras
 
-**`delegate()` no existe todavía** — es `SYN-41`. El tipo `DelegateStep` está escrito y nada lo
-emite.
+Hay **tres formas** de componer agentes y las tres son correctas en su sitio:
 
-Eso **no impide** construir sistemas multi-agente hoy, y los tres últimos ejemplos lo demuestran: el
-bucle de un agente es un generador asíncrono de verdad, así que orquestar varios es código asyncio
-normal. Lo que `SYN-41` añadirá es que la delegación quede **en el journal** como un paso propio,
-con su consumo atribuido y su punto de reanudación.
+1. **A mano, con asyncio** ([`05`](agentes/05_cadena_de_agentes.py),
+   [`06`](agentes/06_agentes_en_paralelo.py)). El bucle de un agente es un generador asíncrono de
+   verdad, así que encadenarlos o lanzarlos en paralelo es código normal. Es lo que quieres cuando
+   **el orden lo decides tú**.
+2. **Envolviendo un agente en un `@tool`** ([`07`](agentes/07_agente_como_herramienta.py)). Sirve
+   cuando el modelo elige, y sigue siendo la respuesta cuando lo de dentro **no es un `Agent`** —
+   una API ajena, un servicio heredado.
+3. **Delegando** ([`09`](agentes/09_delegar.py)). `Agent(delegates=[…])`, y entre agentes es lo que
+   quieres: el consumo del subagente sube al total, la delegación es un paso durable con su propio
+   diario, y el riesgo **se deriva** — delegar en alguien que borra es destructivo sin que nadie lo
+   declare. Ese tercero no se puede conseguir a mano.
 
-Las consecuencias de que no esté, hoy, son tres, y están explicadas al final de
-[`07`](agentes/07_agente_como_herramienta.py): el coste de un subagente no aparece en el `usage` de
-quien delega, un subagente no es un paso durable, y el riesgo no se propaga solo.
+Y si el agente está **en otro contenedor**, la forma es la misma:
+[`12`](agentes/12_agente_remoto.py) conecta uno por A2A y lo mete en la misma lista de `delegates`.
+El bucle no distingue.
 
-La regla que sí se puede seguir desde el primer día:
+La regla vale para todas, incluida la remota:
 
 > **Entre agentes viaja el resultado, nunca el historial.**
 
