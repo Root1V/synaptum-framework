@@ -3421,14 +3421,14 @@ no está, y suponer en su lugar es suponer a favor.</p>
 <td><strong>obligatorio</strong></td>
 </tr>
 <tr>
+<td><code>risk</code></td>
+<td><code>Risk</code></td>
+<td><strong>obligatorio</strong></td>
+</tr>
+<tr>
 <td><code>description</code></td>
 <td><code>str</code></td>
 <td><code>''</code></td>
-</tr>
-<tr>
-<td><code>risk</code></td>
-<td><code>Risk</code></td>
-<td><code>&lt;Risk.DESTRUCTIVE: 'destructive'&gt;</code></td>
 </tr>
 <tr>
 <td><code>poll_every</code></td>
@@ -3479,7 +3479,7 @@ url: el agente, o <strong>el proxy que lo gobierna</strong>. En el camino gobern
 es lo segundo: el framework apunta al endpoint del arnés y no cambia
 nada más.
 description: cuándo usarlo. Si falta se toma de su tarjeta.
-risk: <strong>hay que declararlo</strong>. Sin declaración, destructivo — ver abajo.
+risk: <strong>obligatorio, sin valor por defecto.</strong> Ver abajo por qué no lo tiene.
 poll_every: segundos entre consultas mientras la tarea trabaja.
 timeout: tope total de espera.</p>
 <h3><code>A2AClient</code></h3>

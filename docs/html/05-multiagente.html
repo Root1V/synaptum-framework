@@ -219,6 +219,14 @@ contrato.</p>
 <p><strong>Los ciclos se paran.</strong> <code>Limits.max_delegation_depth</code> (3 por defecto). <code>max_steps</code> no lo cubre:
 cada nivel tiene su propio contador, así que dos agentes que se deleguen mutuamente no terminarían
 nunca.</p>
+<h3>Un agente remoto declara su riesgo, o no se conecta</h3>
+<pre data-lenguaje="python"><code><span class="p-n">RemoteDelegate</span><span class="p-p">(</span><span class="p-n">name</span><span class="p-o">=</span><span class="p-s2">"analista"</span><span class="p-p">,</span> <span class="p-n">url</span><span class="p-o">=</span><span class="p-s2">"https://…"</span><span class="p-p">,</span> <span class="p-n">risk</span><span class="p-o">=</span><span class="p-n">Risk</span><span class="p-o">.</span><span class="p-n">READ</span><span class="p-p">)</span>   <span class="p-c1"># `risk` es obligatorio</span>
+</code></pre>
+<p>Un <code>AgentCard</code> declara <code>skills</code>, no riesgo: la especificación no tiene ese campo. Poner un defecto
+conservador sería correcto <strong>y silencioso</strong> — nadie se enteraría de que nunca se declaró.</p>
+<p>La diferencia con <code>@tool</code> es quién está delante. Ahí el autor de la función puede declarar, y por eso
+<code>Risk.READ</code> por defecto es razonable. Con un agente ajeno el autor no está, pero <strong>quien lo conecta
+sí</strong> — así que la decisión es suya y se le pide que la tome.</p>
 <h3>Lo que sigue siendo válido componer a mano</h3>
 <p>Delegar sirve cuando <strong>el modelo decide</strong> a quién llamar. Cuando el orden lo decides tú —una cadena
 fija, un fan-out— componer con asyncio sigue siendo lo correcto y más simple. Las dos formas están

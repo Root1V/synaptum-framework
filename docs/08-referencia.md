@@ -1701,8 +1701,8 @@ Un agente remoto, tal como lo ve quien delega.
 |---|---|---|
 | `name` | `str` | **obligatorio** |
 | `url` | `str` | **obligatorio** |
+| `risk` | `Risk` | **obligatorio** |
 | `description` | `str` | `''` |
-| `risk` | `Risk` | `<Risk.DESTRUCTIVE: 'destructive'>` |
 | `poll_every` | `float` | `1.0` |
 | `timeout` | `float` | `600.0` |
 | `headers` | `Any` | `None` |
@@ -1719,7 +1719,7 @@ Args:
         es lo segundo: el framework apunta al endpoint del arnés y no cambia
         nada más.
     description: cuándo usarlo. Si falta se toma de su tarjeta.
-    risk: **hay que declararlo**. Sin declaración, destructivo — ver abajo.
+    risk: **obligatorio, sin valor por defecto.** Ver abajo por qué no lo tiene.
     poll_every: segundos entre consultas mientras la tarea trabaja.
     timeout: tope total de espera.
 

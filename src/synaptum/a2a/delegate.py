@@ -57,29 +57,36 @@ class RemoteDelegate:
             es lo segundo: el framework apunta al endpoint del arnés y no cambia
             nada más.
         description: cuándo usarlo. Si falta se toma de su tarjeta.
-        risk: **hay que declararlo**. Sin declaración, destructivo — ver abajo.
+        risk: **obligatorio, sin valor por defecto.** Ver abajo por qué no lo tiene.
         poll_every: segundos entre consultas mientras la tarea trabaja.
         timeout: tope total de espera.
     """
 
     name: str
     url: str
+    risk: Risk
     description: str = ""
-    risk: Risk = Risk.DESTRUCTIVE
     poll_every: float = 1.0
     timeout: float = 600.0
     headers: Any = None
     _depth: int = 0
 
-    # `risk` por defecto es `DESTRUCTIVE`, y no es pesimismo decorativo.
+    # `risk` no tiene valor por defecto, y eso es deliberado.
     #
     # Un `AgentCard` declara `skills`, no riesgo: la especificación no tiene ese
-    # campo. Así que no hay forma de saber qué puede hacer un agente ajeno — y a
-    # diferencia de una herramienta MCP, **puede cambiar sin avisarnos**, porque
+    # campo. No hay forma de saber qué puede hacer un agente ajeno, y a
+    # diferencia de una herramienta MCP **puede cambiar sin avisarnos**, porque
     # al otro lado hay un modelo decidiendo.
     #
-    # Es la misma regla que aplicamos a MCP y por un motivo más fuerte. Quien
-    # sepa que es inocuo lo declara, y asume la consecuencia con su nombre.
+    # La primera versión ponía `DESTRUCTIVE` por defecto. Lo corrigió quien
+    # opera un arnés real, y tenía razón: un defecto conservador es **correcto y
+    # silencioso** — nadie se entera nunca de que el riesgo no se declaró, y la
+    # decisión queda tomada por un valor por defecto en vez de por una persona.
+    #
+    # Aquí sí hay alguien delante: quien construye el `RemoteDelegate`. Con el
+    # `@tool` ese alguien es el autor de la función y por eso `READ` por defecto
+    # es razonable. Con un agente ajeno, el autor no está — así que la decisión
+    # es de quien lo conecta, y se le pide que la tome con su nombre.
 
     @property
     def definition(self) -> ToolDefinition:
