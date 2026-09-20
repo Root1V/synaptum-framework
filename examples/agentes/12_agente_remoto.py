@@ -1,6 +1,7 @@
 """12 · Un agente que vive en otro contenedor.
 
-**Dominio: el pipeline de doblaje.** El revisor de sincronía no es tuyo: lo
+**Dominio: el pipeline de doblaje (Prosodia).** El revisor de sincronía no es
+tuyo: lo
 mantiene otro equipo, se despliega por su cuenta y se actualiza cuando ellos
 quieren. No puedes importarlo — solo hablarle.
 

@@ -103,7 +103,16 @@ Que el mismo código sirva para las dos cosas no es comodidad: es la propiedad �
 quién hay al otro lado de la costura.
 
 Están también **[en el sitio](https://root1v.github.io/synaptum-framework/ejemplos.html)**, una
-página por ejemplo, generadas de estos mismos ficheros.
+página por ejemplo, generadas de estos mismos ficheros, con lo que imprime cada uno al correrlo.
+
+Ninguno usa un dominio inventado: salen de sistemas que existen —
+[Argus](https://github.com/Root1V/argus-observability-platform) (observabilidad y AIOps),
+[Aerarium](https://github.com/Root1V/aerarium-agentic-banking) (núcleo bancario agéntico),
+[Mercatus](https://github.com/Root1V/mercatus-agentic-payments) (pagos entre agentes),
+[Prometheus](https://github.com/Root1V/prometheus-inference-platform) (inferencia autoalojada),
+[Prosodia](https://github.com/Root1V/ai-video-dubbing-pipeline) (doblaje de vídeo) y la
+[plataforma de inteligencia documental](https://github.com/Root1V/agentic-doc-intelligence-platform)
+— porque un ejemplo con `foo` y `bar` enseña la sintaxis y esconde la decisión.
 
 [**`examples/`**](https://github.com/Root1V/synaptum-framework/tree/main/examples) tiene dos pistas:
 doce ejemplos que van del agente más simple a delegar en uno que vive en otro contenedor, pasando
@@ -163,8 +172,10 @@ implemente no hereda ni importa nada nuestro, y puede estar escrito en otro leng
 un socket. No hay ningún arnés, SDK ni plataforma de inferencia concretos en el árbol de
 dependencias: `pip install synaptum` trae **cero** paquetes.
 
-En el despliegue donde nació, esas dos ranuras las ocupan un arnés llamado Aeon y un SDK llamado
-Axonium sobre una plataforma de inferencia local. Nada de eso es un requisito, y el paquete no los
+En el despliegue donde nació, esas dos ranuras las ocupan un arnés llamado
+[Aeon](https://github.com/Root1V/aeon-agent-harness) y un SDK llamado
+[Axonium](https://github.com/Root1V/axonium-sdk) sobre una plataforma de inferencia local,
+[Prometheus](https://github.com/Root1V/prometheus-inference-platform). Nada de eso es un requisito, y el paquete no los
 nombra: son **un** relleno posible de un protocolo abierto. El extra `[axonium]` existe para quien
 tenga esa combinación, y es opcional como el de Anthropic o el de OpenAI.
 

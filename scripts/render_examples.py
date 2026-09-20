@@ -406,6 +406,16 @@ def render_indice(entradas: list[tuple[int, Path, str, str, str]]) -> str:
         lineas += [""]
 
     lineas += [
+        "## Los sistemas de los que salen",
+        "",
+        "No son dominios inventados: cada ejemplo está montado sobre un sistema que existe, y esa es",
+        "la mitad de lo que enseñan. Un ejemplo con `foo` y `bar` enseña la sintaxis; uno sobre una",
+        "conciliación de verdad enseña **dónde está la decisión**.",
+        "",
+        "| | |",
+        "|---|---|",
+        *_proyectos(),
+        "",
         "## Lo que estos ejemplos no enseñan",
         "",
         "`LocalGateway` **no aplica nada**. Corre dentro del proceso que gobernaría, así que sus",
@@ -414,6 +424,38 @@ def render_indice(entradas: list[tuple[int, Path, str, str, str]]) -> str:
         "— para eso la decisión tiene que tomarse fuera del proceso, que es lo que hace un arnés.",
     ]
     return "\n".join(lineas).rstrip() + "\n"
+
+
+def _proyectos() -> list[str]:
+    """Los repositorios del portafolio, sin repetir el que sale dos veces.
+
+    La tabla vive en `render_docs` —que es quien enlaza las menciones sueltas—
+    y se lee de ahí. Dos listas del mismo portafolio se separarían, y la que se
+    quedaría corta sería esta, que es la que nadie edita al añadir un proyecto.
+    """
+    from render_docs import GITHUB, PROYECTOS
+
+    # Un repositorio puede tener varias claves —«Prosodia» y «pipeline de
+    # doblaje» son el mismo— y en la lista se nombra con la que sea un nombre
+    # propio. Si no tiene ninguna, se usa la frase con la que la documentación
+    # lo llama, que es como lo va a buscar quien la esté leyendo.
+    from collections import OrderedDict
+
+    por_repo: OrderedDict[str, tuple[str, str, bool]] = OrderedDict()
+    for clave, (repo, papel) in PROYECTOS.items():
+        propio = clave[0].isupper()
+        anterior = por_repo.get(repo)
+        # Se queda el primero que llega, salvo que llegue un nombre propio y lo
+        # que había fuera una frase. Guardar «es nombre propio» aparte es lo que
+        # hace que «Prosodia» gane a «pipeline de doblaje»: comparar la inicial
+        # del texto ya capitalizado diría que las dos lo son.
+        if anterior is None or (propio and not anterior[2]):
+            por_repo[repo] = (clave if propio else clave.capitalize(), papel, propio)
+
+    return [
+        f"| [{nombre}]({GITHUB}/{repo}) | {papel} |"
+        for repo, (nombre, papel, _) in por_repo.items()
+    ]
 
 
 def main() -> int:

@@ -25,14 +25,14 @@ portafolio, no sobre un dominio inventado.
 | [`02_causa_raiz.py`](agentes/02_causa_raiz.py) | Varias herramientas y **salida tipada** | Argus · AIOps |
 | [`03_extraccion_acotada.py`](agentes/03_extraccion_acotada.py) | `Limits` y **el camino de error**: qué pasa cuando el modelo se equivoca | Plataforma documental |
 | [`04_agente_que_gasta.py`](agentes/04_agente_que_gasta.py) | `risk`, denegación y **aprobación humana** con el run suspendido en disco | Aerarium · tesorería |
-| [`05_cadena_de_agentes.py`](agentes/05_cadena_de_agentes.py) | Dos agentes en cadena, cada uno con su contexto | Pipeline de doblaje |
+| [`05_cadena_de_agentes.py`](agentes/05_cadena_de_agentes.py) | Dos agentes en cadena, cada uno con su contexto | [Prosodia](https://github.com/Root1V/ai-video-dubbing-pipeline) · doblaje |
 | [`06_agentes_en_paralelo.py`](agentes/06_agentes_en_paralelo.py) | Fan-out con `asyncio.gather` y un sintetizador | Argus bajo tormenta |
 | [`07_agente_como_herramienta.py`](agentes/07_agente_como_herramienta.py) | Un supervisor que enruta a especialistas | Mesa de entrada del portafolio |
 | [`08_herramientas_mcp.py`](agentes/08_herramientas_mcp.py) | Herramientas de un **servidor MCP**, y qué cambia cuando no las escribiste tú | Cualquier repo · servidor incluido |
 | [`09_delegar.py`](agentes/09_delegar.py) | `delegates=`: delegar como **primitiva** — coste que sube, riesgo que se deriva, paso durable | Aerarium · cierre de mes |
 | [`10_economia_del_contexto.py`](agentes/10_economia_del_contexto.py) | `max_tool_chars`, prefijo estable y `economy()`: qué ve el modelo y qué cuesta | Argus · depurar con logs |
 | [`11_catalogo_diferido.py`](agentes/11_catalogo_diferido.py) | `deferred()`: veinte herramientas sin inflar el prefijo | Prometheus · consola del operador |
-| [`12_agente_remoto.py`](agentes/12_agente_remoto.py) | `RemoteDelegate`: un agente en **otro contenedor**, por A2A | Pipeline de doblaje · revisor ajeno |
+| [`12_agente_remoto.py`](agentes/12_agente_remoto.py) | `RemoteDelegate`: un agente en **otro contenedor**, por A2A | [Prosodia](https://github.com/Root1V/ai-video-dubbing-pipeline) · revisor ajeno |
 
 ### Sobre MCP
 

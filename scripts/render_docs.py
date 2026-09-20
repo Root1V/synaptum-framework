@@ -27,6 +27,32 @@ RAIZ = Path(__file__).resolve().parents[1]
 FUENTE = RAIZ / "docs"
 SALIDA = FUENTE / "html"
 
+GITHUB = "https://github.com/Root1V"
+
+#: Los proyectos del portafolio que la documentación nombra, y dónde están.
+#:
+#: Los ejemplos están montados sobre sistemas reales —esa es la mitad de lo que
+#: enseñan— y hasta ahora el lector veía el nombre y no tenía dónde ir. Se
+#: enlazan **al construir el HTML** y no editando el Markdown a mano: a mano
+#: habría que acordarse en cada página nueva, y el enlace que falta es siempre
+#: el de la página que alguien acaba de escribir.
+#:
+#: El orden importa: se prueba de la clave más larga a la más corta, para que
+#: una frase gane a una palabra que esté dentro de ella.
+PROYECTOS: dict[str, tuple[str, str]] = {
+    # palabra que aparece en la prosa: (repositorio, qué es)
+    "plataforma de inteligencia documental": (
+        "agentic-doc-intelligence-platform", "extracción agéntica de documentos",
+    ),
+    "Prometheus": ("prometheus-inference-platform", "plataforma de inferencia autoalojada"),
+    "Aerarium": ("aerarium-agentic-banking", "núcleo bancario para comercio agéntico"),
+    "Mercatus": ("mercatus-agentic-payments", "pagos entre agentes"),
+    "Prosodia": ("ai-video-dubbing-pipeline", "doblaje de vídeo multihablante, todo local"),
+    "Axonium": ("axonium-sdk", "SDK a la plataforma de inferencia"),
+    "Argus": ("argus-observability-platform", "observabilidad y AIOps agéntico"),
+    "Aeon": ("aeon-agent-harness", "el arnés: ejecución durable y política fuera del modelo"),
+}
+
 PLANTILLA = """<!doctype html>
 <html lang="es">
 <head>
@@ -323,6 +349,50 @@ def _resaltar(codigo: str, lenguaje: str, _atributos: str) -> str:
     return f'<pre data-lenguaje="{html.escape(lenguaje)}"><code>{marcado}</code></pre>'
 
 
+def _enlazar_proyectos(texto: str) -> str:
+    """Enlaza la primera mención de cada proyecto a su repositorio.
+
+    **Una vez por página**, no en cada aparición: «Argus» sale diez veces en
+    estas páginas y subrayarlas todas convierte la prosa en un campo de minas.
+    La primera vez es donde alguien decide si quiere ir a mirar.
+
+    La excepción son las filas de tabla, donde cada fila es su propio contexto:
+    en la tabla de ejemplos, una columna «Dominio» con el primer «Argus»
+    enlazado y los otros tres en gris parece un error, no una decisión.
+
+    No se toca nada que ya sea código o enlace. Un bloque cercado, un trozo
+    entre comillas invertidas y el texto de un enlace existente se quedan como
+    están: enlazar dentro de ellos rompe el resultado en vez de mejorarlo.
+    """
+    protegido = re.compile(r"(```.*?```|`[^`]*`|\[[^\]]*\]\([^)]*\))", re.S)
+    vistos: set[str] = set()
+
+    def en_prosa(fragmento: str, por_fila: bool) -> str:
+        for clave, (repo, _) in PROYECTOS.items():
+            if clave in vistos and not por_fila:
+                continue
+            patron = re.compile(rf"(?<![\w-]){re.escape(clave)}(?![\w-])")
+            nuevo, sustituidas = patron.subn(f"[{clave}]({GITHUB}/{repo})", fragmento, count=1)
+            if sustituidas:
+                fragmento = nuevo
+                vistos.add(clave)
+        return fragmento
+
+    salida: list[str] = []
+    for bloque in protegido.split(texto):
+        if protegido.fullmatch(bloque or ""):
+            salida.append(bloque)
+            continue
+        # Cada fila de tabla se resuelve por separado; el resto, una vez.
+        lineas = (bloque or "").split("\n")
+        salida.append(
+            "\n".join(
+                en_prosa(linea, por_fila=linea.lstrip().startswith("|")) for linea in lineas
+            )
+        )
+    return "".join(salida)
+
+
 def render(md: Path, todas: list[Path]) -> str:
     from markdown_it import MarkdownIt
 
@@ -330,7 +400,7 @@ def render(md: Path, todas: list[Path]) -> str:
         "commonmark", {"html": False, "linkify": False, "highlight": _resaltar}
     )
     motor.enable("table").enable("strikethrough")
-    cuerpo = motor.render(md.read_text(encoding="utf-8"))
+    cuerpo = motor.render(_enlazar_proyectos(md.read_text(encoding="utf-8")))
 
     # Los enlaces entre páginas apuntan al `.md` —que es lo correcto leyendo el
     # repositorio— y aquí se reescriben al `.html` vecino.

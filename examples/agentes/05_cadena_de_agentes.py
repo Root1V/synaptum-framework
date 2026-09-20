@@ -1,6 +1,7 @@
 """05 · Varios agentes en cadena, cada uno con su contexto.
 
-**Dominio: el pipeline de doblaje** — vídeo en inglés a español, todo local:
+**Dominio: el pipeline de doblaje (Prosodia)** — vídeo en inglés a español, todo
+local:
 Whisper transcribe, pyannote separa hablantes, un LLM traduce con contexto, y
 IndexTTS clona cada voz. Las etapas del medio son las que necesitan criterio, y
 ahí es donde entran los agentes.
