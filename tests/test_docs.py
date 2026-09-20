@@ -105,13 +105,26 @@ def test_every_page_is_linked_from_the_index():
     assert not huerfanas, f"páginas sin enlazar desde el índice: {huerfanas}"
 
 
+def _fuentes_que_pueden_caducar() -> list[Path]:
+    """Documentación y ejemplos: los dos envejecen igual.
+
+    Los ejemplos se quedaron fuera de esta comprobación al principio, y tres de
+    ellos acabaron afirmando que `delegate()` no existía **después** de que
+    existiera. Un ejemplo es documentación que además se ejecuta, así que
+    caduca por las mismas dos vías — y la que no se ejecuta no la ve nadie.
+    """
+    ejemplos = sorted((RAIZ / "examples").rglob("*.py")) if (RAIZ / "examples").exists() else []
+    readmes = sorted((RAIZ / "examples").rglob("README.md")) if (RAIZ / "examples").exists() else []
+    return [*paginas(), *ejemplos, *readmes]
+
+
 def test_the_roadmap_items_the_docs_cite_are_still_open():
     """Documentar algo como pendiente cuando ya está hecho envía a nadie a ninguna parte."""
     roadmap = (RAIZ / "roadmap.md").read_text(encoding="utf-8")
     citados = {
         m.group(1)
-        for pagina in paginas()
-        for m in re.finditer(r"`(SYN-\d+)`", pagina.read_text(encoding="utf-8"))
+        for fuente in _fuentes_que_pueden_caducar()
+        for m in re.finditer(r"`(SYN-\d+)`", fuente.read_text(encoding="utf-8"))
     }
     assert citados, "ninguna página cita un elemento del roadmap"
 
@@ -122,6 +135,25 @@ def test_the_roadmap_items_the_docs_cite_are_still_open():
     assert not ya_hechos, (
         f"la documentación los da por pendientes y el roadmap dice HECHO: {ya_hechos}"
     )
+
+
+def test_every_example_the_docs_point_to_exists():
+    """Una ruta de ejemplo que no existe manda a alguien a un 404 con su primer comando.
+
+    El README llevaba tiempo diciendo `examples/01_agente.py`, que fue cierto
+    hasta que los ejemplos se repartieron en dos pistas. Nadie lo vio porque
+    ningún test mira las rutas que la documentación promete: el comando de
+    «pruébalo» del README era el único que no se ejecutaba nunca.
+    """
+    fuentes = [RAIZ / "README.md", *paginas(), RAIZ / "examples" / "README.md"]
+    rotas = {
+        f"{fuente.name}: {ruta}"
+        for fuente in fuentes
+        if fuente.exists()
+        for ruta in re.findall(r"examples/[\w/]+\.py", fuente.read_text(encoding="utf-8"))
+        if not (RAIZ / ruta).exists()
+    }
+    assert not rotas, f"la documentación apunta a ejemplos que no existen: {sorted(rotas)}"
 
 
 def test_the_reference_matches_the_code():

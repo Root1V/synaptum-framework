@@ -5,13 +5,12 @@ Whisper transcribe, pyannote separa hablantes, un LLM traduce con contexto, y
 IndexTTS clona cada voz. Las etapas del medio son las que necesitan criterio, y
 ahí es donde entran los agentes.
 
-**Lo primero, sin rodeos: `delegate()` no existe todavía** — es `SYN-41`, y el
-tipo `DelegateStep` está escrito pero nada lo emite. Esto no es un problema para
-componer agentes, porque el bucle **es** un generador asíncrono: orquestar varios
-es código async normal, y eso ya funciona. Lo que `SYN-41` añadirá es que la
-delegación quede **en el journal** como un paso propio, con su consumo atribuido.
+**Esto es composición a mano, y sigue siendo la forma correcta aquí.** Delegar
+como primitiva —`Agent(delegates=[…])`, ver el ejemplo 09— sirve cuando **el
+modelo decide** a quién llamar. Cuando el orden lo decides tú, como en una
+cadena fija, componer con asyncio es más simple y más explícito.
 
-La regla que sí se puede seguir hoy, y es la que importa:
+La regla vale para las dos formas:
 
     **Entre agentes viaja el resultado, nunca el historial.**
 
@@ -197,8 +196,9 @@ async def main() -> None:
 #    por separado, y el journal de uno no contamina el del otro.
 # 2. **El brief es texto, no historial.** El revisor recibe 2 frases donde el
 #    traductor manejó una transcripción, un glosario y su razonamiento.
-# 3. **El coste se suma explícitamente.** Hoy lo hace el orquestador; con
-#    `SYN-41` el `DelegateStep` lo atribuirá solo.
+# 3. **El coste se suma explícitamente**, porque aquí el orquestador eres tú.
+#    Delegando como primitiva, el `DelegateStep` lo atribuye solo — es la
+#    diferencia principal entre las dos formas, y está en el ejemplo 09.
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -183,19 +183,33 @@ async def main() -> None:
 # 1. **El coste desaparece de la vista.** `FinalStep.usage` del supervisor mide
 #    *sus* llamadas, no las de dentro. Aquí se suma a mano en `COSTE`, y por eso
 #    el ejemplo imprime las tres cifras: si solo miras la del supervisor, un
-#    sistema que gasta cinco veces más parece igual de barato. Esto es
-#    exactamente lo que `DelegateStep.usage` existe para resolver, y lo que
-#    `SYN-41` conectará al journal.
+#    sistema que gasta cinco veces más parece igual de barato.
 #
-# 2. **Un subagente no es un paso durable.** Si el proceso muere a mitad de un
-#    especialista, al reanudar la herramienta se reejecuta entera — el journal
-#    del supervisor la ve como una llamada, no como un run con sus propios
-#    pasos. Para herramientas de lectura da igual; para una que mueva dinero, no.
+#    **Esto ya está resuelto** si delegas como primitiva en vez de a mano:
+#    `Agent(delegates=[…])` transporta el consumo del subagente en el
+#    `DelegateStep` y lo suma al total del padre. Ver el ejemplo 09.
+#
+# 2. **Un subagente envuelto a mano no es un paso durable.** Si el proceso muere
+#    a mitad de un especialista, al reanudar la herramienta se reejecuta entera
+#    — el journal la ve como una llamada, no como un run con sus propios pasos.
+#    Para lectura da igual; para algo que mueva dinero, no.
+#
+#    **También resuelto delegando como primitiva**: el subagente tiene su propio
+#    diario y no se repite.
 #
 # 3. **El riesgo no se propaga.** `especialista_tesoreria` es `READ` por
-#    defecto aunque por dentro llame a algo que escribe. Hoy hay que declararlo
-#    a mano en el envoltorio; el framework no puede deducirlo, y fingir que sí
-#    sería peor.
+#    defecto aunque por dentro llame a algo que escribe, y aquí hay que
+#    declararlo a mano en el envoltorio.
+#
+#    **Delegando como primitiva sí se deriva**: el riesgo de delegar es el mayor
+#    de lo que el subagente puede hacer. Envolviendo a mano el framework no
+#    puede deducirlo —ve una función que devuelve `str`—; como delegado, sí ve
+#    sus herramientas.
+#
+# Los tres desaparecen con `Agent(delegates=[…])`, que es el ejemplo
+# [`09`](09_delegar.py). Este patrón sigue siendo el correcto cuando lo de
+# dentro **no es un `Agent`**: una API ajena, un servicio heredado, cualquier
+# cosa que no tenga un bucle que ceder.
 
 if __name__ == "__main__":
     asyncio.run(main())

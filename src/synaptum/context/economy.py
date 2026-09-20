@@ -129,7 +129,13 @@ class ContextEconomy:
 
         crecimiento = self.input_growth
         if crecimiento is not None:
-            lineas.append(f"  crecimiento {crecimiento:+,.0f} tokens de entrada por turno")
+            # El mismo separador de millares que el resto del informe: dos
+            # estilos en cuatro líneas hacen dudar de la cifra más que de la
+            # línea.
+            lineas.append(
+                f"  crecimiento {'+' if crecimiento >= 0 else '-'}"
+                f"{_o(abs(round(crecimiento)))} tokens de entrada por turno"
+            )
 
         if self.prefix_rewrites:
             lineas.append(
