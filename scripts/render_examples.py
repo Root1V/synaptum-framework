@@ -16,7 +16,10 @@ Qué hace con cada fichero:
 * los separadores `# ── Título ──` se convierten en secciones, así que el código
   llega troceado y no como un muro de doscientas líneas;
 * el bloque de comentarios del final —«lo que esto enseña»— sube a prosa, que es
-  lo que es. Dejarlo dentro de un `<pre>` lo escondía en gris.
+  lo que es. Dejarlo dentro de un `<pre>` lo escondía en gris;
+* y **cada ejemplo se ejecuta aquí**, para que la página enseñe lo que imprime
+  de verdad. Una salida copiada a mano es una captura de pantalla vieja: se
+  queda igual mientras el programa cambia, y nadie la compara nunca.
 
 Todo lo demás se transcribe **tal cual**. Una página que reordena o resume el
 código deja de servir para lo único que importa aquí: leerlo y correrlo.
@@ -28,7 +31,10 @@ código deja de servir para lo único que importa aquí: leerlo y correrlo.
 from __future__ import annotations
 
 import ast
+import importlib.util
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -37,6 +43,7 @@ EJEMPLOS = RAIZ / "examples"
 DOCS = RAIZ / "docs"
 
 BLOB = "https://github.com/Root1V/synaptum-framework/blob/main"
+ARBOL = "https://github.com/Root1V/synaptum-framework/tree/main"
 
 #: Las dos pistas, en orden de lectura, y numeradas de corrido.
 #:
@@ -48,6 +55,62 @@ PISTAS = [
 ]
 
 SEPARADOR = re.compile(r"^# ── (.+?) ─+\s*$")
+
+#: Ejemplos que necesitan un extra para correr, y cuál.
+#:
+#: Donde el extra no está —en el CI, que instala solo el núcleo— el ejemplo no
+#: se ejecuta y se **conserva** la salida que ya tenía la página. Regenerarla a
+#: ciegas la borraría; volver a ejecutarla sin el extra sería inventarla.
+REQUIERE_EXTRA = {"08_herramientas_mcp.py": "mcp"}
+
+#: Variables que se quitan antes de ejecutar un ejemplo.
+#:
+#: Con credenciales en el entorno, los ejemplos hablan con un modelo de verdad,
+#: y entonces la salida cambia en cada ejecución y cuesta dinero. La página
+#: enseña lo que imprime el doble, que es lo que verá quien lo clone.
+DEL_MODELO = (
+    "AXONIUM_CLIENT_ID", "AXONIUM_CLIENT_SECRET",
+    "SYNAPTUM_BASE_URL", "SYNAPTUM_API_KEY", "SYNAPTUM_MODEL",
+)
+
+#: Cuánto se le da a un ejemplo para terminar. Ninguno pasa de un segundo con el
+#: doble; el tope está para que un cuelgue falle y no deje el CI colgado.
+PLAZO = 120
+
+
+def salida_de(fichero: Path) -> str | None:
+    """Ejecuta el ejemplo y devuelve lo que imprimió.
+
+    ``None`` cuando no se puede ejecutar aquí por un extra que falta — entonces
+    quien llama conserva lo que ya había.
+    """
+    extra = REQUIERE_EXTRA.get(fichero.name)
+    if extra and importlib.util.find_spec(extra) is None:
+        return None
+
+    entorno = {k: v for k, v in os.environ.items() if k not in DEL_MODELO}
+    proceso = subprocess.run(
+        [sys.executable, str(fichero)],
+        capture_output=True, text=True, timeout=PLAZO, env=entorno, cwd=RAIZ,
+    )
+    if proceso.returncode != 0:
+        # Ruidoso a propósito: un ejemplo que no corre es un ejemplo roto, y
+        # publicar su página sin salida lo escondería.
+        raise SystemExit(
+            f"{fichero.relative_to(RAIZ)} falló al ejecutarse "
+            f"(código {proceso.returncode}):\n{proceso.stdout}{proceso.stderr}"
+        )
+    return proceso.stdout.strip("\n")
+
+
+def salida_previa(pagina: Path) -> str:
+    """Rescata el bloque de salida de una página ya generada."""
+    if not pagina.exists():
+        return ""
+    encontrado = re.search(
+        r"## Lo que imprime\n\n```text\n(.*?)\n```", pagina.read_text(encoding="utf-8"), re.S
+    )
+    return encontrado.group(1) if encontrado else ""
 
 
 def fuentes() -> list[tuple[int, Path, str]]:
@@ -94,18 +157,16 @@ def titulo_de(numero: int, doc: str) -> str:
 def _entradilla(doc: str, enlaces: dict[str, str]) -> list[str]:
     """La cadena de documentación, sin su primera línea, ya en Markdown.
 
-    La invocación (`uv run python …`) va sangrada dentro del docstring, que en
-    Markdown sería un bloque de código sin lenguaje: ni resaltado ni botón de
-    copiar, justo en la línea que más se copia. Se convierte en un bloque con
-    lenguaje.
+    La invocación (`uv run python …`) se saca de aquí: tiene su propia sección,
+    con la salida pegada debajo. Dentro del docstring iba sangrada, que en
+    Markdown es un bloque sin lenguaje — ni resaltado ni botón de copiar, justo
+    en la línea que más se copia.
     """
-    lineas = doc.splitlines()[1:]
-    salida: list[str] = []
-    for linea in lineas:
-        if linea.strip().startswith("uv run "):
-            salida += ["```bash", linea.strip(), "```"]
-        else:
-            salida.append(_enlaces(linea, enlaces))
+    salida = [
+        _enlaces(linea, enlaces)
+        for linea in doc.splitlines()[1:]
+        if not linea.strip().startswith("uv run ")
+    ]
     return _sin_bordes(salida)
 
 
@@ -241,7 +302,7 @@ def _sin_bordes(lineas: list[str]) -> list[str]:
     return lineas
 
 
-def render(numero: int, fichero: Path, enlaces: dict[str, str]) -> str:
+def render(numero: int, fichero: Path, enlaces: dict[str, str], salida: str) -> str:
     fuente = fichero.read_text(encoding="utf-8")
     modulo = ast.parse(fuente)
     doc = ast.get_docstring(modulo, clean=True) or fichero.stem
@@ -253,12 +314,31 @@ def render(numero: int, fichero: Path, enlaces: dict[str, str]) -> str:
     lineas = [
         f"# {titulo_de(numero, doc)}",
         "",
-        f"> **Generada de [`{relativa}`]({BLOB}/{relativa}).** El fichero corre; esta página lo",
-        "> transcribe. Si los dos no coinciden, falla un test.",
+        f"> **Esto es un fichero que se ejecuta:** [`{relativa}`]({BLOB}/{relativa}) ↗",
+        "> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.",
         "",
         *_entradilla(doc, enlaces),
         "",
+        "## Cómo correrlo",
+        "",
     ]
+
+    extra = REQUIERE_EXTRA.get(fichero.name)
+    lineas += ["```bash"]
+    if extra:
+        lineas += [f"uv sync --extra {extra}"]
+    lineas += [f"uv run python {relativa}", "```", ""]
+    lineas += [
+        "No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo",
+        "demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.",
+        "Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**",
+        "habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el",
+        "código. Ver [Modelos](04-modelos.md).",
+        "",
+    ]
+
+    if salida:
+        lineas += ["## Lo que imprime", "", "```text", salida, "```", ""]
 
     for titulo, codigo in _secciones(cuerpo):
         cabecera, codigo = _cabecera(codigo)
@@ -272,6 +352,13 @@ def render(numero: int, fichero: Path, enlaces: dict[str, str]) -> str:
         if cola:
             lineas += ["## Lo que esto enseña", "", *_prosa(cola, enlaces), ""]
 
+    lineas += [
+        "---",
+        "",
+        f"**El fichero entero, para clonarlo y tocarlo:** [`{relativa}`]({BLOB}/{relativa}) ↗",
+        "",
+        f"Está en [`examples/`]({ARBOL}/examples) con los otros quince, y todos corren igual.",
+    ]
     return "\n".join(lineas).rstrip() + "\n"
 
 
@@ -288,6 +375,9 @@ def render_indice(entradas: list[tuple[int, Path, str, str, str]]) -> str:
         "",
         "Cada uno está sobre un proyecto real, no sobre un dominio inventado, porque un ejemplo con",
         "`foo` y `bar` enseña la sintaxis y esconde la decisión.",
+        "",
+        "Cada página trae el fichero entero, **lo que imprime al correrlo** —capturado ejecutándolo,",
+        "no escrito a mano— y el enlace a GitHub para clonarlo.",
         "",
         "```bash",
         "uv run python examples/agentes/01_triaje.py",
@@ -350,7 +440,16 @@ def main() -> int:
 
     generadas = {"ejemplos.md": render_indice(entradas)}
     for numero, fichero, _ in lista:
-        generadas[pagina_de(numero, fichero)] = render(numero, fichero, enlaces)
+        nombre = pagina_de(numero, fichero)
+        salida = salida_de(fichero)
+        if salida is None:
+            salida = salida_previa(DOCS / nombre)
+            print(
+                f"  · {fichero.name}: no se ejecuta aquí "
+                f"(falta el extra '{REQUIERE_EXTRA[fichero.name]}'), se conserva su salida",
+                file=sys.stderr,
+            )
+        generadas[nombre] = render(numero, fichero, enlaces, salida)
 
     desfasadas: list[str] = []
     for nombre, contenido in generadas.items():

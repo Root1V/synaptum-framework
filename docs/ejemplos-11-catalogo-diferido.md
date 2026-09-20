@@ -1,7 +1,7 @@
 # 11 · Un catálogo grande sin pagarlo en cada turno
 
-> **Generada de [`examples/agentes/11_catalogo_diferido.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/11_catalogo_diferido.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/agentes/11_catalogo_diferido.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/11_catalogo_diferido.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 **Dominio: Prometheus** — la consola del operador de la plataforma de inferencia
 local. Veinte herramientas: backends, modelos cargados, colas, cuotas, claves.
@@ -17,8 +17,43 @@ Y hay un coste que no es dinero: cuantas más ve el modelo, peor elige.
     buscar_herramientas(consulta)      →  las que encajan, con su esquema
     usar_herramienta(nombre, argumentos)  →  ejecuta la que se eligió
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/agentes/11_catalogo_diferido.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+11 · Un catálogo grande, diferido
+─────────────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  el catálogo entero en el prefijo: 20 herramientas, 3.603 caracteres
+  diferido:                           2 herramientas,   387 caracteres
+
+  ¿merece la pena con este catálogo? True
+  (con menos de quince, no: los dos turnos extra de buscar y usar
+  cuestan una inferencia cada uno, y solo los amortiza un catálogo grande)
+
+  riesgo de `usar_herramienta`: destructive
+  — el despachador hereda el riesgo de **la peor del catálogo**. Sin eso,
+  esconder veinte herramientas detrás de una las blanquearía a todas: el
+  arnés vería una lectura y dejaría pasar `revocar_clave`.
+
+  → buscar_herramientas({"consulta":"modelos cargados vram backend"})
+    ← modelos_cargados: Qué modelos tiene un backend en memoria ahora mismo.
+  → usar_herramienta({"argumentos":"{\"backend\": \"backend-3\"}","nombre":"modelos_cargados"})
+    ← llama-4-scout        38,2 GB  · 412 peticiones/h
+
+  El backend 3 tiene cuatro modelos en memoria y 75,1 GB ocupados. whisper-large-v3 lleva nueve días sin una sola petición y ocupa 3,1 GB: es lo primero que descargaría si hace falta sitio.
 ```
 
 ```python
@@ -224,3 +259,9 @@ reanudación sin decirlo.
 
 Y lo que esto **no** arregla: dos turnos de más. Por eso `merece_la_pena()`
 está expuesto — es mejor poder preguntarlo que descubrirlo en la factura.
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/agentes/11_catalogo_diferido.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/11_catalogo_diferido.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

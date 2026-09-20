@@ -192,8 +192,8 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   <main id="contenido">
 <h1>08 · Herramientas que no escribiste tú</h1>
 <blockquote>
-<p><strong>Generada de <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/08_herramientas_mcp.py"><code>examples/agentes/08_herramientas_mcp.py</code></a>.</strong> El fichero corre; esta página lo
-transcribe. Si los dos no coinciden, falla un test.</p>
+<p><strong>Esto es un fichero que se ejecuta:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/08_herramientas_mcp.py"><code>examples/agentes/08_herramientas_mcp.py</code></a> ↗
+Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.</p>
 </blockquote>
 <p><strong>Dominio: cualquiera de tus repos.</strong> Hasta aquí cada herramienta era una función
 con <code>@tool</code>. En una aplicación real, buena parte de lo que un agente necesita ya
@@ -204,7 +204,38 @@ que <strong>el agente no nota la diferencia</strong>: son herramientas como las 
 <p>Lo que este ejemplo enseña de verdad no es cómo conectarse —son cuatro líneas—
 sino <strong>qué significa que la herramienta sea ajena</strong>. Eso está al final y es la
 parte que importa.</p>
-<pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/agentes/08_herramientas_mcp.py
+<h2>Cómo correrlo</h2>
+<pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>sync<span class="p-w"> </span>--extra<span class="p-w"> </span>mcp
+uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/agentes/08_herramientas_mcp.py
+</code></pre>
+<p>No hace falta configurar nada: sin modelo, las respuestas van guionizadas y <strong>todo lo
+demás es real</strong> — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con <code>AXONIUM_CLIENT_ID</code> o <code>SYNAPTUM_BASE_URL</code> en el entorno, <strong>el mismo fichero sin tocar</strong>
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver <a href="04-modelos.html">Modelos</a>.</p>
+<h2>Lo que imprime</h2>
+<pre data-lenguaje="text"><code>08 · Herramientas MCP
+─────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  el servidor publica 4 herramientas:
+
+   · repo.listar_ficheros   riesgo=read         idempotente=True   Lista los ficheros de una carpeta del repositorio.
+   · repo.leer_fichero      riesgo=read         idempotente=True   Lee las primeras líneas de un fichero del repositorio.
+   · repo.buscar            riesgo=read         idempotente=False  Busca un patrón en los ficheros del repositorio.
+   ⚠ repo.aplicar_parche    riesgo=destructive  idempotente=False  Aplica un parche a un fichero del repositorio.
+
+  marcadas destructivas: ['repo.aplicar_parche']
+  ↳ `repo.aplicar_parche` no anota nada, y eso NO significa inofensiva
+
+  → repo.buscar(patron, extension)
+    src/synaptum/a2a/types.py:52: class AgentCard:
+  → repo.leer_fichero(ruta, lineas)
+    [project]
+
+  El agente vive en `src/synaptum/agent/agent.py` y el paquete se llama synaptum, versión 1.0.0rc2, sin dependencias duras.
+
+  (el servidor se cerró al salir del `async with`)
 </code></pre>
 <pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
 
@@ -321,6 +352,9 @@ aquí va <code>prefix=&quot;repo.&quot;</code>.</p>
 a mandar argumentos que ya no encajan — sin que nada en tu repositorio haya
 cambiado. Es el mismo problema que <code>@tool</code> resuelve derivando el esquema de la
 firma, y con MCP vuelve, porque la firma vive en otro sitio.</p>
+<hr />
+<p><strong>El fichero entero, para clonarlo y tocarlo:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/08_herramientas_mcp.py"><code>examples/agentes/08_herramientas_mcp.py</code></a> ↗</p>
+<p>Está en <a href="https://github.com/Root1V/synaptum-framework/tree/main/examples"><code>examples/</code></a> con los otros quince, y todos corren igual.</p>
 
 <nav class="paginado" aria-label="Paginación"><a class="prev" href="ejemplos-07-agente-como-herramienta.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">07 · Un agente como herramienta de otro, y un supervisor que enruta</span></a><a class="siguiente" href="ejemplos-09-delegar.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">09 · Delegar como primitiva, no como patrón</span></a></nav>
   </main>

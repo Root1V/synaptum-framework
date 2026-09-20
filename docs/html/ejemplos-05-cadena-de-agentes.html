@@ -192,8 +192,8 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   <main id="contenido">
 <h1>05 · Varios agentes en cadena, cada uno con su contexto</h1>
 <blockquote>
-<p><strong>Generada de <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/05_cadena_de_agentes.py"><code>examples/agentes/05_cadena_de_agentes.py</code></a>.</strong> El fichero corre; esta página lo
-transcribe. Si los dos no coinciden, falla un test.</p>
+<p><strong>Esto es un fichero que se ejecuta:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/05_cadena_de_agentes.py"><code>examples/agentes/05_cadena_de_agentes.py</code></a> ↗
+Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.</p>
 </blockquote>
 <p><strong>Dominio: el pipeline de doblaje</strong> — vídeo en inglés a español, todo local:
 Whisper transcribe, pyannote separa hablantes, un LLM traduce con contexto, y
@@ -209,7 +209,26 @@ cadena fija, componer con asyncio es más simple y más explícito.</p>
 <p>Duplicar el contexto de un agente en otro es la forma más cara de equivocarse:
 se paga dos veces por los mismos tokens y el segundo hereda los errores del
 primero sin poder distinguirlos de sus datos.</p>
+<h2>Cómo correrlo</h2>
 <pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/agentes/05_cadena_de_agentes.py
+</code></pre>
+<p>No hace falta configurar nada: sin modelo, las respuestas van guionizadas y <strong>todo lo
+demás es real</strong> — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con <code>AXONIUM_CLIENT_ID</code> o <code>SYNAPTUM_BASE_URL</code> en el entorno, <strong>el mismo fichero sin tocar</strong>
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver <a href="04-modelos.html">Modelos</a>.</p>
+<h2>Lo que imprime</h2>
+<pre data-lenguaje="text"><code>05 · Cadena de agentes
+──────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  traductor  «Mira, no estoy diciendo que sea imposible. Estoy diciendo que nadie lo ha hecho todavía.»
+             registro coloquial · se mantiene «Mira,» por coherencia con seg-0007
+  revisor    corregida · cabe en el hueco: False
+             «Mira, no digo que sea imposible. Digo que nadie lo ha hecho aún.»
+
+  a síntesis «Mira, no digo que sea imposible. Digo que nadie lo ha hecho aún.»
+  coste total del segmento: entrada=500 salida=100
 </code></pre>
 <pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
 
@@ -388,6 +407,9 @@ duraciones y el revisor no ve el razonamiento del traductor: solo su resultado.<
 <pre data-lenguaje="text"><code>Delegando como primitiva, el `DelegateStep` lo atribuye solo — es la
 diferencia principal entre las dos formas, y está en el ejemplo 09.
 </code></pre>
+<hr />
+<p><strong>El fichero entero, para clonarlo y tocarlo:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/05_cadena_de_agentes.py"><code>examples/agentes/05_cadena_de_agentes.py</code></a> ↗</p>
+<p>Está en <a href="https://github.com/Root1V/synaptum-framework/tree/main/examples"><code>examples/</code></a> con los otros quince, y todos corren igual.</p>
 
 <nav class="paginado" aria-label="Paginación"><a class="prev" href="ejemplos-04-agente-que-gasta.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">04 · Un agente que mueve dinero, y el runtime que lo frena</span></a><a class="siguiente" href="ejemplos-06-agentes-en-paralelo.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">06 · Varios agentes a la vez, y uno que decide</span></a></nav>
   </main>

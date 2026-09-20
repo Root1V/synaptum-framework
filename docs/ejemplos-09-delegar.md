@@ -1,7 +1,7 @@
 # 09 · Delegar como primitiva, no como patrón
 
-> **Generada de [`examples/agentes/09_delegar.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/09_delegar.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/agentes/09_delegar.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/09_delegar.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 **Dominio: Aerarium** — el cierre de mes. Hay dos trabajos distintos y no
 conviene mezclarlos en un solo agente: conciliar es leer mucho y decidir poco,
@@ -18,8 +18,45 @@ documenta al final. Este fichero hace lo mismo con una línea distinta —
 
 El tercero es el que no se puede conseguir a mano, y es el que importa.
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/agentes/09_delegar.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+09 · Delegar como primitiva
+───────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  el catálogo del supervisor:
+    conciliador    riesgo=read       argumentos=['brief']
+    tesoreria      riesgo=hard_write argumentos=['brief']
+
+  «tesoreria» sale HARD_WRITE sin que nadie lo declare aquí: el riesgo
+  de delegar es el mayor de lo que el otro puede hacer.
+
+  → delega en conciliador: Concilia el periodo 2026-08.
+    ← conciliador · entrada=200 salida=40
+      su diario vive en 'cierre-2026-08/000001-delegate'
+  → delega en tesoreria: Paga el asiento as-8812 por 1.204.000 micros.
+    ← tesoreria · entrada=200 salida=40
+      su diario vive en 'cierre-2026-08/000003-delegate'
+
+  Agosto queda cerrado con una salvedad: pagado as-8812 (Cloudflare, 1.204.000µ). as-8840 y as-8851 quedan retenidos — un duplicado aparente de nómina y un reembolso sin justificante.
+
+  gasto propio del supervisor: entrada=300 salida=60
+  total del run:               entrada=700 salida=140
+  la diferencia es lo que costaron los especialistas, y sin
+  delegar como primitiva no aparecería en ninguna parte.
 ```
 
 ```python
@@ -246,3 +283,9 @@ herramientas del especialista sí la cruzan cuando las llama, así que un efecto
 destructivo se detiene igual; lo que se pierde es detenerlo antes de pagar la
 inferencia del hijo. Cerrarlo exige un método nuevo en la costura, y eso va
 por el canal de coordinación.
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/agentes/09_delegar.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/09_delegar.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

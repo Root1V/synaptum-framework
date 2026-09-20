@@ -1,7 +1,7 @@
 # 08 · Herramientas que no escribiste tú
 
-> **Generada de [`examples/agentes/08_herramientas_mcp.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/08_herramientas_mcp.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/agentes/08_herramientas_mcp.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/08_herramientas_mcp.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 **Dominio: cualquiera de tus repos.** Hasta aquí cada herramienta era una función
 con `@tool`. En una aplicación real, buena parte de lo que un agente necesita ya
@@ -15,8 +15,44 @@ Lo que este ejemplo enseña de verdad no es cómo conectarse —son cuatro líne
 sino **qué significa que la herramienta sea ajena**. Eso está al final y es la
 parte que importa.
 
+## Cómo correrlo
+
 ```bash
+uv sync --extra mcp
 uv run python examples/agentes/08_herramientas_mcp.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+08 · Herramientas MCP
+─────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  el servidor publica 4 herramientas:
+
+   · repo.listar_ficheros   riesgo=read         idempotente=True   Lista los ficheros de una carpeta del repositorio.
+   · repo.leer_fichero      riesgo=read         idempotente=True   Lee las primeras líneas de un fichero del repositorio.
+   · repo.buscar            riesgo=read         idempotente=False  Busca un patrón en los ficheros del repositorio.
+   ⚠ repo.aplicar_parche    riesgo=destructive  idempotente=False  Aplica un parche a un fichero del repositorio.
+
+  marcadas destructivas: ['repo.aplicar_parche']
+  ↳ `repo.aplicar_parche` no anota nada, y eso NO significa inofensiva
+
+  → repo.buscar(patron, extension)
+    src/synaptum/a2a/types.py:52: class AgentCard:
+  → repo.leer_fichero(ruta, lineas)
+    [project]
+
+  El agente vive en `src/synaptum/agent/agent.py` y el paquete se llama synaptum, versión 1.0.0rc2, sin dependencias duras.
+
+  (el servidor se cerró al salir del `async with`)
 ```
 
 ```python
@@ -147,3 +183,9 @@ aquí va `prefix="repo."`.
 a mandar argumentos que ya no encajan — sin que nada en tu repositorio haya
 cambiado. Es el mismo problema que `@tool` resuelve derivando el esquema de la
 firma, y con MCP vuelve, porque la firma vive en otro sitio.
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/agentes/08_herramientas_mcp.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/08_herramientas_mcp.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

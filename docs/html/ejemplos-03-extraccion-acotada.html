@@ -192,8 +192,8 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   <main id="contenido">
 <h1>03 · Un bucle acotado, y qué pasa cuando el modelo se equivoca</h1>
 <blockquote>
-<p><strong>Generada de <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/03_extraccion_acotada.py"><code>examples/agentes/03_extraccion_acotada.py</code></a>.</strong> El fichero corre; esta página lo
-transcribe. Si los dos no coinciden, falla un test.</p>
+<p><strong>Esto es un fichero que se ejecuta:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/03_extraccion_acotada.py"><code>examples/agentes/03_extraccion_acotada.py</code></a> ↗
+Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.</p>
 </blockquote>
 <p><strong>Dominio: la plataforma de inteligencia documental</strong> — extracción agéntica
 <em>acotada</em> sobre boletas de pago, con validación determinista detrás. Su README lo
@@ -206,7 +206,27 @@ falla, el error vuelve al modelo para que rectifique en vez de propagarse.</li>
 </ul>
 <p>Lo que este ejemplo añade sobre el 02: <strong>el camino de error</strong>. Un agente que solo
 se prueba cuando acierta no está probado.</p>
+<h2>Cómo correrlo</h2>
 <pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/agentes/03_extraccion_acotada.py
+</code></pre>
+<p>No hace falta configurar nada: sin modelo, las respuestas van guionizadas y <strong>todo lo
+demás es real</strong> — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con <code>AXONIUM_CLIENT_ID</code> o <code>SYNAPTUM_BASE_URL</code> en el entorno, <strong>el mismo fichero sin tocar</strong>
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver <a href="04-modelos.html">Modelos</a>.</p>
+<h2>Lo que imprime</h2>
+<pre data-lenguaje="text"><code>03 · Extracción acotada, con el camino de error
+───────────────────────────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  → leer_pagina
+  → validar_ruc
+
+  ROSA MERCEDES QUISPE HUAMAN · 2026-09
+  bruto 4,302.50 − descuentos 548.55 = neto 3,753.95
+  ✓ el neto cuadra con bruto − descuentos
+
+  llamadas al modelo: 3 (una se perdió en un JSON truncado y se reintentó sola)
 </code></pre>
 <pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
 
@@ -333,6 +353,9 @@ se prueba cuando acierta no está probado.</p>
 reintento</strong>. Un objeto mal formado no es un fallo del run, es una muestra
 mala — y el bucle lo sabe porque la taxonomía de errores lo dice, no porque
 alguien escribiera un <code>try</code> aquí.</p>
+<hr />
+<p><strong>El fichero entero, para clonarlo y tocarlo:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/03_extraccion_acotada.py"><code>examples/agentes/03_extraccion_acotada.py</code></a> ↗</p>
+<p>Está en <a href="https://github.com/Root1V/synaptum-framework/tree/main/examples"><code>examples/</code></a> con los otros quince, y todos corren igual.</p>
 
 <nav class="paginado" aria-label="Paginación"><a class="prev" href="ejemplos-02-causa-raiz.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">02 · Varias herramientas y una respuesta tipada</span></a><a class="siguiente" href="ejemplos-04-agente-que-gasta.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">04 · Un agente que mueve dinero, y el runtime que lo frena</span></a></nav>
   </main>

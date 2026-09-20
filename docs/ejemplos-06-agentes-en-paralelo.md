@@ -1,7 +1,7 @@
 # 06 · Varios agentes a la vez, y uno que decide
 
-> **Generada de [`examples/agentes/06_agentes_en_paralelo.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/06_agentes_en_paralelo.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/agentes/06_agentes_en_paralelo.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/06_agentes_en_paralelo.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 **Dominio: Argus bajo tormenta** — 10.446 señales se deduplican en 45
 notificaciones. Cuando cae un servicio central, media plataforma se queja a la
@@ -15,8 +15,35 @@ El patrón es **orchestrator-worker**, y hoy se escribe con `asyncio.gather`
 porque el bucle de cada agente es un generador asíncrono de verdad — el motor es
 `await`, no una cola de mensajes. Nada que aprender más allá de asyncio.
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/agentes/06_agentes_en_paralelo.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+06 · Agentes en paralelo
+────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  tres líneas a la vez…
+
+  red          descartada       cero conexiones rechazadas y rtt normal: la red está sana
+  despliegue   VIVA (75%)       2.7.0 entró a las 02:09, cinco minutos antes del síntoma
+  recursos     VIVA (80%)       61.2 de 64 GB de RAM: el host está al límite
+
+  síntesis   El despliegue 2.7.0 y la RAM al límite son la misma causa, no dos: subió el número de modelos residentes por encima de lo que cabe en 64 GB. Revertir 2.7.0 resuelve las dos.
+
+  reloj: 0.3s en paralelo frente a ~0.9s en serie
+  coste: entrada=700 salida=140 — el mismo que en serie, porque los tokens no saben de concurrencia
 ```
 
 ```python
@@ -191,3 +218,9 @@ de trabajadores.
 deja explotar a propósito, porque en un incidente un investigador mudo es
 peor que uno que grita.
 ```
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/agentes/06_agentes_en_paralelo.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/06_agentes_en_paralelo.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

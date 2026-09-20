@@ -1,13 +1,46 @@
 # 15 · Un paso destructivo se detiene, alguien decide, y el run sigue donde estaba
 
-> **Generada de [`examples/propiedades/03_aprobacion.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/03_aprobacion.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/propiedades/03_aprobacion.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/03_aprobacion.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 Aquí es donde la durabilidad deja de ser una optimización de coste: **no se le
 pregunta dos veces a una persona porque el proceso se cayó.**
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/propiedades/03_aprobacion.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+03 · Aprobación humana a mitad de un run
+────────────────────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  1ª vuelta    tool → require_approval · destructive_requires_human
+  1ª vuelta    detenido · herramienta 'transferir'
+               transferencias hechas: 0
+               journal: 5 eventos · el run queda suspendido
+
+  … alguien mira la petición y la aprueba …
+
+  2ª vuelta    modelo ×1 · transferencias hechas: 1
+
+  Transferencia completada.
+  efecto       250.00 € → ES76 0049 1500 05 · exactamente una vez
+
+  Sin esto, reanudar un run suspendido levantaba UncertainEffect: el
+  replay veía intención sin resultado y lo leía como «no se sabe si
+  ejecutó». Pero aquí no hay incertidumbre — se denegó ANTES de
+  ejecutar, así que la denegación se registra como desenlace del paso.
 ```
 
 ```python
@@ -144,3 +177,9 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/propiedades/03_aprobacion.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/03_aprobacion.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

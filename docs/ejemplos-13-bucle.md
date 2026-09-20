@@ -1,14 +1,39 @@
 # 13 · El bucle entero, en un fichero
 
-> **Generada de [`examples/propiedades/01_bucle.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/01_bucle.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/propiedades/01_bucle.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/01_bucle.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 Un agente con dos herramientas que responde una pregunta sobre un repositorio.
 Lo interesante no es la tarea: es que **todo lo que el agente hace pasa por el
 stream de eventos**, así que verlo es hacer `async for`.
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/propiedades/01_bucle.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+01 · El bucle entero
+────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  modelo       input=100 · output=20 · cache_read=0
+  herramienta  contar_lineas(fichero='README.md')
+  ↳            README.md: 226 líneas
+  modelo       input=100 · output=20 · cache_read=0
+
+  El README.md: 226 líneas.
+
+  total        input=200 · output=40 · cache_read=0
 ```
 
 ```python
@@ -137,3 +162,9 @@ def _consumo(u) -> str:
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/propiedades/01_bucle.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/01_bucle.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.

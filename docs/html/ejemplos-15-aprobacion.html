@@ -192,12 +192,40 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   <main id="contenido">
 <h1>15 · Un paso destructivo se detiene, alguien decide, y el run sigue donde estaba</h1>
 <blockquote>
-<p><strong>Generada de <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/03_aprobacion.py"><code>examples/propiedades/03_aprobacion.py</code></a>.</strong> El fichero corre; esta página lo
-transcribe. Si los dos no coinciden, falla un test.</p>
+<p><strong>Esto es un fichero que se ejecuta:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/03_aprobacion.py"><code>examples/propiedades/03_aprobacion.py</code></a> ↗
+Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.</p>
 </blockquote>
 <p>Aquí es donde la durabilidad deja de ser una optimización de coste: <strong>no se le
 pregunta dos veces a una persona porque el proceso se cayó.</strong></p>
+<h2>Cómo correrlo</h2>
 <pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/propiedades/03_aprobacion.py
+</code></pre>
+<p>No hace falta configurar nada: sin modelo, las respuestas van guionizadas y <strong>todo lo
+demás es real</strong> — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con <code>AXONIUM_CLIENT_ID</code> o <code>SYNAPTUM_BASE_URL</code> en el entorno, <strong>el mismo fichero sin tocar</strong>
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver <a href="04-modelos.html">Modelos</a>.</p>
+<h2>Lo que imprime</h2>
+<pre data-lenguaje="text"><code>03 · Aprobación humana a mitad de un run
+────────────────────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  1ª vuelta    tool → require_approval · destructive_requires_human
+  1ª vuelta    detenido · herramienta 'transferir'
+               transferencias hechas: 0
+               journal: 5 eventos · el run queda suspendido
+
+  … alguien mira la petición y la aprueba …
+
+  2ª vuelta    modelo ×1 · transferencias hechas: 1
+
+  Transferencia completada.
+  efecto       250.00 € → ES76 0049 1500 05 · exactamente una vez
+
+  Sin esto, reanudar un run suspendido levantaba UncertainEffect: el
+  replay veía intención sin resultado y lo leía como «no se sabe si
+  ejecutó». Pero aquí no hay incertidumbre — se denegó ANTES de
+  ejecutar, así que la denegación se registra como desenlace del paso.
 </code></pre>
 <pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
 
@@ -332,6 +360,9 @@ pregunta dos veces a una persona porque el proceso se cayó.</strong></p>
 <span class="p-k">if</span> <span class="p-vm">__name__</span> <span class="p-o">==</span> <span class="p-s2">"__main__"</span><span class="p-p">:</span>
     <span class="p-n">asyncio</span><span class="p-o">.</span><span class="p-n">run</span><span class="p-p">(</span><span class="p-n">main</span><span class="p-p">())</span>
 </code></pre>
+<hr />
+<p><strong>El fichero entero, para clonarlo y tocarlo:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/propiedades/03_aprobacion.py"><code>examples/propiedades/03_aprobacion.py</code></a> ↗</p>
+<p>Está en <a href="https://github.com/Root1V/synaptum-framework/tree/main/examples"><code>examples/</code></a> con los otros quince, y todos corren igual.</p>
 
 <nav class="paginado" aria-label="Paginación"><a class="prev" href="ejemplos-14-durabilidad.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">14 · Matar el proceso a mitad y reanudar sin volver a pagar la inferencia</span></a><a class="siguiente" href="ejemplos-16-streaming.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">16 · Ver los tokens según llegan, y cortar a mitad</span></a></nav>
   </main>

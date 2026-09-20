@@ -8,6 +8,9 @@ sin tocar** habla con un modelo de verdad.
 Cada uno está sobre un proyecto real, no sobre un dominio inventado, porque un ejemplo con
 `foo` y `bar` enseña la sintaxis y esconde la decisión.
 
+Cada página trae el fichero entero, **lo que imprime al correrlo** —capturado ejecutándolo,
+no escrito a mano— y el enlace a GitHub para clonarlo.
+
 ```bash
 uv run python examples/agentes/01_triaje.py
 ```

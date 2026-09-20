@@ -192,8 +192,8 @@ pre[data-lenguaje]::after { transition: opacity .13s; }
   <main id="contenido">
 <h1>10 · Lo que el modelo ve en cada turno, y lo que cuesta</h1>
 <blockquote>
-<p><strong>Generada de <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/10_economia_del_contexto.py"><code>examples/agentes/10_economia_del_contexto.py</code></a>.</strong> El fichero corre; esta página lo
-transcribe. Si los dos no coinciden, falla un test.</p>
+<p><strong>Esto es un fichero que se ejecuta:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/10_economia_del_contexto.py"><code>examples/agentes/10_economia_del_contexto.py</code></a> ↗
+Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.</p>
 </blockquote>
 <p><strong>Dominio: Argus</strong> — depurar un incidente mirando logs. La herramienta devuelve
 lo que devuelve: 150.000 caracteres de una ventana de cinco minutos. El modelo
@@ -206,7 +206,71 @@ economy(estado)            qué costó el run y **por qué**
 </code></pre>
 <p>Ninguna de las tres inventa nada: si nadie midió la caché, el informe lo dice en
 vez de escribir un cero.</p>
+<h2>Cómo correrlo</h2>
 <pre data-lenguaje="bash"><code>uv<span class="p-w"> </span>run<span class="p-w"> </span>python<span class="p-w"> </span>examples/agentes/10_economia_del_contexto.py
+</code></pre>
+<p>No hace falta configurar nada: sin modelo, las respuestas van guionizadas y <strong>todo lo
+demás es real</strong> — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con <code>AXONIUM_CLIENT_ID</code> o <code>SYNAPTUM_BASE_URL</code> en el entorno, <strong>el mismo fichero sin tocar</strong>
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver <a href="04-modelos.html">Modelos</a>.</p>
+<h2>Lo que imprime</h2>
+<pre data-lenguaje="text"><code>10 · Economía del contexto
+──────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  la herramienta devolvió      45.472 caracteres
+  al modelo le llegan          16.000 caracteres
+
+  y el recorte lo dice, en vez de terminar en mitad de una línea:
+
+    [… recortado: 29.472 de 45.472 caracteres. Pide un rango concreto si necesitas lo que falta …]
+
+  Cabeza **y** cola, no los primeros 16.000 caracteres: en un volcado
+  de logs el final es donde está el fallo, y cortar por delante lo tira.
+  El journal guarda el resultado entero pase lo que pase — esto solo
+  decide qué se le **reenvía** al modelo en cada turno posterior.
+
+  ── el mismo run, con el tope y sin él ──
+
+    turno 1: sin tope       188  ·  con tope       188
+    turno 2: sin tope    45.660  ·  con tope    16.188
+
+  El turno 1 es idéntico: el volcado todavía no ha vuelto. La
+  diferencia aparece en el 2 — y se pagaría **otra vez** en el 3, en el
+  4 y en todos los demás, porque el historial se reenvía entero.
+
+  ── el informe del run ──
+
+Run con-tope · 2 turnos
+  caché      0% de la entrada servida de caché
+  crecimiento +0 tokens de entrada por turno
+  prefijo    estable durante todo el run
+  total      entrada=200 salida=40 caché=0
+
+  Con el doble los números son los del guion —declara `cache_read=0`,
+  un cero **medido**— así que lo que enseña el informe es su forma. Un
+  proveedor que no reporte caché saldría «sin medir», que es distinto de
+  cero y el informe no los confunde. Contra la plataforma real estas
+  cifras son reales: exporta las credenciales y vuelve a correrlo.
+
+  ── y el mismo agente, con la hora en las instrucciones ──
+
+  huella del prefijo: 507a5687c0def2fb → 43f597f9f1e535b5
+  qué cambió:         instrucciones de sistema: cambiaron
+
+  Eso no dice «la huella no coincide», que no sirve para nada: dice
+  qué arreglar. Y así es como sale en el informe de un run:
+
+Run con-reloj · 2 turnos
+  caché      0% de la entrada servida de caché
+  crecimiento +0 tokens de entrada por turno
+  ⚠ prefijo  reescrito 1 vez/veces — cada una tira toda la caché posterior
+      · 000002-model: instrucciones de sistema: cambiaron
+  total      entrada=200 salida=40 caché=0
+
+  Nadie escribió un error y nada falló. Lo único que pasó es que la
+  factura es más alta de lo que debería, y eso no se nota mirando un run.
 </code></pre>
 <pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
 
@@ -388,10 +452,21 @@ muchísimo más de lo que hacía falta.</p>
         <span class="p-s2">"depurador"</span><span class="p-p">,</span> <span class="p-n">model</span><span class="p-o">=</span><span class="p-n">nombre_del_modelo</span><span class="p-p">(),</span> <span class="p-n">tools</span><span class="p-o">=</span><span class="p-p">[</span><span class="p-n">leer_logs</span><span class="p-p">]</span>
     <span class="p-p">)</span>
 
-    <span class="p-c1"># El mecanismo, sin depender de que el modelo haga nada: dos peticiones</span>
-    <span class="p-c1"># construidas con un instante de diferencia, y sus huellas.</span>
-    <span class="p-n">antes</span> <span class="p-o">=</span> <span class="p-n">Request</span><span class="p-p">(</span><span class="p-n">model</span><span class="p-o">=</span><span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">model</span><span class="p-p">,</span> <span class="p-n">system</span><span class="p-o">=</span><span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">instructions</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-o">=</span><span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">tools</span><span class="p-p">)</span>
-    <span class="p-n">ahora</span> <span class="p-o">=</span> <span class="p-n">Request</span><span class="p-p">(</span><span class="p-n">model</span><span class="p-o">=</span><span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">model</span><span class="p-p">,</span> <span class="p-n">system</span><span class="p-o">=</span><span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">instructions</span><span class="p-p">,</span> <span class="p-n">tools</span><span class="p-o">=</span><span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">tools</span><span class="p-p">)</span>
+    <span class="p-c1"># El mecanismo, sin depender de que el modelo haga nada: dos turnos del</span>
+    <span class="p-c1"># mismo agente, y sus huellas.</span>
+    <span class="p-c1">#</span>
+    <span class="p-c1"># Las dos horas van escritas en vez de leer el reloj **para que este ejemplo</span>
+    <span class="p-c1"># imprima siempre lo mismo**. En un run de verdad las pone `datetime.now()`</span>
+    <span class="p-c1"># —como hace `ConLaHoraDentro` unas líneas más abajo— y cambian solas en</span>
+    <span class="p-c1"># cada turno, que es justamente el problema.</span>
+    <span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">turno</span><span class="p-p">(</span><span class="p-n">hora</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Request</span><span class="p-p">:</span>
+        <span class="p-k">return</span> <span class="p-n">Request</span><span class="p-p">(</span>
+            <span class="p-n">model</span><span class="p-o">=</span><span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">model</span><span class="p-p">,</span>
+            <span class="p-n">system</span><span class="p-o">=</span><span class="p-sa">f</span><span class="p-s2">"Depuras incidentes de una plataforma de inferencia. Ahora son las </span><span class="p-si">{</span><span class="p-n">hora</span><span class="p-si">}</span><span class="p-s2">."</span><span class="p-p">,</span>
+            <span class="p-n">tools</span><span class="p-o">=</span><span class="p-n">agente</span><span class="p-o">.</span><span class="p-n">tools</span><span class="p-p">,</span>
+        <span class="p-p">)</span>
+
+    <span class="p-n">antes</span><span class="p-p">,</span> <span class="p-n">ahora</span> <span class="p-o">=</span> <span class="p-n">turno</span><span class="p-p">(</span><span class="p-s2">"02:14:07.100"</span><span class="p-p">),</span> <span class="p-n">turno</span><span class="p-p">(</span><span class="p-s2">"02:14:07.842"</span><span class="p-p">)</span>
 
     <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"  huella del prefijo: </span><span class="p-si">{</span><span class="p-n">prefix_fingerprint</span><span class="p-p">(</span><span class="p-n">antes</span><span class="p-p">)</span><span class="p-si">}</span><span class="p-s2"> → </span><span class="p-si">{</span><span class="p-n">prefix_fingerprint</span><span class="p-p">(</span><span class="p-n">ahora</span><span class="p-p">)</span><span class="p-si">}</span><span class="p-s2">"</span><span class="p-p">)</span>
     <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"  qué cambió:         </span><span class="p-si">{</span><span class="p-n">describe_prefix_change</span><span class="p-p">(</span><span class="p-n">antes</span><span class="p-p">,</span><span class="p-w"> </span><span class="p-n">ahora</span><span class="p-p">)</span><span class="p-si">}</span><span class="p-s2">"</span><span class="p-p">)</span>
@@ -468,6 +543,9 @@ sistema cambiaron».</p>
 Sin saber cuánto se está sirviendo de caché, conservar el historial parece caro
 cuando a menudo es casi gratis, y resumirlo parece barato cuando cuesta una
 inferencia y pierde información.</p>
+<hr />
+<p><strong>El fichero entero, para clonarlo y tocarlo:</strong> <a href="https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/10_economia_del_contexto.py"><code>examples/agentes/10_economia_del_contexto.py</code></a> ↗</p>
+<p>Está en <a href="https://github.com/Root1V/synaptum-framework/tree/main/examples"><code>examples/</code></a> con los otros quince, y todos corren igual.</p>
 
 <nav class="paginado" aria-label="Paginación"><a class="prev" href="ejemplos-09-delegar.html" rel="prev"><span class="etiqueta">Anterior</span><span class="nombre">09 · Delegar como primitiva, no como patrón</span></a><a class="siguiente" href="ejemplos-11-catalogo-diferido.html" rel="siguiente"><span class="etiqueta">Siguiente</span><span class="nombre">11 · Un catálogo grande sin pagarlo en cada turno</span></a></nav>
   </main>

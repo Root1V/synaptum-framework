@@ -1,7 +1,7 @@
 # 07 · Un agente como herramienta de otro, y un supervisor que enruta
 
-> **Generada de [`examples/agentes/07_agente_como_herramienta.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/07_agente_como_herramienta.py).** El fichero corre; esta página lo
-> transcribe. Si los dos no coinciden, falla un test.
+> **Esto es un fichero que se ejecuta:** [`examples/agentes/07_agente_como_herramienta.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/07_agente_como_herramienta.py) ↗
+> Esta página lo transcribe y enseña lo que imprime. Si dejan de coincidir, falla un test.
 
 **Dominio: la mesa de entrada de tu portafolio.** Llega una petición en lenguaje
 natural y puede ser de tres sitios distintos: un incidente de Argus, un documento
@@ -13,8 +13,35 @@ framework para esto — un `@tool` es una función asíncrona, y un agente se
 ejecuta con `async for`. Pero tiene consecuencias que conviene entender antes de
 usarlo, y están al final del fichero.
 
+## Cómo correrlo
+
 ```bash
 uv run python examples/agentes/07_agente_como_herramienta.py
+```
+
+No hace falta configurar nada: sin modelo, las respuestas van guionizadas y **todo lo
+demás es real** — las herramientas se ejecutan, el journal se escribe, el consumo se mide.
+Con `AXONIUM_CLIENT_ID` o `SYNAPTUM_BASE_URL` en el entorno, **el mismo fichero sin tocar**
+habla con un modelo de verdad; lo que cambia entonces es lo que diga el modelo, no el
+código. Ver [Modelos](04-modelos.md).
+
+## Lo que imprime
+
+```text
+07 · Un agente como herramienta
+───────────────────────────────
+sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un modelo real)
+
+  petición   ¿Por qué va lento el gateway de inferencia y cuánto saldo le queda al agente agt-7741?
+
+  ↳ delega a observabilidad
+  ↳ delega a tesoreria
+
+  El gateway recarga el modelo en cada petición —5.9s de los 6.4s del p95—, y agt-7741 tiene 4.812.400µ disponibles con 150.000µ retenidos.
+
+  coste supervisor   entrada=300
+  coste especialistas entrada=400
+  coste real         entrada=700
 ```
 
 ```python
@@ -224,3 +251,9 @@ Los tres desaparecen con `Agent(delegates=[…])`, que es el ejemplo
 [`09`](ejemplos-09-delegar.md). Este patrón sigue siendo el correcto cuando lo de
 dentro **no es un `Agent`**: una API ajena, un servicio heredado, cualquier
 cosa que no tenga un bucle que ceder.
+
+---
+
+**El fichero entero, para clonarlo y tocarlo:** [`examples/agentes/07_agente_como_herramienta.py`](https://github.com/Root1V/synaptum-framework/blob/main/examples/agentes/07_agente_como_herramienta.py) ↗
+
+Está en [`examples/`](https://github.com/Root1V/synaptum-framework/tree/main/examples) con los otros quince, y todos corren igual.
