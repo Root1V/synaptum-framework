@@ -215,7 +215,8 @@
    "remaining_requests": "int | None",
    "remaining_tokens": "int | None",
    "reset_requests": "int | None",
-   "reset_tokens": "int | None"
+   "reset_tokens": "int | None",
+   "scope": "str | None"
   },
   "RequestUsage": {
    "cost_usd": "float | None",
@@ -246,13 +247,15 @@
    "relevance_score": "float | None"
   },
   "ResponseMeta": {
+   "attempts": "<class 'int'>",
    "idempotent_replay": "<class 'bool'>",
    "idempotent_replay_of": "str | None",
    "instance": "str | None",
    "instance_id": "str | None",
    "rate_limit": "axonium.models.common.RateLimitSnapshot | None",
    "request_id": "str | None",
-   "trace_id": "str | None"
+   "trace_id": "str | None",
+   "waited_s": "<class 'float'>"
   },
   "StreamChoice": {
    "delta": "axonium.models.chat.ChoiceDelta | None",
@@ -290,5 +293,5 @@
    "total_tokens": "int | None"
   }
  },
- "version": "1.0.0rc4"
+ "version": "1.0.0rc5"
 }

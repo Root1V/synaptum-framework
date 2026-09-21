@@ -371,6 +371,23 @@ def test_a_replay_names_the_generation_that_was_actually_billed():
     assert respuesta.provider_metadata["idempotent_replay_of"] == "req-original"
 
 
+def test_the_wait_the_sdk_did_on_purpose_reaches_the_journal():
+    """Hay dos reintentos apilados: el del SDK y el nuestro encima.
+
+    Sin `waited_s` y `attempts`, una llamada que tardó porque el SDK respetó un
+    `Retry-After` es indistinguible de una plataforma lenta. Tres equipos la
+    reportaron como un cuelgue y ninguno como espera.
+    """
+    respuesta = asyncio.run(
+        AxoniumModel(client=_ClienteFalso(_con_meta(
+            request_id="req-1", waited_s=12.5, attempts=3,
+        ))).complete(Request(model="axonium:m"))
+    )
+
+    assert respuesta.provider_metadata["waited_s"] == 12.5
+    assert respuesta.provider_metadata["attempts"] == 3
+
+
 def test_a_replay_served_through_the_gateway_is_not_counted_twice():
     """De punta a punta: puente → LocalGateway → bucle.
 
