@@ -390,6 +390,10 @@ def _translate(failure: Exception) -> Exception:
         status=status,
         provider="axonium",
         retry_after=float(espera) if espera is not None else None,
+        # El SDK ya los trae; iban solo dentro del texto del mensaje, que es
+        # donde van las cosas que nadie puede leer con un programa.
+        request_id=getattr(failure, "request_id", None),
+        trace_id=getattr(failure, "trace_id", None),
     )
 
 

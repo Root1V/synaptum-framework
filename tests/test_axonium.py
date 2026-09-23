@@ -15,7 +15,14 @@ pytest.importorskip("axonium", reason="extra 'axonium' no instalado")
 
 from axonium import ChatCompletion, Usage as AxUsage  # noqa: E402
 
-from synaptum import FinishReason, Request, Response, Thinking, ToolCall  # noqa: E402
+from synaptum import (  # noqa: E402
+    FinishReason,
+    ProviderError,
+    Request,
+    Response,
+    Thinking,
+    ToolCall,
+)
 from synaptum.providers.axonium import (  # noqa: E402
     AxoniumModel,
     message_from_axonium,
@@ -369,6 +376,27 @@ def test_a_replay_names_the_generation_that_was_actually_billed():
     )
 
     assert respuesta.provider_metadata["idempotent_replay_of"] == "req-original"
+
+
+def test_a_failure_carries_the_id_that_makes_it_diagnosable():
+    """Sin `request_id`, un fallo del otro lado es una descripción.
+
+    Quien opera la plataforma no puede buscar «un 500 de hace tres días»: busca
+    un identificador. Lo traía el SDK y nosotros lo dejábamos dentro del texto
+    del mensaje, que es donde van las cosas que nadie lee con un programa.
+    """
+    from axonium.errors import APIError
+
+    from synaptum.providers.axonium import _translate
+
+    traducido = _translate(APIError(
+        "boom", status=500, request_id="req-envenenado", trace_id="tr-9",
+    ))
+
+    assert isinstance(traducido, ProviderError)
+    assert traducido.request_id == "req-envenenado"
+    assert traducido.trace_id == "tr-9"
+    assert traducido.status == 500
 
 
 def test_the_wait_the_sdk_did_on_purpose_reaches_the_journal():
