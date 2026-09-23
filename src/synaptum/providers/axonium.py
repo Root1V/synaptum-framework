@@ -333,6 +333,20 @@ def metadata_from_axonium(source: Any) -> dict[str, Any]:
             # él una auditoría que parta del request_id de un replay no
             # encuentra nada y no sabe por qué.
             "idempotent_replay_of",
+            # Cuánto esperó el SDK a propósito, y en cuántos intentos (`rc5`).
+            #
+            # Nos importa más que a nadie porque **hay dos reintentos apilados**:
+            # el suyo, dentro de una llamada, y el nuestro encima. Sin esto, una
+            # llamada que tardó veinte segundos porque el SDK respetó un
+            # `Retry-After` es indistinguible de una plataforma lenta — tres
+            # equipos ya la reportaron como un cuelgue, y ninguno como espera.
+            #
+            # Restado del reloj de fuera queda lo que tardó la plataforma. No se
+            # usa para decidir nada todavía; entra ahora porque el sitio donde
+            # hay que mirarlo es el journal, y al journal solo llega lo que se
+            # recoge en el momento.
+            "waited_s",
+            "attempts",
         )
     }
     return {campo: valor for campo, valor in recogido.items() if valor is not None}
@@ -376,6 +390,10 @@ def _translate(failure: Exception) -> Exception:
         status=status,
         provider="axonium",
         retry_after=float(espera) if espera is not None else None,
+        # El SDK ya los trae; iban solo dentro del texto del mensaje, que es
+        # donde van las cosas que nadie puede leer con un programa.
+        request_id=getattr(failure, "request_id", None),
+        trace_id=getattr(failure, "trace_id", None),
     )
 
 

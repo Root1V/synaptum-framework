@@ -98,6 +98,18 @@ class ProviderError(SynaptumError):
 
     Cuando no se pasa ``retryable`` explícito, se deduce del estado según la
     regla de clasificación.  Un error sin estado se considera transitorio.
+
+    ``request_id`` y ``trace_id`` son **lo único que hace diagnosticable un
+    fallo del otro lado**.  Iban dentro del texto del mensaje, que es donde van
+    las cosas que nadie puede leer con un programa: para reportar un fallo a
+    quien opera la plataforma hay que darle el identificador de esa respuesta,
+    y sacarlo de una cadena con una expresión regular no es una interfaz.
+
+    Salió de un caso real: una clave de idempotencia quedó ligada a una
+    respuesta de error y devolvía ese error durante horas. Quien opera la
+    plataforma pidió el ``request_id`` de una de ellas para buscarla en su
+    almacén, y no lo teníamos — estaba en el texto de una excepción que nadie
+    guardó.
     """
 
     def __init__(
@@ -108,9 +120,13 @@ class ProviderError(SynaptumError):
         provider: str = "",
         retryable: bool | None = None,
         retry_after: float | None = None,
+        request_id: str | None = None,
+        trace_id: str | None = None,
     ) -> None:
         self.status = status
         self.provider = provider
+        self.request_id = request_id
+        self.trace_id = trace_id
         resolved = retryable if retryable is not None else retryable_for_status(status)
         super().__init__(message, retryable=resolved, retry_after=retry_after)
 
