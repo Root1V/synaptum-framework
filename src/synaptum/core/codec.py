@@ -133,14 +133,62 @@ def _decode_dataclass(klass: type, payload: Mapping[str, Any]) -> Any:
     return klass(**kwargs)
 
 
+def unwrap_outcome(payload: Mapping[str, Any]) -> tuple[Any, str, Mapping[str, Any] | None]:
+    """Abre la envoltura de desenlace que escribe el arnés.
+
+    El ``payload`` de un registro deja de ser el resultado y pasa a ser
+    ``{outcome, reason, result}``. Devuelve ``(outcome, reason, contenido)``,
+    donde el contenido es ``None`` en un desenlace sin resultado.
+
+    **Un payload sin ``outcome`` significa ``result``**, y no es tolerancia: hay
+    diarios ya escritos y leerlos de otra forma dejaría colgado un paso que sí
+    se ejecutó.
+
+    Y en un paso denegado la clave ``result`` está **ausente**, no nula. Es lo
+    que impide el modo de fallo del propio arreglo: quien no mire ``outcome`` no
+    debe encontrarse algo con forma de resultado de una llamada que no ocurrió.
+    """
+    from .events import Outcome
+
+    # La envoltura se reconoce por **no traer discriminante**: nuestros eventos
+    # siempre llevan `kind`, y desde `SYN-80` llevan también `outcome`, así que
+    # mirar solo `outcome` confundía cualquier evento nuestro con una envoltura.
+    if "kind" in payload or "outcome" not in payload:
+        return Outcome.RESULT, "", payload
+
+    contenido = payload.get("result")
+    return (
+        Outcome(payload["outcome"]),
+        str(payload.get("reason") or ""),
+        contenido if isinstance(contenido, Mapping) else None,
+    )
+
+
 def decode_event(payload: Mapping[str, Any]) -> Event:
     """Reconstruye un evento del bucle desde su forma JSON.
+
+    Acepta también la **envoltura de desenlace** del arnés cuando lleva el
+    evento dentro. Una envoltura sin ``result`` no se puede reconstruir sola —
+    no trae la identidad del paso, que en el almacén vive en sus propias
+    columnas— y eso se dice en vez de devolver un evento a medias.
 
     Raises:
         ValueError: si el discriminante no corresponde a ningún tipo conocido.
             Fallar aquí es mejor que devolver un evento a medias que el replay
             interpretará como un paso sin hacer.
     """
+    outcome, reason, contenido = unwrap_outcome(payload)
+    if contenido is None:
+        raise ValueError(
+            f"Envoltura de desenlace sin `result` (outcome={outcome.value!r}). "
+            "No trae la identidad del paso: quien la lea del almacén tiene que "
+            "construir el evento con las columnas del registro y pasar "
+            "`outcome` y `reason`."
+        )
+    if contenido is not payload:
+        evento = decode_event(contenido)
+        return dataclasses.replace(evento, outcome=outcome, reason=reason)
+
     kind = str(payload.get("kind", ""))
     target = _EVENT.get(kind)
     if target is None:

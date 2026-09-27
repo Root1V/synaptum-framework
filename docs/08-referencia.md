@@ -248,6 +248,8 @@ Base común.  No se instancia directamente.
 | `at` | `float \| None` | `None` |
 | `meta` | `Mapping[str, Any]` | *(fábrica)* |
 | `decision` | `Decision \| None` | `None` |
+| `outcome` | `Outcome` | `<Outcome.RESULT: 'result'>` |
+| `reason` | `str` | `''` |
 | `kind` | `str` | `'step'` |
 
 | Miembro | Firma | |
@@ -268,6 +270,8 @@ Una llamada al modelo.
 | `at` | `float \| None` | `None` |
 | `meta` | `Mapping[str, Any]` | *(fábrica)* |
 | `decision` | `Decision \| None` | `None` |
+| `outcome` | `Outcome` | `<Outcome.RESULT: 'result'>` |
+| `reason` | `str` | `''` |
 | `kind` | `str` | `'model'` |
 | `request` | `Request \| None` | `None` |
 | `response` | `Response \| None` | `None` |
@@ -295,6 +299,8 @@ La ejecución de una herramienta.
 | `at` | `float \| None` | `None` |
 | `meta` | `Mapping[str, Any]` | *(fábrica)* |
 | `decision` | `Decision \| None` | `None` |
+| `outcome` | `Outcome` | `<Outcome.RESULT: 'result'>` |
+| `reason` | `str` | `''` |
 | `kind` | `str` | `'tool'` |
 | `call` | `ToolCall \| None` | `None` |
 | `result` | `ToolResult \| None` | `None` |
@@ -324,6 +330,8 @@ Una pausa a la espera de decisión.
 | `at` | `float \| None` | `None` |
 | `meta` | `Mapping[str, Any]` | *(fábrica)* |
 | `decision` | `Decision \| None` | `None` |
+| `outcome` | `Outcome` | `<Outcome.RESULT: 'result'>` |
+| `reason` | `str` | `''` |
 | `kind` | `str` | `'approval'` |
 | `subject` | `str` | `''` |
 
@@ -348,6 +356,8 @@ Delegación a un subagente con contexto aislado.
 | `at` | `float \| None` | `None` |
 | `meta` | `Mapping[str, Any]` | *(fábrica)* |
 | `decision` | `Decision \| None` | `None` |
+| `outcome` | `Outcome` | `<Outcome.RESULT: 'result'>` |
+| `reason` | `str` | `''` |
 | `kind` | `str` | `'delegate'` |
 | `agent` | `str` | `''` |
 | `brief` | `str` | `''` |
@@ -375,6 +385,8 @@ Cierre del run.
 | `at` | `float \| None` | `None` |
 | `meta` | `Mapping[str, Any]` | *(fábrica)* |
 | `decision` | `Decision \| None` | `None` |
+| `outcome` | `Outcome` | `<Outcome.RESULT: 'result'>` |
+| `reason` | `str` | `''` |
 | `kind` | `str` | `'final'` |
 | `output` | `Any` | `None` |
 | `usage` | `Usage` | *(fábrica)* |
@@ -1124,9 +1136,14 @@ Tres respuestas posibles para cada paso, y la tercera es la interesante:
 * **Hecho** — hay resultado registrado.  Se devuelve y no se ejecuta nada.
   Aquí es donde se ahorra la inferencia.
 * **Nuevo** — no hay rastro.  Se ejecuta con normalidad.
-* **Denegado** — hay resultado, y dice que la costura no dejó ocurrir el
-  efecto.  Se vuelve a intentar: entre una reanudación y otra alguien pudo
-  aprobar lo que antes se denegó.
+* **Denegado y reintentable** — la costura no dejó ocurrir el efecto, o
+  nadie contestó a tiempo.  Se vuelve a intentar: entre una reanudación y
+  otra la política pudo cambiar, y a una expiración se puede volver a
+  preguntar porque es la **ausencia** de una decisión.
+* **Denegado y cerrado** — **una persona dijo que no.**  No se reintenta ni
+  se vuelve a preguntar: volver a preguntar tras una negativa es ir de
+  compras a por un sí.  Vuelve al modelo como evidencia, que es lo que hace
+  que rectifique en vez de insistir.
 * **Incierto** — hay intención sin resultado.  El proceso cayó en medio, así
   que el efecto **pudo haber ocurrido**.
 

@@ -695,6 +695,16 @@ Un turno sin resultado no se cuenta: se intentó y no se sabe qué costó.</p>
 <td><code>None</code></td>
 </tr>
 <tr>
+<td><code>outcome</code></td>
+<td><code>Outcome</code></td>
+<td><code>&lt;Outcome.RESULT: 'result'&gt;</code></td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
 <td><code>kind</code></td>
 <td><code>str</code></td>
 <td><code>'step'</code></td>
@@ -767,6 +777,16 @@ Un turno sin resultado no se cuenta: se intentó y no se sabe qué costó.</p>
 <td><code>decision</code></td>
 <td><code>Decision | None</code></td>
 <td><code>None</code></td>
+</tr>
+<tr>
+<td><code>outcome</code></td>
+<td><code>Outcome</code></td>
+<td><code>&lt;Outcome.RESULT: 'result'&gt;</code></td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
 </tr>
 <tr>
 <td><code>kind</code></td>
@@ -859,6 +879,16 @@ durabilidad existe para evitar.</p>
 <td><code>decision</code></td>
 <td><code>Decision | None</code></td>
 <td><code>None</code></td>
+</tr>
+<tr>
+<td><code>outcome</code></td>
+<td><code>Outcome</code></td>
+<td><code>&lt;Outcome.RESULT: 'result'&gt;</code></td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
 </tr>
 <tr>
 <td><code>kind</code></td>
@@ -959,6 +989,16 @@ justamente lo que un harness no puede deducir desde fuera.</p>
 <td><code>None</code></td>
 </tr>
 <tr>
+<td><code>outcome</code></td>
+<td><code>Outcome</code></td>
+<td><code>&lt;Outcome.RESULT: 'result'&gt;</code></td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
+</tr>
+<tr>
 <td><code>kind</code></td>
 <td><code>str</code></td>
 <td><code>'approval'</code></td>
@@ -1038,6 +1078,16 @@ dos veces a una persona porque el proceso se cayó.</p>
 <td><code>decision</code></td>
 <td><code>Decision | None</code></td>
 <td><code>None</code></td>
+</tr>
+<tr>
+<td><code>outcome</code></td>
+<td><code>Outcome</code></td>
+<td><code>&lt;Outcome.RESULT: 'result'&gt;</code></td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
 </tr>
 <tr>
 <td><code>kind</code></td>
@@ -1134,6 +1184,16 @@ su historial: es lo que hace que delegar aísle contexto en vez de duplicarlo.</
 <td><code>decision</code></td>
 <td><code>Decision | None</code></td>
 <td><code>None</code></td>
+</tr>
+<tr>
+<td><code>outcome</code></td>
+<td><code>Outcome</code></td>
+<td><code>&lt;Outcome.RESULT: 'result'&gt;</code></td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
 </tr>
 <tr>
 <td><code>kind</code></td>
@@ -2777,9 +2837,14 @@ efecto que lo siguió, y el registro dejaría de describir lo que pasó.</p>
 <li><strong>Hecho</strong> — hay resultado registrado.  Se devuelve y no se ejecuta nada.
 Aquí es donde se ahorra la inferencia.</li>
 <li><strong>Nuevo</strong> — no hay rastro.  Se ejecuta con normalidad.</li>
-<li><strong>Denegado</strong> — hay resultado, y dice que la costura no dejó ocurrir el
-efecto.  Se vuelve a intentar: entre una reanudación y otra alguien pudo
-aprobar lo que antes se denegó.</li>
+<li><strong>Denegado y reintentable</strong> — la costura no dejó ocurrir el efecto, o
+nadie contestó a tiempo.  Se vuelve a intentar: entre una reanudación y
+otra la política pudo cambiar, y a una expiración se puede volver a
+preguntar porque es la <strong>ausencia</strong> de una decisión.</li>
+<li><strong>Denegado y cerrado</strong> — <strong>una persona dijo que no.</strong>  No se reintenta ni
+se vuelve a preguntar: volver a preguntar tras una negativa es ir de
+compras a por un sí.  Vuelve al modelo como evidencia, que es lo que hace
+que rectifique en vez de insistir.</li>
 <li><strong>Incierto</strong> — hay intención sin resultado.  El proceso cayó en medio, así
 que el efecto <strong>pudo haber ocurrido</strong>.</li>
 </ul>

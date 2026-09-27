@@ -103,6 +103,51 @@ class Disposition(str, Enum):
     """Pendiente de una persona.  El run se suspende, no falla."""
 
 
+class Outcome(str, Enum):
+    """Cómo terminó un paso, según el diario.
+
+    Un desenlace denegado **es un hecho registrado**, no la ausencia de uno.
+    Sin esto, un paso que no se ejecutó porque alguien dijo que no se parece
+    demasiado a uno del que no sabemos nada.
+
+    Los cuatro que no son ``RESULT`` comparten que **el efecto no ocurrió**, y
+    se diferencian en si se puede volver a intentar:
+
+    * ``DENIED_BY_POLICY`` — la costura dijo que no. Se puede reintentar: entre
+      una reanudación y otra la política pudo cambiar, o el modelo puede probar
+      con otros argumentos.
+    * ``APPROVAL_DENIED`` — **una persona dijo que no.** No se reintenta y no se
+      vuelve a preguntar: volver a preguntar tras una negativa es ir de compras
+      a por un sí, y el paso queda cerrado.
+    * ``APPROVAL_EXPIRED`` — nadie contestó. Es la **ausencia** de decisión, no
+      una decisión, así que preguntar otra vez es legítimo.
+
+    La distinción entre los dos últimos se la pedimos a quien escribe el
+    diario, y resultó que la colapsábamos nosotros: hasta `SYN-80` una negativa
+    humana se reintentaba igual que una expiración.
+    """
+
+    RESULT = "result"
+    """El paso ocurrió y dejó resultado.  Es el valor por defecto **a propósito**:
+    hay diarios escritos antes de que esta envoltura existiera, y leerlos de
+    cualquier otra forma dejaría colgado un paso que sí se ejecutó."""
+
+    DENIED_BY_POLICY = "denied_by_policy"
+    APPROVAL_GRANTED = "approval_granted"
+    APPROVAL_DENIED = "approval_denied"
+    APPROVAL_EXPIRED = "approval_expired"
+
+    @property
+    def final(self) -> bool:
+        """¿Cierra el paso, o se puede volver a intentar?"""
+        return self is Outcome.APPROVAL_DENIED
+
+    @property
+    def happened(self) -> bool:
+        """¿Ocurrió el efecto?"""
+        return self in (Outcome.RESULT, Outcome.APPROVAL_GRANTED)
+
+
 @dataclass(frozen=True, slots=True)
 class Decision:
     disposition: Disposition
@@ -186,6 +231,17 @@ class StepEvent:
     ambiguo cuando en realidad no hay ninguna ambigüedad: sabemos con certeza
     que no pasó nada.
     """
+
+    outcome: Outcome = Outcome.RESULT
+    """Cómo terminó el paso.
+
+    Por defecto ``RESULT``, que es lo que significa un registro sin envoltura:
+    los diarios escritos antes de que esto existiera describen pasos que
+    ocurrieron, y tratarlos de otro modo dejaría colgado un paso ejecutado.
+    """
+
+    reason: str = ""
+    """Por qué, cuando el desenlace no es un resultado.  Legible, no un código."""
 
     kind: str = "step"
 
