@@ -16,6 +16,7 @@ inventa un veredicto verde.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 
@@ -32,6 +33,7 @@ from synaptum import (
     SqliteCheckpointer,
     ToolStep,
     UncertainEffect,
+    dumps,
     make_step_id,
 )
 
@@ -147,11 +149,23 @@ _IDENTITY = corpus("identidad-de-paso", "fixtures")
 
 
 def _load_identity_cases() -> list[tuple[str, dict]]:
+    """Los casos de **acuñación**, y solo esos.
+
+    Antes se leía todo `*.json` de la carpeta dando por hecho que cualquier
+    fichero de ahí tenía esta forma. El día que Aeon publicó el corpus de
+    hashes dorados en la misma carpeta, sus once casos entraron aquí y
+    fallaron: no tienen `operations` porque no describen una acuñación.
+
+    Suponer la forma por la ubicación es cómodo hasta que alguien añade un
+    vecino. Ahora se selecciona por lo que el documento **declara ser**.
+    """
     if _IDENTITY is None:
         return []
     cases: list[tuple[str, dict]] = []
     for path in sorted(_IDENTITY.glob("*.json")):
         document = json.loads(path.read_text())
+        if document.get("contract") != "identidad-de-paso":
+            continue
         for case in document.get("cases", []):
             cases.append((f"{path.stem}::{case['name']}", case))
     return cases
@@ -228,6 +242,86 @@ def test_step_identity_matches_the_golden_case(name: str, case: dict):
 
 def test_the_identity_cases_are_actually_being_read():
     assert IDENTITY_CASES, "no se leyó ningún caso de identidad de paso"
+
+
+# ── Contrato: los hashes dorados de una llamada a herramienta ─────────────────
+#
+# Lo que ata una aprobación a lo que se aprobó. El arnés escribe el hash de la
+# llamada en el payload de la decisión; al reanudar se compara contra el de la
+# llamada que se va a ejecutar, y si no coinciden es que alguien cambió los
+# argumentos después de que una persona dijera que sí.
+#
+# Por eso la equivalencia entre implementaciones **es** la garantía: si el Go
+# del arnés y este Python no producen el mismo hash del mismo paso, una
+# aprobación legítima parece manipulada — una falsa alarma en el peor sitio.
+
+_HASHES = _IDENTITY / "hashes-dorados.json" if _IDENTITY else None
+
+#: Casos donde sabemos que divergimos, con el porqué.
+#:
+#: Se registran con nombre en vez de silenciarse, y el test exige que **sigan**
+#: divergiendo: el día que dejen de hacerlo también falla, y entonces hay que
+#: quitar la entrada. Una divergencia acallada es indistinguible de una que
+#: nadie vio, y una lista de excepciones que nadie revisa es lo mismo con más
+#: pasos.
+DIVERGENCIAS_CONOCIDAS = {
+    "big-integer-beyond-double-precision": (
+        "JCS serializa los números como dobles de ECMAScript, así que 2^53+1 "
+        "se pliega a 2^53. Python conserva el entero exacto. Divergimos por ser "
+        "más precisos que la especificación, que es la peor forma de divergir: "
+        "el hash del arnés no coincide con el nuestro y la aprobación parece "
+        "manipulada. Llevado al canal el 2026-09-27."
+    ),
+}
+
+
+def _hash_de(paso: dict) -> tuple[str, str]:
+    """La forma hasheada del contrato, serializada como la serializamos."""
+    forma = {
+        "step_id": paso["step_id"],
+        "tool_args": paso["tool_args"],
+        "tool_name": paso["tool_name"],
+    }
+    canonico = dumps(forma)
+    return canonico, hashlib.sha256(canonico.encode()).hexdigest()
+
+
+def _casos_de_hash() -> list[tuple[str, dict]]:
+    if _HASHES is None or not _HASHES.exists():
+        return []
+    return [(c["name"], c) for c in json.loads(_HASHES.read_text())["cases"]]
+
+
+HASH_CASES = _casos_de_hash()
+
+
+@pytest.mark.skipif(not HASH_CASES, reason=SIN_CONTRATOS)
+@pytest.mark.parametrize("name,case", HASH_CASES, ids=[n for n, _ in HASH_CASES])
+def test_the_golden_tool_call_hashes_match(name: str, case: dict):
+    canonico, digest = _hash_de(case["step"])
+    motivo = DIVERGENCIAS_CONOCIDAS.get(name)
+
+    if motivo is None:
+        assert canonico == case["canonical_json"], (
+            f"{name}: nuestra forma canónica difiere de la del corpus.\n"
+            f"  corpus : {case['canonical_json']}\n"
+            f"  nuestra: {canonico}\n  ({case['why']})"
+        )
+        assert digest == case["sha256"], f"{name}: mismo canónico y distinto hash"
+        return
+
+    # Una divergencia registrada tiene que **seguir** ahí. Si se arregla en
+    # cualquiera de los dos lados, esto falla y obliga a quitar la entrada.
+    assert canonico != case["canonical_json"], (
+        f"{name}: ya no divergimos, así que sobra la entrada en "
+        f"DIVERGENCIAS_CONOCIDAS. Motivo que había: {motivo}"
+    )
+
+
+@pytest.mark.skipif(not HASH_CASES, reason=SIN_CONTRATOS)
+def test_the_golden_hash_corpus_is_not_empty():
+    """Un corpus que no se lee pasa igual que uno que sí."""
+    assert len(HASH_CASES) >= 11, f"solo se leyeron {len(HASH_CASES)} casos de hash"
 
 
 # ── Contrato: normalización entre proveedores ─────────────────────────────────
