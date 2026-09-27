@@ -111,9 +111,14 @@ class Replay:
     * **Hecho** — hay resultado registrado.  Se devuelve y no se ejecuta nada.
       Aquí es donde se ahorra la inferencia.
     * **Nuevo** — no hay rastro.  Se ejecuta con normalidad.
-    * **Denegado** — hay resultado, y dice que la costura no dejó ocurrir el
-      efecto.  Se vuelve a intentar: entre una reanudación y otra alguien pudo
-      aprobar lo que antes se denegó.
+    * **Denegado y reintentable** — la costura no dejó ocurrir el efecto, o
+      nadie contestó a tiempo.  Se vuelve a intentar: entre una reanudación y
+      otra la política pudo cambiar, y a una expiración se puede volver a
+      preguntar porque es la **ausencia** de una decisión.
+    * **Denegado y cerrado** — **una persona dijo que no.**  No se reintenta ni
+      se vuelve a preguntar: volver a preguntar tras una negativa es ir de
+      compras a por un sí.  Vuelve al modelo como evidencia, que es lo que hace
+      que rectifique en vez de insistir.
     * **Incierto** — hay intención sin resultado.  El proceso cayó en medio, así
       que el efecto **pudo haber ocurrido**.
     """
@@ -124,6 +129,8 @@ class Replay:
         """Cuántos pasos se han saltado.  Métrica, no lógica."""
         self.denied = 0
         """Cuántos se reintentan por haber sido denegados antes."""
+        self.closed_by_decision = 0
+        """Cuántos quedaron cerrados porque una persona dijo que no."""
 
     @property
     def active(self) -> bool:
@@ -150,11 +157,30 @@ class Replay:
         """
         done = self._state.result_of(step_id)
         if done is not None:
+            if done.outcome.final:
+                # Una persona dijo que no.  Es un desenlace **cerrado**: se
+                # devuelve para que el bucle lo cuente, no para reejecutarlo.
+                #
+                # Hasta `SYN-80` esto caía en la rama de abajo y se reintentaba
+                # igual que una expiración — colapsando exactamente lo que
+                # pedimos no colapsar a quien escribe el diario.  Una negativa
+                # es una decisión y cierra el paso; una expiración es su
+                # ausencia.
+                self.closed_by_decision += 1
+                return done
+
             if done.decision is not None and not done.decision.allowed:
                 # Denegado antes de ejecutar: desenlace conocido, efecto que no
                 # ocurrió.  No es el caso incierto, y se puede reintentar.
                 self.denied += 1
                 return None
+
+            if not done.outcome.happened:
+                # Sin resultado y sin decisión: una expiración, o una política
+                # que denegó sin dejar `Decision`.  Reintentable por lo mismo.
+                self.denied += 1
+                return None
+
             self.replayed += 1
             return done
 

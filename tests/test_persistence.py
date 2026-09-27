@@ -30,11 +30,13 @@ from synaptum import (
     Response,
     Risk,
     Role,
+    RunState,
     Session,
     SqliteCheckpointer,
     Text,
     Thinking,
     ToolCall,
+    ToolResult,
     ToolStep,
     Usage,
     dumps,
@@ -410,3 +412,177 @@ def test_a_closed_run_returns_its_recorded_outcome(tmp_path):
     assert [type(e).__name__ for e in events] == ["FinalStep"]
     assert events[-1].meta["reason_code"] == "budget.exhausted"
     assert empty.model_calls == 0 and empty.tool_calls == 0
+
+
+# ── SYN-80 · la envoltura de desenlace del arnés ──────────────────────────────
+#
+# Un desenlace denegado **es un hecho registrado**, no la ausencia de uno. Lo
+# que estos tests fijan es la diferencia entre los tres «no»: una política que
+# dijo que no, una persona que dijo que no, y nadie que contestara.
+
+def _paso(outcome: str, *, reason: str = "") -> RunState:
+    """Un diario con un solo paso cerrado con ese desenlace."""
+    from synaptum.core.events import Outcome
+
+    return RunState(
+        run_id="r",
+        events=(
+            ToolStep(
+                run_id="r", step_id="000001-tool", step_seq=0,
+                phase=Phase.ATTEMPTED, call=ToolCall(id="c1", name="borrar"),
+            ),
+            ToolStep(
+                run_id="r", step_id="000001-tool", step_seq=0,
+                phase=Phase.COMPLETED, outcome=Outcome(outcome), reason=reason,
+            ),
+        ),
+    )
+
+
+def test_a_human_no_closes_the_step_instead_of_being_asked_again():
+    """Volver a preguntar tras una negativa es ir de compras a por un sí.
+
+    Es exactamente la distinción que le pedimos a quien escribe el diario que
+    **no** colapsara, y que nosotros colapsábamos: hasta `SYN-80` una negativa
+    humana entraba por la misma rama que una expiración y se reintentaba.
+    """
+    from synaptum.run.journal import Replay
+
+    replay = Replay(_paso("approval_denied", reason="Ana dijo que no"))
+    resuelto = replay.resolve("000001-tool", idempotent=False)
+
+    assert resuelto is not None, "una negativa humana no se reintenta"
+    assert resuelto.reason == "Ana dijo que no"
+    assert replay.closed_by_decision == 1
+
+
+def test_an_expiry_can_be_asked_again_because_nobody_decided():
+    """Una expiración es la **ausencia** de una decisión, no una decisión."""
+    from synaptum.run.journal import Replay
+
+    replay = Replay(_paso("approval_expired"))
+
+    assert replay.resolve("000001-tool", idempotent=False) is None
+    assert replay.denied == 1
+
+
+def test_a_policy_denial_can_be_retried():
+    """Entre una reanudación y otra la política pudo cambiar."""
+    from synaptum.run.journal import Replay
+
+    replay = Replay(_paso("denied_by_policy", reason="forbid-shell-for-everyone"))
+
+    assert replay.resolve("000001-tool", idempotent=False) is None
+    assert replay.denied == 1
+
+
+def test_a_payload_without_outcome_still_means_a_result():
+    """Hay diarios escritos antes de que la envoltura existiera.
+
+    Leerlos de cualquier otra forma dejaría colgado un paso que **sí** se
+    ejecutó, que es un fallo peor que el que la envoltura viene a arreglar.
+    """
+    from synaptum.core.codec import decode_event
+    from synaptum.core.events import Outcome
+
+    viejo = json.loads(dumps(ToolStep(
+        run_id="r", step_id="000001-tool", step_seq=0, phase=Phase.COMPLETED,
+        result=ToolResult.of("c1", "hecho"),
+    )))
+    viejo.pop("outcome", None)
+
+    evento = decode_event(viejo)
+    assert evento.outcome is Outcome.RESULT
+    assert evento.result is not None
+
+
+def test_the_envelope_is_unwrapped_and_its_verdict_travels():
+    from synaptum.core.codec import decode_event
+    from synaptum.core.events import Outcome
+
+    envuelto = {
+        "outcome": "approval_denied",
+        "reason": "denegado por Ana el 27",
+        "result": json.loads(dumps(ToolStep(
+            run_id="r", step_id="000001-tool", step_seq=0, phase=Phase.COMPLETED,
+        ))),
+    }
+
+    evento = decode_event(envuelto)
+    assert evento.outcome is Outcome.APPROVAL_DENIED
+    assert evento.reason == "denegado por Ana el 27"
+
+
+def test_an_envelope_without_result_says_what_it_needs_instead_of_guessing():
+    """En un paso denegado la clave `result` está **ausente**, no nula.
+
+    Esa envoltura sola no trae la identidad del paso —vive en las columnas del
+    registro—, así que reconstruirla aquí sería inventarse un evento a medias
+    que el replay leería como un paso sin hacer.
+    """
+    from synaptum.core.codec import decode_event
+
+    with pytest.raises(ValueError, match="identidad del paso"):
+        decode_event({"outcome": "denied_by_policy", "reason": "no"})
+
+
+def test_resuming_a_humanly_denied_step_does_not_run_the_tool_again(tmp_path):
+    """De punta a punta: el diario dice que una persona dijo que no.
+
+    El bucle no ejecuta la herramienta, no vuelve a preguntar, y el modelo
+    recibe la negativa como evidencia — que es lo que le hace proponer otra
+    cosa en vez de insistir con la misma.
+    """
+    from synaptum.core.events import Outcome
+
+    ejecuciones: list[str] = []
+
+    @tool(risk=Risk.DESTRUCTIVE)
+    async def borrar_disco(path: Annotated[str, "Ruta"]) -> str:
+        """Borra."""
+        ejecuciones.append(path)
+        return "borrado"
+
+    agente = Agent("a", model="fake:m", tools=[borrar_disco])
+    db = tmp_path / "runs.db"
+
+    # El diario que deja el arnés: intención, y una negativa humana.
+    with SqliteCheckpointer(db) as store:
+        async def sembrar() -> None:
+            llamada = ToolCall(id="c1", name="borrar_disco", arguments={"path": "/"})
+            await store.append("run-1", ToolStep(
+                run_id="run-1", step_id=make_step_id(1, "tool"), step_seq=1,
+                phase=Phase.ATTEMPTED, call=llamada, risk=Risk.DESTRUCTIVE,
+            ))
+            await store.append("run-1", ToolStep(
+                run_id="run-1", step_id=make_step_id(1, "tool"), step_seq=1,
+                phase=Phase.COMPLETED, outcome=Outcome.APPROVAL_DENIED,
+                reason="Ana denegó el borrado el 27",
+            ))
+        asyncio.run(sembrar())
+
+    puerta = FakeGateway(
+        calls("borrar_disco", id="c1", path="/"),
+        says("Entendido: no borro nada. Propongo archivar en su lugar."),
+        tools=[borrar_disco],
+    )
+    with SqliteCheckpointer(db) as store:
+        pasos = drain(agente, "borra el disco", Session("run-1", puerta, store))
+
+    assert ejecuciones == [], "la herramienta se ejecutó pese a la negativa"
+
+    denegado = next(
+        p for p in pasos if isinstance(p, ToolStep) and p.phase is Phase.COMPLETED
+    )
+    assert denegado.outcome is Outcome.APPROVAL_DENIED
+
+    # Y la negativa llegó al modelo: el último turno la lleva en el contexto.
+    ultimo = puerta.requests[-1]
+    evidencia = [
+        parte
+        for mensaje in ultimo.messages
+        for parte in mensaje.content
+        if isinstance(parte, ToolResult)
+    ]
+    assert evidencia and evidencia[-1].is_error
+    assert "Ana denegó" in evidencia[-1].content[0].text

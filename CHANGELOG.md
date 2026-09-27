@@ -9,6 +9,36 @@ Lo que hay en `main` desde la `1.0.0rc2`. Se anota aquí según entra y no al co
 reconstruir un registro del `git log` tres semanas después produce una lista de commits, no un
 registro de cambios — y lo que se pierde es siempre el *porqué*, que es la mitad que sirve.
 
+### Añadido
+
+- **`Outcome`** y los campos `StepEvent.outcome` y `StepEvent.reason` — cómo terminó un paso, según
+  el diario. Un desenlace denegado **es un hecho registrado**, no la ausencia de uno: sin esto, un
+  paso que no se ejecutó porque alguien dijo que no se parece demasiado a uno del que no se sabe
+  nada. Cinco valores: `result`, `denied_by_policy`, `approval_granted`, `approval_denied` y
+  `approval_expired`.
+
+- **`ProviderError.request_id` y `.trace_id`.** Son lo único que hace diagnosticable un fallo del
+  otro lado, y viajaban dentro del texto del mensaje — donde van las cosas que nadie puede leer con
+  un programa. Salió de un caso real: quien opera la plataforma pidió el identificador de una
+  respuesta concreta y no lo teníamos, estando delante.
+
+- El adaptador de plataforma recoge **`waited_s` y `attempts`** del SDK. Importan porque hay **dos
+  reintentos apilados** —el del SDK dentro de una llamada y el del bucle encima—, y sin ellos una
+  espera respetada a propósito es indistinguible de una plataforma lenta.
+
+### Cambia una conducta por defecto
+
+- **Un paso que una persona denegó ya no se reintenta al reanudar.** Antes, cualquier «no»
+  registrado volvía a intentarse; ahora solo los que se pueden volver a intentar: una denegación de
+  política (que pudo cambiar) y una **expiración** (que es la *ausencia* de una decisión, no una
+  decisión). Una negativa humana cierra el paso y vuelve al modelo como evidencia, porque volver a
+  preguntar tras un «no» es ir de compras a por un sí.
+
+  Es la distinción que pedimos por el canal que no se colapsara, y que colapsábamos nosotros.
+
+- Un registro **sin `outcome` sigue significando `result`**. No es tolerancia: hay diarios ya
+  escritos, y leerlos de otra forma dejaría colgado un paso que sí se ejecutó.
+
 ### Documentación
 
 - **Los dieciséis ejemplos son una sección del sitio**, una página por ejemplo, con el fichero
@@ -37,6 +67,11 @@ registro de cambios — y lo que se pierde es siempre el *porqué*, que es la mi
   con «no existe».
 
 ### Corregido
+
+- **El cargador de los corpus compartidos suponía la forma por la ubicación**, leyendo todo `*.json`
+  de una carpeta como si solo pudiera haber una clase de documento ahí. El día que llegó un vecino
+  con otra forma, sus once casos entraron en el test equivocado. Ahora selecciona por lo que el
+  documento **declara ser**.
 
 - `ContextEconomy.report()` mezclaba separadores de millares en el mismo informe.
 - `validar_ruc`, en el ejemplo `03`, prometía comprobar el dígito verificador y solo comprobaba el

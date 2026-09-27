@@ -396,8 +396,23 @@ class Agent:
 
                     done = replay.resolve(step_id, idempotent=idempotent)
                     if done is not None:
-                        assert isinstance(done, ToolStep) and done.result is not None
-                        results.append(done.result)
+                        assert isinstance(done, ToolStep)
+                        if done.result is None:
+                            # Desenlace cerrado sin resultado: una persona dijo
+                            # que no.  No se reejecuta y no se vuelve a
+                            # preguntar; vuelve al modelo como evidencia, que es
+                            # lo que le hace rectificar en vez de insistir.
+                            #
+                            # Sin esta rama el bucle daba por hecho que todo
+                            # paso resuelto traía resultado, que era cierto
+                            # mientras un «no» se reintentaba siempre.
+                            results.append(ToolResult.of(
+                                call.id,
+                                f"Denegado: {done.reason or done.outcome.value}.",
+                                is_error=True,
+                            ))
+                        else:
+                            results.append(done.result)
                         yield done
                         continue
 
