@@ -32,8 +32,10 @@ from synaptum import (
     RunState,
     SqliteCheckpointer,
     ToolStep,
+    InvalidToolCallError,
     UncertainEffect,
     dumps,
+    tool_call_hash,
     make_step_id,
 )
 
@@ -257,22 +259,23 @@ def test_the_identity_cases_are_actually_being_read():
 
 _HASHES = _IDENTITY / "hashes-dorados.json" if _IDENTITY else None
 
-#: Casos donde sabemos que divergimos, con el porqué.
+#: Casos que **no deben producir hash**: se rechaza construirlo.
 #:
-#: Se registran con nombre en vez de silenciarse, y el test exige que **sigan**
-#: divergiendo: el día que dejen de hacerlo también falla, y entonces hay que
-#: quitar la entrada. Una divergencia acallada es indistinguible de una que
-#: nadie vio, y una lista de excepciones que nadie revisa es lo mismo con más
-#: pasos.
-DIVERGENCIAS_CONOCIDAS = {
-    "big-integer-beyond-double-precision": (
-        "JCS serializa los números como dobles de ECMAScript, así que 2^53+1 "
-        "se pliega a 2^53. Python conserva el entero exacto. Divergimos por ser "
-        "más precisos que la especificación, que es la peor forma de divergir: "
-        "el hash del arnés no coincide con el nuestro y la aprobación parece "
-        "manipulada. Llevado al canal el 2026-09-27."
-    ),
-}
+#: La divergencia que medimos el 27 —nosotros conservábamos `2^53+1` y la
+#: canonicalización compartida lo pliega— se cerró decidiendo que un número de
+#: esa magnitud no se ata: se rechaza. Ver `tool_call_hash`.
+#:
+#: Esta lista es local **hasta que el corpus traiga su propio `expect`**. En
+#: cuanto lo traiga, manda el fichero: el acuerdo tiene que vivir donde los dos
+#: lo leen, no en una constante de cada repositorio.
+RECHAZADOS_EN_LOCAL = {"big-integer-beyond-double-precision"}
+
+
+def _se_espera_rechazo(case: dict) -> bool:
+    declarado = case.get("expect")
+    if declarado is not None:
+        return declarado == "reject"
+    return case["name"] in RECHAZADOS_EN_LOCAL
 
 
 def _hash_de(paso: dict) -> tuple[str, str]:
@@ -298,24 +301,26 @@ HASH_CASES = _casos_de_hash()
 @pytest.mark.skipif(not HASH_CASES, reason=SIN_CONTRATOS)
 @pytest.mark.parametrize("name,case", HASH_CASES, ids=[n for n, _ in HASH_CASES])
 def test_the_golden_tool_call_hashes_match(name: str, case: dict):
-    canonico, digest = _hash_de(case["step"])
-    motivo = DIVERGENCIAS_CONOCIDAS.get(name)
+    paso = case["step"]
 
-    if motivo is None:
-        assert canonico == case["canonical_json"], (
-            f"{name}: nuestra forma canónica difiere de la del corpus.\n"
-            f"  corpus : {case['canonical_json']}\n"
-            f"  nuestra: {canonico}\n  ({case['why']})"
-        )
-        assert digest == case["sha256"], f"{name}: mismo canónico y distinto hash"
+    if _se_espera_rechazo(case):
+        # No es que divergamos: es que este paso **no se puede atar**, y el
+        # hash se niega a construirlo en vez de elegir entre plegar y divergir.
+        with pytest.raises(InvalidToolCallError, match="2\\^53"):
+            tool_call_hash(paso["step_id"], paso["tool_name"], paso["tool_args"])
         return
 
-    # Una divergencia registrada tiene que **seguir** ahí. Si se arregla en
-    # cualquiera de los dos lados, esto falla y obliga a quitar la entrada.
-    assert canonico != case["canonical_json"], (
-        f"{name}: ya no divergimos, así que sobra la entrada en "
-        f"DIVERGENCIAS_CONOCIDAS. Motivo que había: {motivo}"
+    canonico, digest = _hash_de(paso)
+    assert canonico == case["canonical_json"], (
+        f"{name}: nuestra forma canónica difiere de la del corpus.\n"
+        f"  corpus : {case['canonical_json']}\n"
+        f"  nuestra: {canonico}\n  ({case['why']})"
     )
+    assert digest == case["sha256"], f"{name}: mismo canónico y distinto hash"
+
+    # Y el hash público produce lo mismo que la forma de arriba: si algún día
+    # dejaran de coincidir, el corpus estaría validando algo que nadie usa.
+    assert tool_call_hash(paso["step_id"], paso["tool_name"], paso["tool_args"]) == digest
 
 
 @pytest.mark.skipif(not HASH_CASES, reason=SIN_CONTRATOS)
@@ -515,6 +520,37 @@ def test_the_normalization_corpus_runs_against_the_python_adapter(
         _assert_stops_at_first_sentinel(adapter, body, case["name"])
 
     _check_usage(response.usage, expected, case["name"])
+    _assert_every_key_was_read(expected, case["name"])
+
+
+#: Las claves de expectativa que este runner sabe comprobar.
+#:
+#: Existe para que una clave **nueva** falle en vez de ignorarse. Un
+#: comprobador que se salta en silencio lo que no entiende desarrolla puntos
+#: ciegos exactamente donde el contrato crece — y el contrato crece ahí, porque
+#: las claves nuevas son las que describen lo recién acordado.
+#:
+#: Aeon lo encontró en su runner: leía 5 de 13, y tres casos no tenían ni una
+#: sola clave que comprobara. Pasaban sin verificar **ninguna** de sus
+#: afirmaciones, y ese número se publicó en el canal como evidencia. Lo avisaron
+#: por si aplicaba a los nuestros: la pregunta no es «¿pasan mis casos?», es
+#: «¿hay alguna clave del fichero que mi código no lea?».
+CLAVES_QUE_SE_COMPRUEBAN = {
+    "text", "model", "finish_reason", "content_kinds",
+    "tool_calls", "tool_call_ids_are_nonempty",
+    "event_kinds", "event_kinds_collapsed", "partial_text",
+    "stops_at_first_sentinel",
+    "usage", "usage_state", "usage_relations",
+}
+
+
+def _assert_every_key_was_read(expected: dict, where: str) -> None:
+    desconocidas = sorted(set(expected) - CLAVES_QUE_SE_COMPRUEBAN)
+    assert not desconocidas, (
+        f"{where}: el corpus afirma {desconocidas} y este runner no sabe "
+        "comprobarlo. Impleméntalo o quítalo del corpus — ignorarlo en silencio "
+        "haría pasar el caso sin verificar lo que dice."
+    )
 
 
 @pytest.mark.parametrize(

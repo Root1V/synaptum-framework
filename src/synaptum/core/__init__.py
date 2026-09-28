@@ -26,12 +26,14 @@ from .events import (
     Event,
     FinalStep,
     ModelStep,
+    Outcome,
     Phase,
     Risk,
     StepEvent,
     ToolStep,
     idempotency_key,
     make_step_id,
+    tool_call_hash,
 )
 from .protocols import (
     SEAM_VERSION,
@@ -130,6 +132,7 @@ __all__ = [
     "ALLOW",
     "StepEvent",
     "ModelStep",
+    "Outcome",
     "ToolStep",
     "DelegateStep",
     "ApprovalStep",
@@ -137,6 +140,7 @@ __all__ = [
     "Event",
     "make_step_id",
     "idempotency_key",
+    "tool_call_hash",
     # RM-04 · taxonomía de errores
     "SynaptumError",
     "ConfigurationError",

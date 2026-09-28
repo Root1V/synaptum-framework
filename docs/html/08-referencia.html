@@ -3292,6 +3292,57 @@ rompería la comparación de replay entre versiones.</p>
 <p>str(object='') -&gt; str str(bytes_or_buffer[, encoding[, errors]]) -&gt; str</p>
 <h2>Sin agrupar</h2>
 <p>Exportados y todavía sin sitio en esta página. Que aparezcan aquí es un aviso para quien mantiene la referencia, no para quien la lee.</p>
+<h3><code>Outcome</code></h3>
+<p>Cómo terminó un paso, según el diario.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Valor</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Outcome.RESULT</code></td>
+<td><code>'result'</code></td>
+</tr>
+<tr>
+<td><code>Outcome.DENIED_BY_POLICY</code></td>
+<td><code>'denied_by_policy'</code></td>
+</tr>
+<tr>
+<td><code>Outcome.APPROVAL_GRANTED</code></td>
+<td><code>'approval_granted'</code></td>
+</tr>
+<tr>
+<td><code>Outcome.APPROVAL_DENIED</code></td>
+<td><code>'approval_denied'</code></td>
+</tr>
+<tr>
+<td><code>Outcome.APPROVAL_EXPIRED</code></td>
+<td><code>'approval_expired'</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Un desenlace denegado <strong>es un hecho registrado</strong>, no la ausencia de uno.
+Sin esto, un paso que no se ejecutó porque alguien dijo que no se parece
+demasiado a uno del que no sabemos nada.</p>
+<p>Los cuatro que no son <code>RESULT</code> comparten que <strong>el efecto no ocurrió</strong>, y
+se diferencian en si se puede volver a intentar:</p>
+<ul>
+<li><code>DENIED_BY_POLICY</code> — la costura dijo que no. Se puede reintentar: entre
+una reanudación y otra la política pudo cambiar, o el modelo puede probar
+con otros argumentos.</li>
+<li><code>APPROVAL_DENIED</code> — <strong>una persona dijo que no.</strong> No se reintenta y no se
+vuelve a preguntar: volver a preguntar tras una negativa es ir de compras
+a por un sí, y el paso queda cerrado.</li>
+<li><code>APPROVAL_EXPIRED</code> — nadie contestó. Es la <strong>ausencia</strong> de decisión, no
+una decisión, así que preguntar otra vez es legítimo.</li>
+</ul>
+<p>La distinción entre los dos últimos se la pedimos a quien escribe el
+diario, y resultó que la colapsábamos nosotros: una negativa humana se
+reintentaba igual que una expiración, así que al reanudar un paso que
+alguien había denegado volvía a intentarse.</p>
 <h3><code>deferred</code></h3>
 <pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">deferred</span><span class="p-p">(</span><span class="p-n">herramientas</span><span class="p-p">:</span> <span class="p-n">Sequence</span><span class="p-p">[</span><span class="p-n">Tool</span><span class="p-p">],</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">max_resultados</span><span class="p-p">:</span> <span class="p-nb">int</span> <span class="p-o">=</span> <span class="p-mi">5</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-nb">list</span><span class="p-p">[</span><span class="p-n">Tool</span><span class="p-p">]</span>
 </code></pre>
@@ -3310,6 +3361,38 @@ elige peor cuantas más ve, que es medio problema que esto resuelve.</p>
 <p>¿Vale la pena diferir este catálogo?</p>
 <p>Está expuesto a propósito: es mejor que alguien pueda preguntar a que lo
 descubra midiendo su factura.</p>
+<h3><code>tool_call_hash</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">tool_call_hash</span><span class="p-p">(</span><span class="p-n">step_id</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">tool_name</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">tool_args</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">])</span> <span class="p-o">-&gt;</span> <span class="p-nb">str</span>
+</code></pre>
+<p>Lo que ata una aprobación a lo que se aprobó.</p>
+<p>Quien gobierna escribe este hash junto a la decisión; al reanudar se compara
+contra el de la llamada que se va a ejecutar. Si no coinciden, alguien
+cambió los argumentos después de que una persona dijera que sí.</p>
+<p>Se hashea un <strong>objeto</strong> con tres claves —<code>step_id</code>, <code>tool_args</code>,
+<code>tool_name</code>— canonicalizado entero. Objeto y no lista a propósito: así el
+orden lo deriva la canonicalización de la especificación en vez de ser una
+convención que cada implementación tenga que recordar.</p>
+<h2>Por qué se niega con un entero grande</h2>
+<p>La canonicalización compartida (RFC 8785) serializa los números como dobles
+de ECMAScript, así que <code>2^53+1</code> se pliega a <code>2^53</code> y <strong>dos aprobaciones
+distintas producen el mismo hash</strong>: una concedida para un importe valida el
+otro. Python no pliega, que suena mejor y es peor — entonces el hash del
+otro extremo no coincide con el nuestro y una aprobación legítima parece
+manipulada.</p>
+<p>Así que no se elige entre plegar y divergir: <strong>se rechaza</strong>. Es lo que
+convierte «un identificador que deba quedar atado viaja como string» en algo
+que no se puede incumplir sin enterarse.</p>
+<p>El corte es de <strong>magnitud</strong>, no de ida y vuelta.  Comprobar «¿sobrevive el
+ida y vuelta?» suena más preciso y es una ruleta: aceptaría <code>2^53+2</code> y
+rechazaría <code>2^53+1</code>, así que <strong>la mitad de los identificadores pasarían
+según su paridad</strong> — y el equipo que lo integre vería pasar sus valores de
+prueba y daría el asunto por resuelto.</p>
+<p><code>2^53</code> se acepta: es el último entero consecutivo representable, y es
+donde acaba el terreno en el que el sentido común funciona.</p>
+<p>Raises:
+InvalidToolCallError: si algún número del paso supera el límite en
+magnitud.  Se dice <strong>cuál</strong> y <strong>dónde</strong>, porque quien lo reciba
+tiene que cambiar ese campo a string y necesita saber cuál es.</p>
 <h2>Dobles de desarrollo</h2>
 <p><code>synaptum.testing</code> — Infraestructura, no una utilidad de test: es la vía principal para construir sin gastar.</p>
 <h3><code>FakeGateway</code></h3>

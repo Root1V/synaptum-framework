@@ -17,6 +17,13 @@ registro de cambios — y lo que se pierde es siempre el *porqué*, que es la mi
   nada. Cinco valores: `result`, `denied_by_policy`, `approval_granted`, `approval_denied` y
   `approval_expired`.
 
+- **`tool_call_hash()`** — lo que ata una aprobación a lo que se aprobó, y **se niega** a construir
+  el hash con un número de magnitud mayor que `2^53`, diciendo cuál y dónde. La canonicalización
+  compartida serializa los números como dobles, así que por encima de ese límite dos valores
+  distintos producen el mismo hash: una aprobación concedida para un importe validaría otro. El
+  corte es de magnitud y no de ida y vuelta — comprobar si el número «sobrevive» aceptaría `2^53+2`
+  y rechazaría `2^53+1`, dejando pasar la mitad de los identificadores según su paridad.
+
 - **`ProviderError.request_id` y `.trace_id`.** Son lo único que hace diagnosticable un fallo del
   otro lado, y viajaban dentro del texto del mensaje — donde van las cosas que nadie puede leer con
   un programa. Salió de un caso real: quien opera la plataforma pidió el identificador de una

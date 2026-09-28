@@ -1554,6 +1554,39 @@ str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
 
 Exportados y todavía sin sitio en esta página. Que aparezcan aquí es un aviso para quien mantiene la referencia, no para quien la lee.
 
+### `Outcome`
+
+Cómo terminó un paso, según el diario.
+
+| Valor | |
+|---|---|
+| `Outcome.RESULT` | `'result'` |
+| `Outcome.DENIED_BY_POLICY` | `'denied_by_policy'` |
+| `Outcome.APPROVAL_GRANTED` | `'approval_granted'` |
+| `Outcome.APPROVAL_DENIED` | `'approval_denied'` |
+| `Outcome.APPROVAL_EXPIRED` | `'approval_expired'` |
+
+Un desenlace denegado **es un hecho registrado**, no la ausencia de uno.
+Sin esto, un paso que no se ejecutó porque alguien dijo que no se parece
+demasiado a uno del que no sabemos nada.
+
+Los cuatro que no son ``RESULT`` comparten que **el efecto no ocurrió**, y
+se diferencian en si se puede volver a intentar:
+
+* ``DENIED_BY_POLICY`` — la costura dijo que no. Se puede reintentar: entre
+  una reanudación y otra la política pudo cambiar, o el modelo puede probar
+  con otros argumentos.
+* ``APPROVAL_DENIED`` — **una persona dijo que no.** No se reintenta y no se
+  vuelve a preguntar: volver a preguntar tras una negativa es ir de compras
+  a por un sí, y el paso queda cerrado.
+* ``APPROVAL_EXPIRED`` — nadie contestó. Es la **ausencia** de decisión, no
+  una decisión, así que preguntar otra vez es legítimo.
+
+La distinción entre los dos últimos se la pedimos a quien escribe el
+diario, y resultó que la colapsábamos nosotros: una negativa humana se
+reintentaba igual que una expiración, así que al reanudar un paso que
+alguien había denegado volvía a intentarse.
+
 ### `deferred`
 
 ```python
@@ -1584,6 +1617,50 @@ def merece_la_pena(herramientas: Sequence[Any]) -> bool
 
 Está expuesto a propósito: es mejor que alguien pueda preguntar a que lo
 descubra midiendo su factura.
+
+### `tool_call_hash`
+
+```python
+def tool_call_hash(step_id: str, tool_name: str, tool_args: Mapping[str, Any]) -> str
+```
+
+Lo que ata una aprobación a lo que se aprobó.
+
+Quien gobierna escribe este hash junto a la decisión; al reanudar se compara
+contra el de la llamada que se va a ejecutar. Si no coinciden, alguien
+cambió los argumentos después de que una persona dijera que sí.
+
+Se hashea un **objeto** con tres claves —``step_id``, ``tool_args``,
+``tool_name``— canonicalizado entero. Objeto y no lista a propósito: así el
+orden lo deriva la canonicalización de la especificación en vez de ser una
+convención que cada implementación tenga que recordar.
+
+Por qué se niega con un entero grande
+--------------------------------------
+La canonicalización compartida (RFC 8785) serializa los números como dobles
+de ECMAScript, así que ``2^53+1`` se pliega a ``2^53`` y **dos aprobaciones
+distintas producen el mismo hash**: una concedida para un importe valida el
+otro. Python no pliega, que suena mejor y es peor — entonces el hash del
+otro extremo no coincide con el nuestro y una aprobación legítima parece
+manipulada.
+
+Así que no se elige entre plegar y divergir: **se rechaza**. Es lo que
+convierte «un identificador que deba quedar atado viaja como string» en algo
+que no se puede incumplir sin enterarse.
+
+El corte es de **magnitud**, no de ida y vuelta.  Comprobar «¿sobrevive el
+ida y vuelta?» suena más preciso y es una ruleta: aceptaría ``2^53+2`` y
+rechazaría ``2^53+1``, así que **la mitad de los identificadores pasarían
+según su paridad** — y el equipo que lo integre vería pasar sus valores de
+prueba y daría el asunto por resuelto.
+
+``2^53`` se acepta: es el último entero consecutivo representable, y es
+donde acaba el terreno en el que el sentido común funciona.
+
+Raises:
+    InvalidToolCallError: si algún número del paso supera el límite en
+        magnitud.  Se dice **cuál** y **dónde**, porque quien lo reciba
+        tiene que cambiar ese campo a string y necesita saber cuál es.
 
 ## Dobles de desarrollo
 
