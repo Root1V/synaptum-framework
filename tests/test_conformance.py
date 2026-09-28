@@ -672,3 +672,42 @@ def test_the_inclusive_input_convention_holds_in_the_recorded_bodies():
         comprobados += 1
 
     assert comprobados >= 3, f"solo {comprobados} grabaciones confirman la convención"
+
+
+def test_a_float_at_the_limit_cannot_be_told_from_one_that_was_folded():
+    """La imagen espejo del límite de Go, en Python.
+
+    Aeon midió que su `encoding/json` decodifica a `float64` salvo que pidas
+    `UseNumber`, así que un `2^53+1` leído de un fichero **llega ya plegado** y
+    su guard no tiene nada que mirar. Fuimos a comprobar el nuestro y la mitad
+    buena se confirmó: Python conserva los enteros de precisión arbitraria, así
+    que el dígito llega intacto.
+
+    La mitad mala no la esperaba. Un **literal flotante** sí llega plegado:
+
+        json.loads('{"reference": 9007199254740993.0}')  ->  9007199254740992.0
+
+    …que vale exactamente `2^53` y pasaba el corte. Por eso el límite es `>=`
+    para un flotante y `>` para un entero: con el entero no hay ambigüedad, con
+    el flotante no se puede saber de dónde viene.
+    """
+    plegado = json.loads('{"reference": 9007199254740993.0}')
+    assert plegado["reference"] == float(2**53), "el pliegue ocurre al decodificar"
+
+    with pytest.raises(InvalidToolCallError, match=r"2\^53"):
+        tool_call_hash("s8", "payments.capture", plegado)
+
+    # Y el entero del mismo valor sí se ata: ahí no hay nada que dudar.
+    assert tool_call_hash("s8", "payments.capture", {"reference": 2**53})
+
+
+def test_the_corpus_integers_survive_being_read_from_the_file():
+    """Lo que Aeon pidió comprobar: que nuestro lector no normalice números."""
+    if _HASHES is None or not _HASHES.exists():
+        pytest.skip(SIN_CONTRATOS)
+
+    casos = {c["name"]: c for c in json.loads(_HASHES.read_text())["cases"]}
+    leido = casos["big-integer-beyond-double-precision"]["step"]["tool_args"]["reference"]
+
+    assert isinstance(leido, int), "un lector que normalice números borra el caso"
+    assert leido == 2**53 + 1, f"llegó {leido}, así que el dígito se perdió al leer"

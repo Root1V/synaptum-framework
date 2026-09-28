@@ -1654,8 +1654,20 @@ rechazaría ``2^53+1``, así que **la mitad de los identificadores pasarían
 según su paridad** — y el equipo que lo integre vería pasar sus valores de
 prueba y daría el asunto por resuelto.
 
-``2^53`` se acepta: es el último entero consecutivo representable, y es
-donde acaba el terreno en el que el sentido común funciona.
+``2^53`` se acepta **si llega como entero**: es el último entero consecutivo
+representable, y es donde acaba el terreno en el que el sentido común
+funciona.
+
+Un ``float`` es otra cosa
+--------------------------
+Ahí el límite es ``>=`` y no ``>``, y la asimetría es deliberada. Un
+``9007199254740993.0`` **ya llegó plegado** a ``2^53``: el dígito se perdió
+al decodificarlo, un nivel antes de que esto pueda mirarlo. Así que un
+flotante que vale exactamente ``2^53`` es indistinguible de un ``2^53+1``
+que alguien plegó, y atar lo que no se puede distinguir es justamente lo
+que esta comprobación existe para impedir.
+
+Con un entero no hay ambigüedad —``2^53`` es ``2^53``— y por eso pasa.
 
 Raises:
     InvalidToolCallError: si algún número del paso supera el límite en

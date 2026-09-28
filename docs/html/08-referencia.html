@@ -3387,8 +3387,17 @@ ida y vuelta?» suena más preciso y es una ruleta: aceptaría <code>2^53+2</cod
 rechazaría <code>2^53+1</code>, así que <strong>la mitad de los identificadores pasarían
 según su paridad</strong> — y el equipo que lo integre vería pasar sus valores de
 prueba y daría el asunto por resuelto.</p>
-<p><code>2^53</code> se acepta: es el último entero consecutivo representable, y es
-donde acaba el terreno en el que el sentido común funciona.</p>
+<p><code>2^53</code> se acepta <strong>si llega como entero</strong>: es el último entero consecutivo
+representable, y es donde acaba el terreno en el que el sentido común
+funciona.</p>
+<h2>Un <code>float</code> es otra cosa</h2>
+<p>Ahí el límite es <code>&gt;=</code> y no <code>&gt;</code>, y la asimetría es deliberada. Un
+<code>9007199254740993.0</code> <strong>ya llegó plegado</strong> a <code>2^53</code>: el dígito se perdió
+al decodificarlo, un nivel antes de que esto pueda mirarlo. Así que un
+flotante que vale exactamente <code>2^53</code> es indistinguible de un <code>2^53+1</code>
+que alguien plegó, y atar lo que no se puede distinguir es justamente lo
+que esta comprobación existe para impedir.</p>
+<p>Con un entero no hay ambigüedad —<code>2^53</code> es <code>2^53</code>— y por eso pasa.</p>
 <p>Raises:
 InvalidToolCallError: si algún número del paso supera el límite en
 magnitud.  Se dice <strong>cuál</strong> y <strong>dónde</strong>, porque quien lo reciba

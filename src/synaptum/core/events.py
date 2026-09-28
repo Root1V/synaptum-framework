@@ -232,8 +232,20 @@ def tool_call_hash(step_id: str, tool_name: str, tool_args: Mapping[str, Any]) -
     según su paridad** — y el equipo que lo integre vería pasar sus valores de
     prueba y daría el asunto por resuelto.
 
-    ``2^53`` se acepta: es el último entero consecutivo representable, y es
-    donde acaba el terreno en el que el sentido común funciona.
+    ``2^53`` se acepta **si llega como entero**: es el último entero consecutivo
+    representable, y es donde acaba el terreno en el que el sentido común
+    funciona.
+
+    Un ``float`` es otra cosa
+    --------------------------
+    Ahí el límite es ``>=`` y no ``>``, y la asimetría es deliberada. Un
+    ``9007199254740993.0`` **ya llegó plegado** a ``2^53``: el dígito se perdió
+    al decodificarlo, un nivel antes de que esto pueda mirarlo. Así que un
+    flotante que vale exactamente ``2^53`` es indistinguible de un ``2^53+1``
+    que alguien plegó, y atar lo que no se puede distinguir es justamente lo
+    que esta comprobación existe para impedir.
+
+    Con un entero no hay ambigüedad —``2^53`` es ``2^53``— y por eso pasa.
 
     Raises:
         InvalidToolCallError: si algún número del paso supera el límite en
@@ -265,16 +277,25 @@ def _rechaza_enteros_grandes(valor: Any, tool: str, ruta: str = "") -> None:
         return
     if valor != valor or valor in (float("inf"), float("-inf")):
         return
-    if abs(valor) > LIMITE_ENTERO_EXACTO:
+    # Un flotante en el límite pudo llegar plegado desde más arriba; un entero
+    # no.  De ahí que el corte sea `>=` para uno y `>` para el otro.
+    excedido = (
+        abs(valor) >= LIMITE_ENTERO_EXACTO
+        if isinstance(valor, float)
+        else abs(valor) > LIMITE_ENTERO_EXACTO
+    )
+    if excedido:
         # Import perezoso: `errors` importa de aquí para su `Denied`, así que
         # al revés a nivel de módulo es un ciclo.
         from .errors import InvalidToolCallError
 
         raise InvalidToolCallError(
-            f"'{ruta}' vale {valor!r}, de magnitud mayor que 2^53. Un número así "
-            "no se puede atar: la canonicalización compartida lo serializa como "
-            "un doble y pierde dígitos, así que dos valores distintos producirían "
-            "el mismo hash. Si es un identificador, mándalo como cadena.",
+            f"'{ruta}' vale {valor!r}, en el terreno donde un doble pierde "
+            "dígitos (2^53). Un número así no se puede atar: la canonicalización "
+            "compartida lo serializa como un doble, así que dos valores distintos "
+            "producirían el mismo hash — y un flotante que vale justo 2^53 pudo "
+            "llegar plegado desde 2^53+1 sin que nadie pueda saberlo. Si es un "
+            "identificador, mándalo como cadena.",
             tool=tool,
         )
 
