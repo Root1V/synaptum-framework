@@ -24,6 +24,11 @@ registro de cambios — y lo que se pierde es siempre el *porqué*, que es la mi
   corte es de magnitud y no de ida y vuelta — comprobar si el número «sobrevive» aceptaría `2^53+2`
   y rechazaría `2^53+1`, dejando pasar la mitad de los identificadores según su paridad.
 
+  Con un **flotante** el corte es `>=` en vez de `>`, y la asimetría es deliberada: un
+  `9007199254740993.0` llega ya plegado a `2^53` —el dígito se pierde al decodificar, antes de que
+  nada pueda mirarlo— así que un flotante que vale justo `2^53` es indistinguible de uno que vino
+  de más arriba. Con un entero no hay ambigüedad.
+
 - **`ProviderError.request_id` y `.trace_id`.** Son lo único que hace diagnosticable un fallo del
   otro lado, y viajaban dentro del texto del mensaje — donde van las cosas que nadie puede leer con
   un programa. Salió de un caso real: quien opera la plataforma pidió el identificador de una
