@@ -27,11 +27,21 @@ justifica toda la arquitectura, y se apoya entera en esta línea.
 
 from __future__ import annotations
 
+import hashlib
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
 
-from .types import Request, Response, Risk, ToolCall, ToolResult, Usage
+from .types import (
+    Request,
+    Response,
+    Risk,
+    ToolCall,
+    ToolResult,
+    Usage,
+    dumps,
+)
 
 __all__ = [
     "Phase",
@@ -123,8 +133,9 @@ class Outcome(str, Enum):
       una decisión, así que preguntar otra vez es legítimo.
 
     La distinción entre los dos últimos se la pedimos a quien escribe el
-    diario, y resultó que la colapsábamos nosotros: hasta `SYN-80` una negativa
-    humana se reintentaba igual que una expiración.
+    diario, y resultó que la colapsábamos nosotros: una negativa humana se
+    reintentaba igual que una expiración, así que al reanudar un paso que
+    alguien había denegado volvía a intentarse.
     """
 
     RESULT = "result"
@@ -180,6 +191,92 @@ def make_step_id(seq: int, kind: str) -> str:
     if seq < 0:
         raise ValueError("seq no puede ser negativo.")
     return f"{seq:06d}-{kind}"
+
+
+#: El mayor entero que un doble IEEE-754 representa **sin vecinos perdidos**.
+#:
+#: Por encima de 2^53 los dobles van de dos en dos: `2^53+1` no existe y se
+#: pliega a `2^53`, mientras que `2^53+2` sí es exacto. Los pares sobreviven y
+#: los impares no.
+LIMITE_ENTERO_EXACTO = 2**53
+
+
+def tool_call_hash(step_id: str, tool_name: str, tool_args: Mapping[str, Any]) -> str:
+    """Lo que ata una aprobación a lo que se aprobó.
+
+    Quien gobierna escribe este hash junto a la decisión; al reanudar se compara
+    contra el de la llamada que se va a ejecutar. Si no coinciden, alguien
+    cambió los argumentos después de que una persona dijera que sí.
+
+    Se hashea un **objeto** con tres claves —``step_id``, ``tool_args``,
+    ``tool_name``— canonicalizado entero. Objeto y no lista a propósito: así el
+    orden lo deriva la canonicalización de la especificación en vez de ser una
+    convención que cada implementación tenga que recordar.
+
+    Por qué se niega con un entero grande
+    --------------------------------------
+    La canonicalización compartida (RFC 8785) serializa los números como dobles
+    de ECMAScript, así que ``2^53+1`` se pliega a ``2^53`` y **dos aprobaciones
+    distintas producen el mismo hash**: una concedida para un importe valida el
+    otro. Python no pliega, que suena mejor y es peor — entonces el hash del
+    otro extremo no coincide con el nuestro y una aprobación legítima parece
+    manipulada.
+
+    Así que no se elige entre plegar y divergir: **se rechaza**. Es lo que
+    convierte «un identificador que deba quedar atado viaja como string» en algo
+    que no se puede incumplir sin enterarse.
+
+    El corte es de **magnitud**, no de ida y vuelta.  Comprobar «¿sobrevive el
+    ida y vuelta?» suena más preciso y es una ruleta: aceptaría ``2^53+2`` y
+    rechazaría ``2^53+1``, así que **la mitad de los identificadores pasarían
+    según su paridad** — y el equipo que lo integre vería pasar sus valores de
+    prueba y daría el asunto por resuelto.
+
+    ``2^53`` se acepta: es el último entero consecutivo representable, y es
+    donde acaba el terreno en el que el sentido común funciona.
+
+    Raises:
+        InvalidToolCallError: si algún número del paso supera el límite en
+            magnitud.  Se dice **cuál** y **dónde**, porque quien lo reciba
+            tiene que cambiar ese campo a string y necesita saber cuál es.
+    """
+    _rechaza_enteros_grandes({"step_id": step_id, "tool_name": tool_name,
+                              "tool_args": dict(tool_args)}, tool_name)
+    forma = {"step_id": step_id, "tool_args": dict(tool_args), "tool_name": tool_name}
+    return hashlib.sha256(dumps(forma).encode()).hexdigest()
+
+
+def _rechaza_enteros_grandes(valor: Any, tool: str, ruta: str = "") -> None:
+    """Recorre el paso **antes** de canonicalizar.
+
+    Antes y no después: una vez canonicalizado el dígito ya se perdió y no
+    queda nada que detectar.
+    """
+    if isinstance(valor, Mapping):
+        for clave, dentro in valor.items():
+            _rechaza_enteros_grandes(dentro, tool, f"{ruta}.{clave}" if ruta else str(clave))
+        return
+    if isinstance(valor, (list, tuple)):
+        for indice, dentro in enumerate(valor):
+            _rechaza_enteros_grandes(dentro, tool, f"{ruta}[{indice}]")
+        return
+    # `bool` es subclase de `int` y nunca es un identificador.
+    if isinstance(valor, bool) or not isinstance(valor, (int, float)):
+        return
+    if valor != valor or valor in (float("inf"), float("-inf")):
+        return
+    if abs(valor) > LIMITE_ENTERO_EXACTO:
+        # Import perezoso: `errors` importa de aquí para su `Denied`, así que
+        # al revés a nivel de módulo es un ciclo.
+        from .errors import InvalidToolCallError
+
+        raise InvalidToolCallError(
+            f"'{ruta}' vale {valor!r}, de magnitud mayor que 2^53. Un número así "
+            "no se puede atar: la canonicalización compartida lo serializa como "
+            "un doble y pierde dígitos, así que dos valores distintos producirían "
+            "el mismo hash. Si es un identificador, mándalo como cadena.",
+            tool=tool,
+        )
 
 
 def idempotency_key(event: "StepEvent") -> tuple[str, str, str]:

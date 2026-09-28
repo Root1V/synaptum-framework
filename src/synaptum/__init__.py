@@ -49,6 +49,7 @@ from .core import (
     Image,
     Message,
     ModelStep,
+    Outcome,
     Phase,
     ReasoningDelta,
     ReasoningEnd,
@@ -80,6 +81,7 @@ from .core import (
     dumps,
     idempotency_key,
     make_step_id,
+    tool_call_hash,
     to_jsonable,
 )
 from .core import UncertainEffect
