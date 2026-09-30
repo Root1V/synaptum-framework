@@ -2826,6 +2826,11 @@ efecto que lo siguió, y el registro dejaría de describir lo que pasó.</p>
 <td>El cierre del run, si ya lo hubo.</td>
 </tr>
 <tr>
+<td><code>ocupado_por_otro</code></td>
+<td><code>ocupado_por_otro(self, step_id: str) -&gt; StepEvent | None</code></td>
+<td>El paso que el diario tiene en <strong>esa misma posición</strong>, si es de otra clase.</td>
+</tr>
+<tr>
 <td><code>resolve</code></td>
 <td><code>resolve(self, step_id: str, *, idempotent: bool = True) -&gt; StepEvent | None</code></td>
 <td>Devuelve el resultado ya registrado, o <code>None</code> si toca ejecutar.</td>

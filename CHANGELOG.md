@@ -48,6 +48,13 @@ registro de cambios — y lo que se pierde es siempre el *porqué*, que es la mi
 
   Es la distinción que pedimos por el canal que no se colapsara, y que colapsábamos nosotros.
 
+- **Reanudar un run cuyo diario describe otra secuencia de pasos se rechaza** con
+  `ConfigurationError`. Pasa al actualizar el framework si el bucle emite un paso más o uno menos:
+  como los identificadores son posicionales, cada consulta falla por separado, ninguna sabe de las
+  otras y **todo se reejecuta** — medido, un pago no idempotente repetido y la inferencia pagada
+  otra vez, en silencio. Se detecta por la **clase** del paso que ocupa esa posición y no por su
+  ausencia: un hueco es normal, porque las escrituras diferidas se agrupan.
+
 - Un registro **sin `outcome` sigue significando `result`**. No es tolerancia: hay diarios ya
   escritos, y leerlos de otra forma dejaría colgado un paso que sí se ejecutó.
 

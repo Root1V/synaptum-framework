@@ -19,6 +19,7 @@ from synaptum import (
     Agent,
     ApprovalStep,
     Check,
+    ConfigurationError,
     Decision,
     Disposition,
     FinalStep,
@@ -589,26 +590,22 @@ def test_resuming_a_humanly_denied_step_does_not_run_the_tool_again(tmp_path):
     assert "Ana denegó" in evidencia[-1].content[0].text
 
 
-# ── Hueco conocido: el diario y el bucle pueden dejar de hablar del mismo paso ─
+# ── Cuando el diario y el bucle dejan de hablar del mismo paso ────────────────
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "SYN-82 · La identidad de paso es posicional, así que un bucle que "
-        "emite un paso más que el que escribió el diario pide identificadores "
-        "desplazados: los registros viejos no se consultan nunca y todo se "
-        "reejecuta. Medido: un pago HARD_WRITE repetido y la inferencia pagada "
-        "otra vez, en silencio. Ni el prefijo estable ni `UncertainEffect` lo "
-        "ven — el primero mira la configuración, que no cambió, y el segundo "
-        "mira intención-sin-resultado en el MISMO identificador. Qué hacer va "
-        "por el canal: la identidad de paso es contrato compartido."
-    ),
-)
-def test_a_run_survives_the_loop_growing_a_step(tmp_path):
+def test_a_journal_from_another_loop_shape_is_refused_instead_of_replayed(tmp_path):
     """Un diario escrito por un bucle con un paso menos, reanudado por el de hoy.
 
     Es lo que pasa al actualizar el framework si la secuencia de pasos cambia —
     y cambió al entrar la delegación, que añadió una clase de paso.
+
+    Medido antes de arreglarlo, con su control al lado:
+
+        control (mismo bucle)    pagos repetidos []      inferencias 1
+        deriva  (un paso más)    pagos repetidos [100]   inferencias 2
+
+    Un pago `HARD_WRITE` repetido y la inferencia pagada otra vez, **en
+    silencio**: los identificadores son posicionales, así que cada consulta
+    fallaba por separado y ninguna sabía de las otras.
 
     La simulación toca **el payload y no solo la columna**: `load()` reconstruye
     el evento del payload, así que desplazar la columna no desplaza nada. Las
@@ -651,9 +648,32 @@ def test_a_run_survives_the_loop_growing_a_step(tmp_path):
 
     ejecuciones.clear()
     with SqliteCheckpointer(db) as store:
-        drain(agente, "paga 100", Session("r1", FakeGateway(*[responder] * 6, tools=[pagar]), store))
+        with pytest.raises(ConfigurationError, match="000000-tool"):
+            drain(agente, "paga 100", Session("r1", FakeGateway(*[responder] * 6, tools=[pagar]), store))
 
-    assert ejecuciones == [], (
-        "el pago se repitió: el diario describe un efecto que ya ocurrió y el "
-        "bucle no lo encontró porque pregunta por otro identificador"
+    assert ejecuciones == [], "se ejecutó el pago antes de darse cuenta"
+
+
+def test_a_gap_in_the_journal_is_not_mistaken_for_another_loop(tmp_path):
+    """Un hueco es normal; una posición ocupada por otra clase, no.
+
+    Las escrituras diferidas se agrupan, así que un registro puede no estar
+    todavía. Si la ausencia bastara para negarse, un run perfectamente sano no
+    se podría reanudar — que es peor que el fallo que esto evita.
+    """
+    from synaptum.run.journal import Replay
+
+    estado = RunState(
+        run_id="r",
+        events=(
+            ToolStep(
+                run_id="r", step_id="000001-tool", step_seq=1,
+                phase=Phase.COMPLETED, result=ToolResult.of("c1", "hecho"),
+            ),
+        ),
     )
+    replay = Replay(estado)
+
+    # Falta el paso 0 —diferido, todavía sin volcar— y eso no es deriva.
+    assert replay.resolve("000000-model", idempotent=True) is None
+    assert replay.resolve("000001-tool", idempotent=False) is not None
