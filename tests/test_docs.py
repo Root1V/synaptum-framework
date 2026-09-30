@@ -39,7 +39,10 @@ def _simbolos_publicos() -> set[str]:
     import importlib
 
     nombres = set(dir(builtins))
-    for modulo in ("synaptum", "synaptum.testing", "synaptum.mcp", "synaptum.a2a"):
+    for modulo in (
+        "synaptum", "synaptum.testing", "synaptum.mcp",
+        "synaptum.a2a", "synaptum.telemetry",
+    ):
         try:
             cargado = importlib.import_module(modulo)
         except ImportError:      # un extra que no está instalado

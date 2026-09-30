@@ -26,6 +26,13 @@ RAIZ = Path(__file__).resolve().parents[1]
 # puede es cargarse solo ni ser necesario para nada.
 PUENTES = {"axonium.py"}
 
+# La telemetría nombra la convención de atributo de **una** plataforma de
+# observabilidad, y por el mismo motivo que un puente nombra a su SDK: un
+# framework que se niegue a escribir ese nombre no se puede enrutar, y la
+# decisión acaba tomándola cada despliegue a mano. Está acotado a un valor por
+# defecto que `traced` acepta como argumento.
+PUENTES |= {"telemetry/__init__.py"}
+
 
 def _modulos(carpeta: Path):
     return [p for p in carpeta.rglob("*.py") if "__pycache__" not in p.parts]
@@ -80,10 +87,11 @@ def test_the_package_names_no_specific_deployment():
     **identidad** solo en el adaptador de ese proveedor. En cualquier otro sitio
     le cuenta a quien lo lee que necesita algo que no necesita.
     """
-    nombres = re.compile(r"\b(Aeon|Axonium|Prometheus)\b")
+    nombres = re.compile(r"\b(Aeon|Axonium|Prometheus|Argus)\b")
     culpables = []
     for modulo in _modulos(PAQUETE):
-        if modulo.name in PUENTES:
+        relativo = modulo.relative_to(PAQUETE).as_posix()
+        if modulo.name in PUENTES or relativo in PUENTES:
             continue
         for numero, linea in enumerate(modulo.read_text().splitlines(), 1):
             if nombres.search(linea):

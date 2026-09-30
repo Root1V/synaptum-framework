@@ -60,9 +60,18 @@ Las herramientas del subagente sí cruzan, así que un efecto destructivo se det
 pierde es detenerlo *antes* de pagar la inferencia del hijo. Cerrarlo exige un método de la costura
 que autorice sin ejecutar, y eso es un cambio de contrato acordado entre varios proyectos.
 
-## No emite trazas todavía
+## No traza la llamada al modelo ni la ejecución de una herramienta
 
-`SYN-37`. Las convenciones GenAI de OpenTelemetry están en el plan; hoy no hay spans.
+`synaptum.telemetry.traced()` emite **la estructura del bucle** —el run, cada turno, las
+delegaciones y las esperas de aprobación— y nada más. El `chat` y el `execute_tool` los emite quien
+los ejecuta: en un despliegue gobernado, el arnés.
+
+No es una carencia, es una decisión. Dos spans para un mismo hecho traen dos duraciones que nunca
+coinciden y un lector eligiendo la que le parezca. **Un dato que existe dos veces es peor que uno
+que falta**, porque el que falta se nota.
+
+En modo autónomo, entonces, esas dos fronteras no las traza nadie. Si las necesitas ahí, el sitio
+donde ponerlas es tu gateway, que es quien hace la llamada.
 
 ## No reintenta lo que no debe
 

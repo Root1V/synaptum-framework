@@ -313,8 +313,9 @@ dentro lo reescriben en cada turno, y el síntoma es una caché que nunca arranc
 <p><strong>El crecimiento</strong> dice cuánto sube la entrada por turno. Es la pendiente entre el primero y el
 último, no una regresión: con cinco puntos, una regresión da una cifra más precisa y no más cierta.</p>
 <h3>Lo que no hace</h3>
-<p><strong>No exporta nada.</strong> Los nombres de atributo, las unidades y el transporte son de la instrumentación
-(<code>SYN-37</code>), y esa forma la fija la plataforma de observabilidad que los consuma.</p>
+<p><strong>No exporta nada.</strong> Calcula y devuelve; quien quiera sacarlo de ahí decide con qué nombres y por
+qué transporte. Las trazas de la estructura del bucle son otra cosa y viven en
+<code>synaptum.telemetry</code>.</p>
 <p><strong>No habla de dinero.</strong> Los tokens se saben; los precios no, y convertirlos con una tarifa inventada
 daría una cifra con aspecto de exacta.</p>
 <h2>Streaming</h2>

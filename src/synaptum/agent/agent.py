@@ -56,6 +56,7 @@ from ..core.events import (
     Disposition,
     FinalStep,
     ModelStep,
+    Outcome,
     Phase,
     StepEvent,
     ToolStep,
@@ -394,6 +395,7 @@ class Agent:
                     risk = spec.risk if spec else Risk.READ
                     idempotent = spec.idempotent if spec else False
 
+                    denegado = None
                     done = replay.resolve(step_id, idempotent=idempotent)
                     if done is not None:
                         assert isinstance(done, ToolStep)
@@ -436,6 +438,13 @@ class Agent:
                                 f"{denial.decision.message}".strip(),
                                 is_error=True,
                             )
+                            # Y la decisión viaja **en el paso**, no solo dentro
+                            # del texto que ve el modelo.  Sin esto, quien
+                            # consuma el stream o lea el diario no puede
+                            # distinguir «el gobierno lo paró» de «la
+                            # herramienta falló», que son cosas distintas para
+                            # quien opera: una es el sistema funcionando.
+                            denegado = denial.decision
                         else:
                             async for event in self._close_denied(
                                 denial, session, journal, seq, total,
@@ -454,6 +463,10 @@ class Agent:
                         run_id=session.run_id, step_id=step_id, step_seq=seq - 1,
                         phase=Phase.COMPLETED, at=time.time(),
                         call=call, result=outcome, risk=risk, idempotent=idempotent,
+                        decision=denegado,
+                        outcome=(
+                            Outcome.DENIED_BY_POLICY if denegado else Outcome.RESULT
+                        ),
                     )
                     await journal.record(tool_result)
                     yield tool_result
