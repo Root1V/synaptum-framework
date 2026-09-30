@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sqlite3
 import warnings
 from typing import Annotated
 
@@ -586,3 +587,73 @@ def test_resuming_a_humanly_denied_step_does_not_run_the_tool_again(tmp_path):
     ]
     assert evidencia and evidencia[-1].is_error
     assert "Ana denegó" in evidencia[-1].content[0].text
+
+
+# ── Hueco conocido: el diario y el bucle pueden dejar de hablar del mismo paso ─
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "SYN-82 · La identidad de paso es posicional, así que un bucle que "
+        "emite un paso más que el que escribió el diario pide identificadores "
+        "desplazados: los registros viejos no se consultan nunca y todo se "
+        "reejecuta. Medido: un pago HARD_WRITE repetido y la inferencia pagada "
+        "otra vez, en silencio. Ni el prefijo estable ni `UncertainEffect` lo "
+        "ven — el primero mira la configuración, que no cambió, y el segundo "
+        "mira intención-sin-resultado en el MISMO identificador. Qué hacer va "
+        "por el canal: la identidad de paso es contrato compartido."
+    ),
+)
+def test_a_run_survives_the_loop_growing_a_step(tmp_path):
+    """Un diario escrito por un bucle con un paso menos, reanudado por el de hoy.
+
+    Es lo que pasa al actualizar el framework si la secuencia de pasos cambia —
+    y cambió al entrar la delegación, que añadió una clase de paso.
+
+    La simulación toca **el payload y no solo la columna**: `load()` reconstruye
+    el evento del payload, así que desplazar la columna no desplaza nada. Las
+    dos primeras veces que lo medí, medí eso.
+    """
+    ejecuciones: list[int] = []
+
+    @tool(risk=Risk.HARD_WRITE)
+    async def pagar(importe: Annotated[int, "Importe"]) -> str:
+        """Paga.  No es idempotente."""
+        ejecuciones.append(importe)
+        return "ok"
+
+    def responder(peticion):
+        if any(m.role is Role.TOOL for m in peticion.messages):
+            return says("Pago confirmado.")
+        return calls("pagar", importe=100)
+
+    agente = Agent("a", model="fake:m", instructions="Paga.", tools=[pagar])
+    db = tmp_path / "runs.db"
+
+    with SqliteCheckpointer(db) as store:
+        drain(agente, "paga 100", Session("r1", FakeGateway(*[responder] * 6, tools=[pagar]), store))
+
+    # El run se cae después de pagar, y su diario resulta ser de un bucle que
+    # emitía un paso menos: todos los ordinales van uno por debajo.
+    con = sqlite3.connect(db)
+    con.execute("DELETE FROM journal WHERE step_id IN ('000002-model','000003-final')")
+    for seq, step_id, payload in list(con.execute("SELECT seq, step_id, payload FROM journal")):
+        ordinal, tipo = step_id.split("-", 1)
+        desplazado = f"{int(ordinal) - 1:06d}-{tipo}"
+        cuerpo = json.loads(payload)
+        cuerpo["step_id"] = desplazado
+        con.execute(
+            "UPDATE journal SET step_id=?, payload=? WHERE seq=?",
+            (desplazado, json.dumps(cuerpo, ensure_ascii=False), seq),
+        )
+    con.commit()
+    con.close()
+
+    ejecuciones.clear()
+    with SqliteCheckpointer(db) as store:
+        drain(agente, "paga 100", Session("r1", FakeGateway(*[responder] * 6, tools=[pagar]), store))
+
+    assert ejecuciones == [], (
+        "el pago se repitió: el diario describe un efecto que ya ocurrió y el "
+        "bucle no lo encontró porque pregunta por otro identificador"
+    )
