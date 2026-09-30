@@ -17,6 +17,20 @@ registro de cambios — y lo que se pierde es siempre el *porqué*, que es la mi
   nada. Cinco valores: `result`, `denied_by_policy`, `approval_granted`, `approval_denied` y
   `approval_expired`.
 
+- **`synaptum.telemetry.traced()`** — la estructura del run como trazas: `agent.run`, `agent.turn`,
+  `agent.delegate` y `agent.approval`. Envuelve el iterador de `Agent.run()` en vez de tocar el
+  bucle, así que el núcleo sigue sin conocer OpenTelemetry y el extra `[otel]` solo hace falta para
+  esto. **No emite la llamada al modelo ni la ejecución de herramientas**: las emite quien las
+  ejecuta, y dos spans del mismo hecho traen dos duraciones que nunca coinciden.
+
+  Un rechazo de gobierno viaja con **el tipo de disposición, no un booleano**, y **no** marca el
+  span como error: una denegación de política es el sistema funcionando, y contarla como fallo
+  enterraría los fallos reales bajo un flujo de rechazos correctos.
+
+  **`describe_tracing()`** dice si el proveedor configurado descarta los spans. Es el fallo que no
+  produce ningún error: sin proveedor los spans se emiten, no llegan a ninguna parte y todo
+  funciona — solo faltan trazas, que es lo que nadie mira justo después de montarlas.
+
 - **`tool_call_hash()`** — lo que ata una aprobación a lo que se aprobó, y **se niega** a construir
   el hash con un número de magnitud mayor que `2^53`, diciendo cuál y dónde. La canonicalización
   compartida serializa los números como dobles, así que por encima de ese límite dos valores
@@ -47,6 +61,18 @@ registro de cambios — y lo que se pierde es siempre el *porqué*, que es la mi
   preguntar tras un «no» es ir de compras a por un sí.
 
   Es la distinción que pedimos por el canal que no se colapsara, y que colapsábamos nosotros.
+
+- **Un paso denegado por política llega al stream y al diario con su `Decision`.** Antes la
+  negativa solo viajaba dentro del texto que ve el modelo, así que quien consumiera los eventos no
+  podía distinguir «el gobierno lo paró» de «la herramienta falló» — y son cosas distintas para
+  quien opera: la primera es el sistema funcionando.
+
+- **Reanudar un run cuyo diario describe otra secuencia de pasos se rechaza** con
+  `ConfigurationError`. Pasa al actualizar el framework si el bucle emite un paso más o uno menos:
+  como los identificadores son posicionales, cada consulta falla por separado, ninguna sabe de las
+  otras y **todo se reejecuta** — medido, un pago no idempotente repetido y la inferencia pagada
+  otra vez, en silencio. Se detecta por la **clase** del paso que ocupa esa posición y no por su
+  ausencia: un hueco es normal, porque las escrituras diferidas se agrupan.
 
 - Un registro **sin `outcome` sigue significando `result`**. No es tolerancia: hay diarios ya
   escritos, y leerlos de otra forma dejaría colgado un paso que sí se ejecutó.

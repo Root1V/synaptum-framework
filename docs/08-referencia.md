@@ -1129,6 +1129,7 @@ Replay(state: RunState) -> None
 |---|---|---|
 | `active` | — | ``True`` si hay algo que reproducir. |
 | `closed` | — | El cierre del run, si ya lo hubo. |
+| `ocupado_por_otro` | `ocupado_por_otro(self, step_id: str) -> StepEvent \| None` | El paso que el diario tiene en **esa misma posición**, si es de otra clase. |
 | `resolve` | `resolve(self, step_id: str, *, idempotent: bool = True) -> StepEvent \| None` | Devuelve el resultado ya registrado, o ``None`` si toca ejecutar. |
 
 Tres respuestas posibles para cada paso, y la tercera es la interesante:

@@ -19,8 +19,10 @@ arquitectura: **al reanudar, una inferencia ya pagada no se paga otra vez.**
 
 from __future__ import annotations
 
-from ..core.errors import UncertainEffect
-from ..core.events import Durability, StepEvent
+import re
+
+from ..core.errors import ConfigurationError, UncertainEffect
+from ..core.events import Durability, Phase, StepEvent
 from ..core.types import dumps
 from ..core.protocols import AppendResult, Checkpointer, RunState
 
@@ -28,6 +30,10 @@ __all__ = ["Journal", "MemoryCheckpointer", "Replay"]
 
 
 # ── RM-23 · Almacén de referencia ─────────────────────────────────────────────
+
+#: Un identificador de paso derivado del ordinal del bucle: `000003-model`.
+_POSICIONAL = re.compile(r"^\d{6}-")
+
 
 class MemoryCheckpointer:
     """``Checkpointer`` en memoria.  Cumple el contrato completo.
@@ -131,6 +137,7 @@ class Replay:
         """Cuántos se reintentan por haber sido denegados antes."""
         self.closed_by_decision = 0
         """Cuántos quedaron cerrados porque una persona dijo que no."""
+        self._preguntados: set[str] = set()
 
     @property
     def active(self) -> bool:
@@ -141,6 +148,37 @@ class Replay:
     def closed(self) -> StepEvent | None:
         """El cierre del run, si ya lo hubo."""
         return self._state.final
+
+    def ocupado_por_otro(self, step_id: str) -> StepEvent | None:
+        """El paso que el diario tiene en **esa misma posición**, si es de otra clase.
+
+        Es la señal inequívoca de que el diario y este bucle no hablan de la
+        misma secuencia. Los identificadores son posicionales —`000003-model`—
+        así que un bucle que emite un paso más, o uno menos, que el que escribió
+        el diario pregunta por posiciones desplazadas: cada consulta falla por
+        separado, ninguna sabe de las otras, y **todo se reejecuta**.
+
+        Se compara la **clase** y no la mera ausencia, y esa distinción es todo:
+        un hueco es normal —las escrituras diferidas se agrupan, así que un
+        registro puede no estar todavía— pero una posición ocupada por otra
+        clase de paso no la produce ningún retraso. El paso 0 de este bucle es
+        siempre de modelo; si el diario tiene ahí una herramienta, lo escribió
+        otra secuencia.
+
+        Lo que **no** caza, dicho para que nadie lo dé por cubierto: un
+        desplazamiento que conserve las clases en cada posición. Ahí las dos
+        secuencias son indistinguibles desde el diario.
+        """
+        ordinal, _, clase = step_id.partition("-")
+        if not _POSICIONAL.match(step_id):
+            return None
+        for evento in self._state.events:
+            if evento.phase is not Phase.COMPLETED:
+                continue
+            suyo_ordinal, _, suya_clase = evento.step_id.partition("-")
+            if suyo_ordinal == ordinal and suya_clase != clase:
+                return evento
+        return None
 
     def resolve(self, step_id: str, *, idempotent: bool = True) -> StepEvent | None:
         """Devuelve el resultado ya registrado, o ``None`` si toca ejecutar.
@@ -155,7 +193,26 @@ class Replay:
                 efecto no es idempotente.  El bucle no tiene la información
                 para decidir, así que no la inventa: la levanta.
         """
+        self._preguntados.add(step_id)
         done = self._state.result_of(step_id)
+
+        if done is None:
+            # Nada en esta posición. ¿La tiene ocupada otra clase de paso?
+            intruso = self.ocupado_por_otro(step_id)
+            if intruso is not None:
+                raise ConfigurationError(
+                    f"El diario del run '{self._state.run_id}' tiene un paso "
+                    f"'{intruso.step_id}' donde este bucle pide '{step_id}'.\n"
+                    "La identidad de paso es posicional, así que un bucle que emite "
+                    "un paso más —o uno menos— que el que escribió el diario pregunta "
+                    "por identificadores desplazados: los registros viejos no se "
+                    "consultan y **todo se reejecuta**, incluido lo que no es "
+                    "idempotente.\n"
+                    "Suele significar que el run se grabó con otra versión del "
+                    "framework. Ese run es de aquella secuencia: dale un `run_id` "
+                    "nuevo, o reanúdalo con la versión que lo escribió."
+                )
+
         if done is not None:
             if done.outcome.final:
                 # Una persona dijo que no.  Es un desenlace **cerrado**: se

@@ -26,10 +26,10 @@ para lo único que hace falta: mirar ayer.
 
 Lo que esto **no** hace
 ------------------------
-No exporta nada. Los nombres de atributo, las unidades y el transporte son de la
-instrumentación (`SYN-37`), y esa forma la fija la plataforma de observabilidad
-que los consuma. Emitir aquí un formato propio sería construir algo que habría
-que tirar.
+No exporta nada: calcula y devuelve. Los nombres de atributo, las unidades y el
+transporte son de quien lo consuma, y las trazas de la estructura del bucle son
+otra cosa y viven en ``synaptum.telemetry``. Un informe que además exportara
+tendría que elegir un formato, y el formato lo fija quien lo recibe.
 
 Y no habla de dinero. Los tokens los sabemos; los precios no, y convertirlos con
 una tarifa inventada daría una cifra con aspecto de exacta.
