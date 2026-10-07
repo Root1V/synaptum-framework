@@ -5,9 +5,18 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ## [Sin publicar]
 
-Lo que hay en `main` desde la `1.0.0rc2`. Se anota aquí según entra y no al cortar la versión:
-reconstruir un registro del `git log` tres semanas después produce una lista de commits, no un
-registro de cambios — y lo que se pierde es siempre el *porqué*, que es la mitad que sirve.
+Nada todavía. Se anota aquí según entra y no al cortar la versión: reconstruir un registro del
+`git log` tres semanas después produce una lista de commits, no un registro de cambios — y lo que
+se pierde es siempre el *porqué*, que es la mitad que sirve.
+
+## [1.0.0rc3] — 2026-10-07
+
+Tercer candidato, y el primero que sale **porque alguien de fuera lo necesitaba**: un segundo
+consumidor —una plataforma documental— fue a portar su loop de extracción y lo que encontró está
+casi todo aquí. Dos de las tres cosas que pidió no eran carencias, eran fallos nuestros.
+
+**Ninguna ruptura respecto a `1.0.0rc2`** en la superficie. Sí cambian dos conductas al reanudar, y
+están dichas abajo.
 
 ### Añadido
 
@@ -132,6 +141,18 @@ registro de cambios — y lo que se pierde es siempre el *porqué*, que es la mi
 - `ContextEconomy.report()` mezclaba separadores de millares en el mismo informe.
 - `validar_ruc`, en el ejemplo `03`, prometía comprobar el dígito verificador y solo comprobaba el
   formato. Una herramienta que declara más de lo que hace es lo peor que puede haber en un catálogo.
+
+### Pendiente antes de `1.0.0`
+
+- **Un segundo consumidor que lo haya usado de verdad.** Es el único criterio que falta y no es de
+  código: una API que solo ha usado quien la escribió no está probada, está confirmada. Hay uno
+  portando su plataforma ahora; lo que encuentre pesa más que cualquier fila del roadmap.
+- **Entrada multimodal** (`SYN-85`) — hoy el adaptador se niega a mandar una imagen en vez de
+  descartarla, que es la mitad honesta pero no la útil.
+- **Re-preguntar con el error de validación** (`SYN-86`) — hoy un reintento manda un request
+  idéntico, así que el modelo nunca ve qué falló. Es repetir, no reintentar.
+- **La mitad servidor de A2A**, esperando una decisión de gobierno que no es nuestra, y el cliente
+  `Gateway` y el `HttpCheckpointer` contra el arnés, que esperan a que sus endpoints existan.
 
 ## [1.0.0rc2] — 2026-09-20
 
