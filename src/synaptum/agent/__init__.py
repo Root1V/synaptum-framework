@@ -1,6 +1,7 @@
 """El bucle del agente."""
 
-from .agent import Agent, Limits, Session
+from .agent import Agent, Limits, Sampling, Session
 from .delegation import Delegate
 
-__all__ = ["Agent", "Delegate", "Limits", "Session"]
+__all__ = ["Agent", "Delegate", "Limits",
+    "Sampling", "Session"]

@@ -136,3 +136,29 @@ def test_a_second_sentinel_cannot_change_the_result():
     dos = uno + 'data: {"choices":[{"delta":{"content":" BASURA"}}]}\ndata: [DONE]\n'
 
     assert split_sse(uno) == split_sse(dos)
+
+
+def test_a_part_the_adapter_cannot_send_is_refused_instead_of_dropped():
+    """VRT-SYN-001 (S-7, primera mitad) · lo que no se sabe mandar, no se calla.
+
+    Una imagen puesta en el mensaje desaparecía del cuerpo, el modelo contestaba
+    sobre un texto sin ella y **nada fallaba**: la respuesta parecía mala y lo
+    que estaba mal era el envío.
+
+    Negarse es peor para quien ya tenía un atajo y mejor para todos los demás.
+    Un fallo ruidoso se arregla una vez; uno silencioso se paga en cada
+    respuesta sin que nadie sepa por qué.
+    """
+    from synaptum import ConfigurationError, Image, Message, Role, Text
+    from synaptum.providers.openai_compatible import _message_to_wire
+
+    con_imagen = Message(
+        role=Role.USER,
+        content=(Text("¿qué dice esta boleta?"), Image(data="xx", media_type="image/png")),
+    )
+
+    with pytest.raises(ConfigurationError, match="image"):
+        _message_to_wire(con_imagen)
+
+    # Y lo que sí sabe mandar sigue pasando igual.
+    assert _message_to_wire(Message.user("hola"))[0]["content"] == "hola"

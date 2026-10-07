@@ -18,7 +18,7 @@ Lo que se toca en el primer fichero.
 Composición, no herencia.  Un agente es su configuración más el bucle.
 
 ```python
-Agent(name: str, *, model: str, instructions: Any = None, tools: Sequence[Any] = (), delegates: Sequence[Any] = (), output: Any = None, limits: Limits | None = None) -> None
+Agent(name: str, *, model: str, instructions: Any = None, tools: Sequence[Any] = (), delegates: Sequence[Any] = (), output: Any = None, limits: Limits | None = None, sampling: "Sampling | None" = None) -> None
 ```
 
 | Miembro | Firma | |
@@ -56,6 +56,38 @@ Topes del bucle.
 Son **corrección, no política**: evitan que un bucle mal formado no termine
 nunca.  Los límites de gasto pertenecen al harness y llegan por la costura
 como ``Denied`` con ``terminate_run``.
+
+### `Sampling`
+
+Cómo muestrea el modelo, y qué puede o no llamar.
+
+| Campo | Tipo | Por defecto |
+|---|---|---|
+| `temperature` | `float \| None` | `None` |
+| `top_p` | `float \| None` | `None` |
+| `max_output_tokens` | `int \| None` | `None` |
+| `stop` | `tuple[str, ...]` | `()` |
+| `tool_choice` | `ToolChoice` | `ToolChoice(mode='auto', name=None)` |
+| `provider_options` | `Mapping[str, Any]` | *(fábrica)* |
+
+| Miembro | Firma | |
+|---|---|---|
+| `as_request_fields` | `as_request_fields(self) -> dict[str, Any]` | Lo que hay que pasarle al ``Request``, sin los que nadie fijó. |
+
+Va aparte de ``Limits`` porque son dos cosas distintas: los límites son
+**corrección** —que un bucle mal formado termine— y esto es **conducta**.
+Mezclarlos haría que subir un tope pareciera del mismo orden que bajar la
+temperatura.
+
+Todo a ``None`` significa «lo que decida quien ejecuta». No se inventa un
+valor por defecto: un ``temperature=0.7`` nuestro pisaría el del proveedor
+sin que nadie lo hubiera pedido, y la diferencia solo se vería en la
+conducta del modelo, que es donde menos se busca.
+
+**Forma parte del prefijo estable.** Cambiar la temperatura a mitad de un
+run cambia cómo responde el modelo, así que reanudar con otra se rechaza
+igual que reanudar con otro modelo: el diario describiría un run que
+ninguna configuración produjo.
 
 ### `Delegate`
 

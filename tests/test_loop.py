@@ -697,3 +697,100 @@ def test_an_outlandish_retry_after_is_capped():
 
     asyncio.run(go())
     assert esperas == [30.0], f"un run se habría quedado un día parado: {esperas}"
+
+
+# ── VRT-SYN-001 · lo que pidió Veritium para un loop de extracción acotado ────
+
+def test_a_badly_called_tool_comes_back_as_evidence_instead_of_killing_the_run():
+    """S-3 · Una llamada con argumentos que no encajan es una muestra mala.
+
+    Lo decía ya el propio `InvalidToolCallError` —«lo que corrige esto es
+    devolverle el error al modelo como ToolResult para que rectifique, no
+    repetir la llamada»— y el bucle dejaba subir la excepción: el run entero
+    moría por un argumento mal escrito. El tipo describía la conducta correcta
+    y el código hacía otra.
+    """
+    from typing import Annotated
+
+    from synaptum import tool
+    from synaptum.testing import FakeGateway, calls, says
+
+    ejecuciones: list[str] = []
+
+    @tool
+    async def leer(ruta: Annotated[str, "Ruta"]) -> str:
+        """Lee un fichero."""
+        ejecuciones.append(ruta)
+        return "contenido"
+
+    def responder(peticion):
+        vistos = sum(1 for m in peticion.messages if m.role is Role.TOOL)
+        if vistos == 0:
+            return calls("leer", carpeta="/x")        # el argumento no existe
+        if vistos == 1:
+            return calls("leer", ruta="/x")           # corregido al ver el error
+        return says("Leído.")
+
+    agente = Agent("a", model="fake:m", instructions="Lee.", tools=[leer])
+    pasos = run(agente, "lee", Session("r", FakeGateway(*[responder] * 6, tools=[leer])))
+
+    fallido = next(
+        p for p in pasos
+        if isinstance(p, ToolStep) and p.phase is Phase.COMPLETED and p.result.is_error
+    )
+    assert "ruta" in fallido.result.content[0].text, "el error no dice qué falta"
+
+    assert ejecuciones == ["/x"], "la herramienta se ejecutó una vez, con la llamada buena"
+    assert next(p.output for p in pasos if isinstance(p, FinalStep)) == "Leído."
+
+
+def test_sampling_travels_to_the_request():
+    """S-1 · El `Request` ya lo transportaba; lo que faltaba era poder fijarlo."""
+    from synaptum import Sampling
+    from synaptum.testing import FakeGateway, says
+
+    agente = Agent(
+        "a", model="fake:m", instructions="Extrae.",
+        sampling=Sampling(
+            temperature=0.0, max_output_tokens=512,
+            provider_options={"chat_template_kwargs": {"enable_thinking": False}},
+        ),
+    )
+    puerta = FakeGateway(says("listo"))
+    run(agente, "extrae", Session("r", puerta))
+
+    enviada = puerta.requests[0]
+    assert enviada.temperature == 0.0, "un cero es un valor, no la ausencia de uno"
+    assert enviada.max_output_tokens == 512
+    assert enviada.provider_options["chat_template_kwargs"] == {"enable_thinking": False}
+
+
+def test_resuming_with_other_sampling_is_refused():
+    """S-1 · Cambiar la temperatura a mitad de un run cambia cómo responde el modelo.
+
+    Reanudar con otra produciría un diario que **ninguna configuración
+    produjo**, que es el mismo daño que reanudar con otro modelo.
+    """
+    from synaptum import ConfigurationError, Sampling
+    from synaptum.testing import FakeGateway, says
+
+    from synaptum import Request
+
+    store = MemoryCheckpointer()
+    frio = Agent("a", model="fake:m", instructions="Extrae.", sampling=Sampling(temperature=0.0))
+
+    # Un run **en vuelo**: hay intención registrada y no cierre. Uno terminado
+    # devuelve su desenlace sin llegar a comprobar nada, que es correcto y no
+    # es lo que se prueba aquí.
+    asyncio.run(store.append("r1", ModelStep(
+        run_id="r1", step_id=make_step_id(0, "model"), step_seq=0,
+        phase=Phase.ATTEMPTED,
+        request=Request(
+            model=frio.model, system=frio.instructions,
+            **frio.sampling.as_request_fields(),
+        ),
+    )))
+
+    caliente = Agent("a", model="fake:m", instructions="Extrae.", sampling=Sampling(temperature=0.7))
+    with pytest.raises(ConfigurationError, match="muestreo"):
+        run(caliente, "extrae", Session("r1", FakeGateway(says("otra")), store))

@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from typing import Any, Iterable, Iterator, Mapping
 
-from ..core.errors import ProviderError
+from ..core.errors import ConfigurationError, ProviderError
 from ..core.types import (
     Finish,
     FinishReason,
@@ -327,6 +327,8 @@ def _message_to_wire(message: Message) -> list[dict[str, Any]]:
             if hasattr(part, "call_id")
         ]
 
+    _rechaza_lo_que_no_sabe_mandar(message)
+
     wire: dict[str, Any] = {"role": message.role.value}
     text = message.text
     calls = message.tool_calls
@@ -341,6 +343,33 @@ def _message_to_wire(message: Message) -> list[dict[str, Any]]:
             for call in calls
         ]
     return [wire]
+
+
+#: Lo que este adaptador sabe poner en el cable.  El razonamiento se omite a
+#: propósito —no se devuelve al proveedor— y por eso no cuenta como pérdida.
+_TRANSPORTABLE = {"text", "tool_call", "tool_result", "thinking", "redacted_thinking"}
+
+
+def _rechaza_lo_que_no_sabe_mandar(message: Message) -> None:
+    """Falla si el mensaje lleva algo que este adaptador no transporta.
+
+    Antes se descartaba en silencio: una imagen puesta en el mensaje
+    desaparecía, el modelo contestaba sobre un texto sin ella, y **nada
+    fallaba**. La respuesta parecía mala y lo que estaba mal era el envío.
+
+    Negarse es peor para quien ya tenía un atajo y mejor para todos los demás:
+    un fallo ruidoso se arregla una vez, y uno silencioso se paga en cada
+    respuesta sin que nadie sepa por qué.
+    """
+    perdidas = sorted({
+        parte.kind for parte in message.content if parte.kind not in _TRANSPORTABLE
+    })
+    if perdidas:
+        raise ConfigurationError(
+            f"El adaptador `openai-compatible` no sabe transportar {perdidas} y "
+            f"no lo descarta en silencio: el modelo respondería sin eso y nadie "
+            f"se enteraría. Entrada multimodal: todavía no está."
+        )
 
 
 def _format_to_wire(response_format: Any) -> dict[str, Any]:
