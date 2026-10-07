@@ -33,7 +33,7 @@ GRUPOS: list[tuple[str, str, tuple[str, ...]]] = [
     (
         "Escribir un agente",
         "Lo que se toca en el primer fichero.",
-        ("Agent", "Session", "Limits", "Delegate", "tool", "Tool", "Risk",
+        ("Agent", "Session", "Limits", "Sampling", "Delegate", "tool", "Tool", "Risk",
          "ToolDefinition", "ToolChoice"),
     ),
     (

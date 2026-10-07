@@ -17,6 +17,15 @@ registro de cambios — y lo que se pierde es siempre el *porqué*, que es la mi
   nada. Cinco valores: `result`, `denied_by_policy`, `approval_granted`, `approval_denied` y
   `approval_expired`.
 
+- **`Sampling`** — `temperature`, `top_p`, `max_output_tokens`, `stop`, `tool_choice` y
+  `provider_options` desde el `Agent`. Va aparte de `Limits` porque son cosas distintas: los límites
+  son **corrección** y esto es **conducta**. Nada tiene valor por defecto: un `temperature` nuestro
+  pisaría el del proveedor sin que nadie lo hubiera pedido, y la diferencia solo se vería en cómo
+  responde el modelo, que es donde menos se busca.
+
+  **Forma parte del prefijo estable**, así que reanudar un run con otro muestreo se rechaza igual
+  que reanudarlo con otro modelo, y el error dice qué cambió: `muestreo: temperature 0.0 → 0.7`.
+
 - **`synaptum.telemetry.traced()`** — la estructura del run como trazas: `agent.run`, `agent.turn`,
   `agent.delegate` y `agent.approval`. Envuelve el iterador de `Agent.run()` en vez de tocar el
   bucle, así que el núcleo sigue sin conocer OpenTelemetry y el extra `[otel]` solo hace falta para
@@ -105,6 +114,15 @@ registro de cambios — y lo que se pierde es siempre el *porqué*, que es la mi
   con «no existe».
 
 ### Corregido
+
+- **Una tool llamada con argumentos que no encajan ya no mata el run.** Vuelve al modelo como
+  `ToolResult(is_error=True)` con el detalle, y el modelo corrige. El docstring de
+  `InvalidToolCallError` describía esa conducta desde el principio —«devolverle el error al modelo
+  para que rectifique, no repetir la llamada»— mientras el bucle dejaba subir la excepción.
+
+- **El adaptador `openai-compatible` se niega a mandar lo que no sabe transportar** en vez de
+  descartarlo en silencio. Una imagen en un mensaje desaparecía del cuerpo, el modelo contestaba sin
+  ella y nada fallaba: la respuesta parecía mala y lo que estaba mal era el envío.
 
 - **El cargador de los corpus compartidos suponía la forma por la ubicación**, leyendo todo `*.json`
   de una carpeta como si solo pudiera haber una clase de documento ahí. El día que llegó un vecino

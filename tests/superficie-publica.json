@@ -59,6 +59,7 @@
  "RunState",
  "SEAM_VERSION",
  "SUPPORT_WINDOW",
+ "Sampling",
  "Schema",
  "SeamVersionError",
  "Session",

@@ -14,7 +14,15 @@ Lo que **no debe cambiar dentro de un run**, y en este orden:
 1. el modelo,
 2. las instrucciones de sistema,
 3. el catálogo de herramientas — nombres, descripciones y esquemas, en su orden,
-4. el formato de salida pedido.
+4. el formato de salida pedido,
+5. **el muestreo** — temperatura, `top_p`, tope de salida, `stop`, elección de
+   herramienta y opciones de proveedor.
+
+El quinto no viaja al principio del prompt y aun así entra aquí, porque esta
+huella hace dos trabajos: decir cuándo se tira la caché **y** decir cuándo un
+run ha dejado de ser el mismo run. Cambiar la temperatura no invalida la caché
+y sí cambia cómo responde el modelo, así que reanudar con otra produciría un
+diario que ninguna configuración produjo — que es el daño que esto evita.
 
 Los mensajes vienen después y crecen; eso es lo normal y no invalida nada,
 porque se añaden al final.
@@ -34,6 +42,8 @@ configuración distinta es otro run — con su propio ``run_id``.
 from __future__ import annotations
 
 import hashlib
+
+from typing import Any
 
 from ..core.types import Request, dumps
 
@@ -71,7 +81,20 @@ def _partes_estables(request: Request) -> dict:
                 "schema": dict(request.response_format.schema),
             }
         ),
+        "sampling": {
+            "temperature": request.temperature,
+            "top_p": request.top_p,
+            "max_output_tokens": request.max_output_tokens,
+            "stop": list(request.stop),
+            "tool_choice": _choice(request.tool_choice),
+            "provider_options": dict(request.provider_options),
+        },
     }
+
+
+def _choice(valor: Any) -> Any:
+    """`ToolChoice` puede ser un enum o un nombre; las dos formas se comparan igual."""
+    return getattr(valor, "value", valor)
 
 
 def describe_prefix_change(antes: Request, ahora: Request) -> str:
@@ -103,5 +126,17 @@ def describe_prefix_change(antes: Request, ahora: Request) -> str:
 
     if viejo["response_format"] != nuevo["response_format"]:
         cambios.append("formato de salida: cambió")
+
+    distinto = [
+        campo
+        for campo, antes_valor in viejo["sampling"].items()
+        if antes_valor != nuevo["sampling"][campo]
+    ]
+    if distinto:
+        detalles = ", ".join(
+            f"{campo} {viejo['sampling'][campo]!r} → {nuevo['sampling'][campo]!r}"
+            for campo in distinto
+        )
+        cambios.append(f"muestreo: {detalles}")
 
     return " · ".join(cambios) or "algo del prefijo estable"

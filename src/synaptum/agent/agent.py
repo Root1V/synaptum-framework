@@ -46,6 +46,7 @@ from typing import Any, AsyncIterator, Mapping, Sequence
 from ..core.errors import (
     ConfigurationError,
     Denied,
+    InvalidToolCallError,
     LimitExceeded,
     ProviderError,
     SynaptumError,
@@ -65,6 +66,7 @@ from ..core.events import (
 from ..core.errors import NoObjectGeneratedError
 from ..core.protocols import CallContext, Checkpointer, Gateway, RunState
 from ..core.types import (
+    AUTO,
     Message,
     Request,
     Response,
@@ -72,6 +74,7 @@ from ..core.types import (
     Risk,
     StreamEvent,
     ToolCall,
+    ToolChoice,
     ToolDefinition,
     ToolResult,
     Usage,
@@ -83,7 +86,56 @@ from ..context.prefix import describe_prefix_change, prefix_fingerprint
 from .delegation import Delegate, delegate_risk, sub_run_id
 from ..run.journal import Journal, MemoryCheckpointer, Replay
 
-__all__ = ["Limits", "Session", "Agent"]
+__all__ = ["Limits", "Sampling", "Session", "Agent"]
+
+
+# ── Muestreo ──────────────────────────────────────────────────────────────────
+
+@dataclass(frozen=True, slots=True)
+class Sampling:
+    """Cómo muestrea el modelo, y qué puede o no llamar.
+
+    Va aparte de ``Limits`` porque son dos cosas distintas: los límites son
+    **corrección** —que un bucle mal formado termine— y esto es **conducta**.
+    Mezclarlos haría que subir un tope pareciera del mismo orden que bajar la
+    temperatura.
+
+    Todo a ``None`` significa «lo que decida quien ejecuta». No se inventa un
+    valor por defecto: un ``temperature=0.7`` nuestro pisaría el del proveedor
+    sin que nadie lo hubiera pedido, y la diferencia solo se vería en la
+    conducta del modelo, que es donde menos se busca.
+
+    **Forma parte del prefijo estable.** Cambiar la temperatura a mitad de un
+    run cambia cómo responde el modelo, así que reanudar con otra se rechaza
+    igual que reanudar con otro modelo: el diario describiría un run que
+    ninguna configuración produjo.
+    """
+
+    temperature: float | None = None
+    """``0`` es un valor medido, no la ausencia de uno: es lo que hace
+    reproducible una extracción."""
+    top_p: float | None = None
+    max_output_tokens: int | None = None
+    stop: tuple[str, ...] = ()
+    tool_choice: ToolChoice = AUTO
+    """Si el modelo elige herramienta, debe usar una, o no puede usar ninguna."""
+    provider_options: Mapping[str, Any] = field(default_factory=dict)
+    """La válvula de escape para lo que un proveedor concreto expone y el
+    vocabulario común no cubre.  Usarla para algo que sí es común es señal de
+    que falta un campo en la especificación, no de que esto sobre."""
+
+    def as_request_fields(self) -> dict[str, Any]:
+        """Lo que hay que pasarle al ``Request``, sin los que nadie fijó."""
+        campos: dict[str, Any] = {"tool_choice": self.tool_choice}
+        if self.stop:
+            campos["stop"] = tuple(self.stop)
+        if self.provider_options:
+            campos["provider_options"] = dict(self.provider_options)
+        for nombre in ("temperature", "top_p", "max_output_tokens"):
+            valor = getattr(self, nombre)
+            if valor is not None:
+                campos[nombre] = valor
+        return campos
 
 
 # ── Límites — RM-27 ───────────────────────────────────────────────────────────
@@ -153,6 +205,7 @@ class Agent:
         delegates: Sequence[Any] = (),
         output: Any = None,
         limits: Limits | None = None,
+        sampling: "Sampling | None" = None,
     ) -> None:
         self.name = name
         self.model = model
@@ -180,6 +233,10 @@ class Agent:
             d.definition for d in self.delegates
         )
         self.limits = limits or Limits()
+        # El muestreo es **del prefijo**, no de la llamada: cambiarlo a mitad de
+        # un run cambia la conducta del modelo, así que entra en la huella y
+        # reanudar con otro se rechaza como se rechaza cambiar de modelo.
+        self.sampling = sampling or Sampling()
         self.output: Schema | None = schema_for(output) if output is not None else None
         self._format = (
             ResponseFormat(
@@ -287,6 +344,7 @@ class Agent:
                     messages=tuple(messages),
                     tools=self.tools,
                     response_format=self._format,
+                    **self.sampling.as_request_fields(),
                 )
 
                 # Una llamada al modelo no tiene efecto externo más allá de su
@@ -428,6 +486,21 @@ class Agent:
 
                     try:
                         outcome = await self._call_tool(session, call, step_id, spec)
+                    except InvalidToolCallError as desajuste:
+                        # El modelo llamó con argumentos que no encajan con la
+                        # firma. **Eso no es un fallo del run**: es una muestra
+                        # mala, y un modelo que ve el error suele corregirla.
+                        #
+                        # Lo decía ya el propio tipo —«lo que corrige esto es
+                        # devolverle el error al modelo como ToolResult para que
+                        # rectifique, no repetir la llamada»— y el bucle hacía
+                        # otra cosa: dejaba subir la excepción y el run moría
+                        # entero por un argumento mal escrito.
+                        outcome = ToolResult.of(
+                            call.id,
+                            f"{desajuste}. Corrige la llamada y vuelve a intentarlo.",
+                            is_error=True,
+                        )
                     except Denied as denial:
                         if denial.disposition is Disposition.DENY_STEP:
                             # El bucle puede intentar otra cosa: se le devuelve
@@ -660,6 +733,7 @@ class Agent:
             system=self.instructions,
             tools=self.tools,
             response_format=self._format,
+            **self.sampling.as_request_fields(),
         )
         if prefix_fingerprint(primera) == prefix_fingerprint(ahora):
             return

@@ -73,7 +73,7 @@ Run con-tope · 2 turnos
 
   ── y el mismo agente, con la hora en las instrucciones ──
 
-  huella del prefijo: 507a5687c0def2fb → 43f597f9f1e535b5
+  huella del prefijo: fc08e6f53966cb81 → d086f6c34f7d8cb6
   qué cambió:         instrucciones de sistema: cambiaron
 
   Eso no dice «la huella no coincide», que no sirve para nada: dice
