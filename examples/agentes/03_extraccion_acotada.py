@@ -128,9 +128,12 @@ async def main() -> None:
     guion = [
         calls("leer_pagina", documento_id="doc-88231", pagina=1),
         calls("validar_ruc", ruc="20481234567"),
-        # Primer intento del modelo: JSON mal formado. Pasa, y pasa más de lo que
-        # nadie admite. El bucle lo trata como reintentable —el muestreo es
-        # estocástico— y vuelve a pedirlo sin que el llamante se entere.
+        # Primer intento del modelo: JSON mal formado. Pasa, y pasa más de lo
+        # que nadie admite. El bucle **le enseña el error y vuelve a preguntar**,
+        # sin que el llamante se entere. Repetir la misma petición byte a byte
+        # —que es lo que hacía antes— no es reintentar: el muestreo es
+        # estocástico, pero un modelo que no ve qué falló no tiene por qué
+        # acertar la segunda vez.
         says('{"ruc": "20481234567", "trabajador": "JOHN DOE",'),
         says(
             '{"ruc": "20481234567", "trabajador": "JOHN DOE", '
@@ -158,7 +161,8 @@ async def main() -> None:
                 print("  ✓ el neto cuadra con bruto − descuentos")
 
     print(f"\n  llamadas al modelo: {llamadas_al_modelo} "
-          f"(una se perdió en un JSON truncado y se reintentó sola)")
+          f"(una se perdió en un JSON truncado; el bucle le enseñó el error\n"
+          f"  y el modelo lo corrigió en el turno siguiente)")
 
 
 # Lo que hay que llevarse: **la validación estructurada vive dentro del

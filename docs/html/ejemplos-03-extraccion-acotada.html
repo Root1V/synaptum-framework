@@ -226,7 +226,8 @@ sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un
   bruto 4,302.50 − descuentos 548.55 = neto 3,753.95
   ✓ el neto cuadra con bruto − descuentos
 
-  llamadas al modelo: 3 (una se perdió en un JSON truncado y se reintentó sola)
+  llamadas al modelo: 4 (una se perdió en un JSON truncado; el bucle le enseñó el error
+  y el modelo lo corrigió en el turno siguiente)
 </code></pre>
 <pre data-lenguaje="python"><code><span class="p-kn">from</span><span class="p-w"> </span><span class="p-nn">__future__</span><span class="p-w"> </span><span class="p-kn">import</span> <span class="p-n">annotations</span>
 
@@ -331,9 +332,12 @@ ninguna empresa; se comprueba con los pesos 5,4,3,2,7,6,5,4,3,2.</p>
     <span class="p-n">guion</span> <span class="p-o">=</span> <span class="p-p">[</span>
         <span class="p-n">calls</span><span class="p-p">(</span><span class="p-s2">"leer_pagina"</span><span class="p-p">,</span> <span class="p-n">documento_id</span><span class="p-o">=</span><span class="p-s2">"doc-88231"</span><span class="p-p">,</span> <span class="p-n">pagina</span><span class="p-o">=</span><span class="p-mi">1</span><span class="p-p">),</span>
         <span class="p-n">calls</span><span class="p-p">(</span><span class="p-s2">"validar_ruc"</span><span class="p-p">,</span> <span class="p-n">ruc</span><span class="p-o">=</span><span class="p-s2">"20481234567"</span><span class="p-p">),</span>
-        <span class="p-c1"># Primer intento del modelo: JSON mal formado. Pasa, y pasa más de lo que</span>
-        <span class="p-c1"># nadie admite. El bucle lo trata como reintentable —el muestreo es</span>
-        <span class="p-c1"># estocástico— y vuelve a pedirlo sin que el llamante se entere.</span>
+        <span class="p-c1"># Primer intento del modelo: JSON mal formado. Pasa, y pasa más de lo</span>
+        <span class="p-c1"># que nadie admite. El bucle **le enseña el error y vuelve a preguntar**,</span>
+        <span class="p-c1"># sin que el llamante se entere. Repetir la misma petición byte a byte</span>
+        <span class="p-c1"># —que es lo que hacía antes— no es reintentar: el muestreo es</span>
+        <span class="p-c1"># estocástico, pero un modelo que no ve qué falló no tiene por qué</span>
+        <span class="p-c1"># acertar la segunda vez.</span>
         <span class="p-n">says</span><span class="p-p">(</span><span class="p-s1">'{"ruc": "20481234567", "trabajador": "JOHN DOE",'</span><span class="p-p">),</span>
         <span class="p-n">says</span><span class="p-p">(</span>
             <span class="p-s1">'{"ruc": "20481234567", "trabajador": "JOHN DOE", '</span>
@@ -361,7 +365,8 @@ ninguna empresa; se comprueba con los pesos 5,4,3,2,7,6,5,4,3,2.</p>
                 <span class="p-nb">print</span><span class="p-p">(</span><span class="p-s2">"  ✓ el neto cuadra con bruto − descuentos"</span><span class="p-p">)</span>
 
     <span class="p-nb">print</span><span class="p-p">(</span><span class="p-sa">f</span><span class="p-s2">"</span><span class="p-se">\n</span><span class="p-s2">  llamadas al modelo: </span><span class="p-si">{</span><span class="p-n">llamadas_al_modelo</span><span class="p-si">}</span><span class="p-s2"> "</span>
-          <span class="p-sa">f</span><span class="p-s2">"(una se perdió en un JSON truncado y se reintentó sola)"</span><span class="p-p">)</span>
+          <span class="p-sa">f</span><span class="p-s2">"(una se perdió en un JSON truncado; el bucle le enseñó el error</span><span class="p-se">\n</span><span class="p-s2">"</span>
+          <span class="p-sa">f</span><span class="p-s2">"  y el modelo lo corrigió en el turno siguiente)"</span><span class="p-p">)</span>
 
 <span class="p-k">if</span> <span class="p-vm">__name__</span> <span class="p-o">==</span> <span class="p-s2">"__main__"</span><span class="p-p">:</span>
     <span class="p-n">asyncio</span><span class="p-o">.</span><span class="p-n">run</span><span class="p-p">(</span><span class="p-n">main</span><span class="p-p">())</span>

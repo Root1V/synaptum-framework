@@ -88,6 +88,13 @@ from ..run.journal import Journal, MemoryCheckpointer, Replay
 
 __all__ = ["Limits", "Sampling", "Session", "Agent"]
 
+#: Nombre de la herramienta con la que un agente entrega su salida final.
+#:
+#: Fijo y no configurable: el modelo lo ve en el catálogo y nada más del bucle
+#: lo necesita. Dejarlo elegir añadiría una forma de que el agente y quien lo
+#: lee hablen de herramientas distintas, a cambio de nada.
+SUBMIT = "submit"
+
 
 # ── Muestreo ──────────────────────────────────────────────────────────────────
 
@@ -206,6 +213,7 @@ class Agent:
         output: Any = None,
         limits: Limits | None = None,
         sampling: "Sampling | None" = None,
+        submit_tool: bool = False,
     ) -> None:
         self.name = name
         self.model = model
@@ -238,13 +246,28 @@ class Agent:
         # reanudar con otro se rechaza como se rechaza cambiar de modelo.
         self.sampling = sampling or Sampling()
         self.output: Schema | None = schema_for(output) if output is not None else None
+
+        #: La salida final se entrega **llamando a una herramienta**, no
+        #: devolviendo texto.
+        #:
+        #: Sustituye a ``response_format`` en vez de acompañarlo, y no es una
+        #: preferencia: dos restricciones que piden lo mismo pueden divergir, y
+        #: con algunos motores una gramática de salida en la misma petición que
+        #: un catálogo de herramientas **impide que el modelo emita tool calls**
+        #: — con lo que la forma de entregar y la de trabajar se estorban.
+        #:
+        #: Lo que gana a cambio: un objeto que no valida vuelve al modelo como
+        #: resultado de herramienta, con el error dentro, y el modelo corrige en
+        #: el turno siguiente. Con texto plano no hay dónde poner esa respuesta.
+        self.submit_tool = submit_tool and self.output is not None
+
         self._format = (
             ResponseFormat(
                 kind="json_schema",
                 schema=self.output.json_schema(),
                 name=getattr(self.output, "name", "output"),
             )
-            if self.output is not None
+            if self.output is not None and not self.submit_tool
             else None
         )
         # El esquema va **también en las instrucciones**, y no solo en
@@ -259,8 +282,27 @@ class Agent:
         # Decirlo en el prompt cuesta unos cientos de tokens una vez por turno y
         # funciona en cualquier proveedor.  Donde `response_format` sí se admite,
         # las dos cosas dicen lo mismo y no estorban.
-        if self.output is not None:
+        if self.output is not None and not self.submit_tool:
             self.instructions = _con_esquema(self.instructions, self.output.json_schema())
+
+        if self.submit_tool:
+            assert self.output is not None
+            # El esquema viaja como los **parámetros** de la herramienta, así que
+            # no hace falta repetirlo en las instrucciones: el catálogo ya lo
+            # lleva, y repetirlo sería la segunda restricción que puede divergir.
+            self.tools = self.tools + (
+                ToolDefinition(
+                    name=SUBMIT,
+                    description=(
+                        "Entrega el resultado final. Llámala **una sola vez**, cuando "
+                        "tengas todos los datos. Si algo no valida, te lo devolveré "
+                        "con el error para que lo corrijas."
+                    ),
+                    parameters=self.output.json_schema(),
+                    risk=Risk.READ,
+                    idempotent=True,
+                ),
+            )
         self._by_name = {t.name: t for t in self.tools}
 
     # ── Bucle ─────────────────────────────────────────────────────────────────
@@ -328,10 +370,36 @@ class Agent:
         total = Usage.zero()
         seq = 0
         turns = 0
+        entregas = 0
+        """Cuántas veces el modelo intentó entregar. Distingue «nunca lo intentó»
+        de «lo intentó y nunca validó», que son dos diagnósticos distintos para
+        quien lea un run agotado."""
+        aceptado: Any = None
+        ultimo_fallo = ""
+        """Lo último que no validó, para que el error lo lleve dentro."""
 
         try:
             while True:
                 if turns >= self.limits.max_steps:
+                    if self.output is not None and entregas:
+                        # «Nunca lo intentó» y «lo intentó y nunca validó» son
+                        # dos diagnósticos distintos, y se separan **por tipo**
+                        # y no solo por el texto: quien atrapa el error suele
+                        # querer actuar distinto —uno se arregla con el prompt y
+                        # el otro con el esquema— y leer un mensaje para decidir
+                        # es la clase de contrato que se rompe al reescribirlo.
+                        raise NoObjectGeneratedError(
+                            f"El modelo entregó {entregas} vez/veces en "
+                            f"{self.limits.max_steps} turnos y ninguna validó. "
+                            f"Lo último que devolvió: {ultimo_fallo[:200]!r}",
+                            raw=ultimo_fallo,
+                        )
+                    if self.output is not None:
+                        donde = f"`{SUBMIT}`" if self.submit_tool else "una salida válida"
+                        raise LimitExceeded(
+                            f"max_steps · el modelo nunca llegó a entregar {donde}",
+                            self.limits.max_steps,
+                        )
                     raise LimitExceeded("max_steps", self.limits.max_steps)
                 turns += 1
 
@@ -424,7 +492,31 @@ class Agent:
                 messages.append(response.message)
 
                 calls = response.tool_calls
+                if not calls and self.output is not None and not self.submit_tool:
+                    entregas += 1
+                    try:
+                        aceptado = self._validate(response.message.text)
+                    except NoObjectGeneratedError as invalido:
+                        # Re-preguntar **enseñando qué falló**. La respuesta
+                        # fallida ya está en el contexto —se añadió arriba— así
+                        # que aquí solo va el porqué.
+                        ultimo_fallo = response.message.text
+                        messages.append(Message.user(
+                            f"Esa salida no vale: {invalido}. Devuelve solo el "
+                            "objeto JSON que pide el esquema, corregido."
+                        ))
+                        continue
+                    break
+
                 if not calls:
+                    if self.submit_tool:
+                        # Con la entrega por herramienta, un turno sin llamadas
+                        # no cierra nada: el modelo habló en vez de entregar.
+                        messages.append(Message.user(
+                            f"No has entregado nada. Llama a `{SUBMIT}` con el "
+                            "resultado para terminar."
+                        ))
+                        continue
                     break
 
                 # ── Pasos de herramienta ──────────────────────────────────────
@@ -453,10 +545,21 @@ class Agent:
                     risk = spec.risk if spec else Risk.READ
                     idempotent = spec.idempotent if spec else False
 
+                    entregando = self.submit_tool and call.name == SUBMIT
+                    if entregando:
+                        entregas += 1
+
                     denegado = None
                     done = replay.resolve(step_id, idempotent=idempotent)
                     if done is not None:
                         assert isinstance(done, ToolStep)
+                        if entregando and done.result is not None and not done.result.is_error:
+                            # Una entrega válida reproducida del diario: el
+                            # objeto se **vuelve a derivar** de los argumentos
+                            # registrados en vez de guardarse. Guardar las dos
+                            # cosas arriesga que discrepen, igual que con el
+                            # contexto.
+                            aceptado = self.output.validate(dict(done.call.arguments))
                         if done.result is None:
                             # Desenlace cerrado sin resultado: una persona dijo
                             # que no.  No se reejecuta y no se vuelve a
@@ -483,6 +586,35 @@ class Agent:
                     )
                     await journal.record(intent)
                     yield intent
+
+                    if entregando:
+                        # No sale por la costura: no hay efecto externo que
+                        # gobernar, solo una comprobación contra el esquema que
+                        # el propio agente declaró.
+                        try:
+                            aceptado = self.output.validate(dict(call.arguments))
+                            outcome = ToolResult.of(call.id, "Aceptado.")
+                        except Exception as invalido:  # noqa: BLE001
+                            # El error vuelve **al modelo**, que es quien puede
+                            # corregirlo. Esa es la diferencia entre reintentar
+                            # —repetir la misma petición y esperar otra suerte—
+                            # y re-preguntar enseñando qué falló.
+                            ultimo_fallo = dumps(call.arguments)
+                            outcome = ToolResult.of(
+                                call.id,
+                                f"El resultado no valida: {invalido}. "
+                                f"Corrígelo y vuelve a llamar a `{SUBMIT}`.",
+                                is_error=True,
+                            )
+                        tool_result = ToolStep(
+                            run_id=session.run_id, step_id=step_id, step_seq=seq - 1,
+                            phase=Phase.COMPLETED, at=time.time(),
+                            call=call, result=outcome, risk=risk, idempotent=True,
+                        )
+                        await journal.record(tool_result)
+                        yield tool_result
+                        results.append(outcome)
+                        continue
 
                     try:
                         outcome = await self._call_tool(session, call, step_id, spec)
@@ -564,7 +696,13 @@ class Agent:
                     )
                 )
 
-            typed = self._final_output(messages[-1].text)
+                # La entrega válida cierra el run **después** de registrar su
+                # resultado: el diario cuenta que se entregó y qué se dijo, y no
+                # solo que el run terminó.
+                if aceptado is not None:
+                    break
+
+            typed = aceptado if aceptado is not None else self._final_output(messages[-1].text)
             final = FinalStep(
                 run_id=session.run_id, step_id=make_step_id(seq, "final"), step_seq=seq,
                 phase=Phase.COMPLETED, at=time.time(),
@@ -590,11 +728,12 @@ class Agent:
             response = await session.gateway.invoke_model(
                 request, self._ctx(session, step_id)
             )
-            # La validación entra **dentro** del reintento a propósito: un objeto
-            # mal formado es reintentable —el muestreo es estocástico— y la
-            # taxonomía de errores ya lo dice, así que basta con levantarlo aquí.
-            if self.output is not None and not response.tool_calls:
-                self._validate(response.message.text)
+            # La validación **ya no entra aquí**, y el motivo es que entrar era
+            # el fallo: un objeto mal formado hacía repetir la **misma**
+            # petición, byte a byte, esperando otra suerte del muestreo. Eso es
+            # repetir, no reintentar — y el modelo nunca llegaba a ver qué había
+            # fallado. Ahora la comprueba el bucle y re-pregunta enseñando el
+            # error, que es lo único que le permite corregir.
             return response
 
         return await self._with_retries(once)
