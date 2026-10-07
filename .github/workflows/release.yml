@@ -165,8 +165,9 @@ jobs:
       # treinta intentos de diez segundos y se quedó corta, así que el job dio
       # rojo sobre una release que estaba perfectamente publicada.
       #
-      # Ahora espera hasta veinte minutos, con el intervalo creciendo: los
-      # primeros intentos son baratos y los últimos no necesitan ser frecuentes.
+      # Ahora espera **veinte minutos** —veinte intentos, con el intervalo
+      # creciendo de 5s a 60s— porque los primeros son baratos y los últimos no
+      # necesitan ser frecuentes.
       # La espera y la comprobación son **el mismo paso** a propósito: una sonda
       # aparte puede decir que sí por un motivo que no es el índice —lo hizo, en
       # local, mirando el entorno en vez del índice— y entonces la verificación
@@ -174,7 +175,7 @@ jobs:
       - name: instalar desde el índice y usarlo como un consumidor
         run: |
           espera=5
-          for intento in $(seq 1 40); do
+          for intento in $(seq 1 20); do
             if uv run --isolated --no-project --index-url "$INDEX" \
                  --with "synaptum==$VERSION" python "$GITHUB_WORKSPACE/.github/humo.py"; then
               echo "verificado tras ${intento} intento(s)"
