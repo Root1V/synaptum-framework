@@ -159,21 +159,35 @@ jobs:
           import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])
           ")" >> "$GITHUB_ENV"
 
-      # Un índice tarda en servir lo que acaba de aceptar, y cuánto es variable.
+      # Un índice tarda en servir lo que acaba de aceptar, y cuánto es variable:
+      # medido, TestPyPI sirvió al primer intento y PyPI tardó **más de cinco
+      # minutos** para la misma versión el mismo día. La espera anterior eran
+      # treinta intentos de diez segundos y se quedó corta, así que el job dio
+      # rojo sobre una release que estaba perfectamente publicada.
+      #
+      # Ahora espera hasta veinte minutos, con el intervalo creciendo: los
+      # primeros intentos son baratos y los últimos no necesitan ser frecuentes.
       # La espera y la comprobación son **el mismo paso** a propósito: una sonda
       # aparte puede decir que sí por un motivo que no es el índice —lo hizo, en
       # local, mirando el entorno en vez del índice— y entonces la verificación
       # arranca creyendo que hay algo. Si la instalación funciona, está servido.
       - name: instalar desde el índice y usarlo como un consumidor
         run: |
-          for intento in $(seq 1 30); do
+          espera=5
+          for intento in $(seq 1 40); do
             if uv run --isolated --no-project --index-url "$INDEX" \
                  --with "synaptum==$VERSION" python "$GITHUB_WORKSPACE/.github/humo.py"; then
               echo "verificado tras ${intento} intento(s)"
               exit 0
             fi
-            echo "intento ${intento}: el índice todavía no lo sirve"
-            sleep 10
+            echo "intento ${intento}: el índice todavía no lo sirve (siguiente en ${espera}s)"
+            sleep "$espera"
+            [ "$espera" -lt 60 ] && espera=$((espera * 2))
           done
-          echo "synaptum==$VERSION no se pudo instalar desde $INDEX cinco minutos después"
+          echo "::error::synaptum==$VERSION no se pudo instalar desde $INDEX en veinte minutos."
+          echo "OJO: esto NO significa que la publicación fallara. El paso anterior la subió;"
+          echo "lo que no se ha podido confirmar es que el índice la sirva. Comprueba a mano"
+          echo "antes de concluir nada, y si instala, lo que falló fue esta comprobación:"
+          echo "  uv run --isolated --no-project --refresh --index-url $INDEX \\"
+          echo "    --with synaptum==$VERSION python .github/humo.py"
           exit 1
