@@ -18,7 +18,7 @@ Lo que se toca en el primer fichero.
 Composición, no herencia.  Un agente es su configuración más el bucle.
 
 ```python
-Agent(name: str, *, model: str, instructions: Any = None, tools: Sequence[Any] = (), delegates: Sequence[Any] = (), output: Any = None, limits: Limits | None = None, sampling: "Sampling | None" = None) -> None
+Agent(name: str, *, model: str, instructions: Any = None, tools: Sequence[Any] = (), delegates: Sequence[Any] = (), output: Any = None, limits: Limits | None = None, sampling: "Sampling | None" = None, submit_tool: bool = False) -> None
 ```
 
 | Miembro | Firma | |

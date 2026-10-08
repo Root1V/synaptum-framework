@@ -5,7 +5,30 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ## [Sin publicar]
 
-Nada todavía. Se anota aquí según entra y no al cortar la versión: reconstruir un registro del
+### Añadido
+
+- **`Agent(submit_tool=True)`** — la salida final se entrega **llamando a una herramienta** cuyo
+  esquema es el `output`, y una entrega que no valida vuelve al modelo con el error dentro para que
+  corrija en el turno siguiente. **Sustituye a `response_format`** en vez de acompañarlo: dos
+  restricciones que piden lo mismo pueden divergir, y con algunos motores una gramática de salida en
+  la misma petición que un catálogo de herramientas impide que el modelo emita tool calls.
+
+  Pedido por el segundo consumidor, y las tres decisiones de forma las tomó él.
+
+### Cambia una conducta por defecto
+
+- **Una salida que no valida se vuelve a pedir enseñando el error**, en vez de repetir la misma
+  petición. Lo anterior no era reintentar: era repetir byte a byte esperando otra suerte del
+  muestreo, con el modelo sin ver nunca qué había fallado.
+
+  Consecuencias para quien ya lo usaba: el reintento consume **turnos** (`max_steps`) y no
+  `max_retries`, y un run que se agota distingue los dos fallos **por tipo** — `LimitExceeded` si
+  el modelo nunca llegó a entregar, `NoObjectGeneratedError` —con el último fallo dentro— si
+  entregó y ninguna validó. Antes las dos acababan igual.
+
+### Corregido
+
+- Nada todavía. Se anota aquí según entra y no al cortar la versión: reconstruir un registro del
 `git log` tres semanas después produce una lista de commits, no un registro de cambios — y lo que
 se pierde es siempre el *porqué*, que es la mitad que sirve.
 

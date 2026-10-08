@@ -15,6 +15,7 @@ from synaptum import (
     FinalStep,
     NoObjectGeneratedError,
     ProviderError,
+    Role,
     Schema,
     Session,
     schema_for,
@@ -205,16 +206,43 @@ def test_a_malformed_object_is_retried_and_the_second_pass_wins():
     assert events[-1].output.veredicto == "rechaza"
 
 
+def test_a_malformed_object_is_asked_again_showing_the_error():
+    """Repetir la misma petición no es reintentar.
+
+    Antes, una salida que no validaba hacía repetir el request **byte a byte**
+    esperando otra suerte del muestreo, y el modelo nunca llegaba a ver qué
+    había fallado. Ahora se le enseña el error, que es lo único que le permite
+    corregir.
+    """
+    gateway = FakeGateway("no es JSON", '{"veredicto": "aprueba", "puntuacion": 7}')
+    agent = Agent("evaluador", model="fake:m", output=Evaluacion)
+
+    eventos = drain(agent, "evalúa", Session("run-1", gateway))
+
+    correctivo = [m for m in gateway.requests[-1].messages if m.role is Role.USER][-1]
+    assert "no es JSON" in correctivo.text, "el turno correctivo no enseña qué volvió"
+
+    final = next(e for e in eventos if isinstance(e, FinalStep))
+    assert (final.output.veredicto, final.output.puntuacion) == ("aprueba", 7)
+
+
 def test_a_persistently_malformed_object_gives_up_with_the_evidence():
+    """Y se rinde diciendo **cuál de los dos fallos** fue.
+
+    «Nunca llegó a entregar» y «entregó y ninguna validó» se arreglan en sitios
+    distintos —el prompt y el esquema— así que se distinguen por tipo y no por
+    el texto del mensaje.
+    """
     from synaptum.agent.agent import Limits
 
-    gateway = FakeGateway(*["no es JSON"] * 4)
-    agent = Agent("evaluador", model="fake:m", output=Evaluacion, limits=Limits(max_retries=2))
+    gateway = FakeGateway(*["no es JSON"] * 10)
+    agent = Agent("evaluador", model="fake:m", output=Evaluacion, limits=Limits(max_steps=4))
 
     with pytest.raises(NoObjectGeneratedError) as caught:
         drain(agent, "evalúa", Session("run-1", gateway))
+
     assert caught.value.raw == "no es JSON"
-    assert gateway.model_calls == 3, "el intento inicial más dos reintentos"
+    assert "4 vez/veces" in str(caught.value) or "veces" in str(caught.value)
 
 
 def test_the_schema_is_not_enforced_on_a_turn_that_calls_tools():
@@ -245,3 +273,90 @@ def test_a_provider_error_is_still_classified_by_its_own_rule():
     with pytest.raises(ProviderError):
         drain(agent, "evalúa", Session("run-1", gateway))
     assert gateway.model_calls == 1, "un 4xx no se reintenta"
+
+
+# ── S-2 · entrega por herramienta ────────────────────────────────────────────
+#
+# Pedido por Veritium y decidido por ellos: el modo *submit tool* **sustituye**
+# a `response_format` en vez de acompañarlo. Dos restricciones que piden lo
+# mismo pueden divergir, y con algunos motores una gramática de salida en la
+# misma petición que un catálogo de herramientas impide que el modelo emita
+# tool calls — la forma de entregar estorbando a la de trabajar.
+
+def test_the_submit_tool_replaces_the_response_format():
+    agente = Agent("extractor", model="fake:m", output=Evaluacion, submit_tool=True)
+
+    assert agente._format is None, "no se envían las dos restricciones"
+    submit = next(t for t in agente.tools if t.name == "submit")
+    assert set(submit.parameters["properties"]) >= {"veredicto", "puntuacion"}
+    assert "json" not in (agente.instructions or "").lower(), (
+        "el esquema ya viaja como parámetros de la tool; repetirlo en el prompt "
+        "sería la segunda restricción que puede divergir"
+    )
+
+
+def test_an_invalid_submit_produces_a_corrective_turn_and_the_second_one_ends_the_run():
+    """El criterio de aceptación de Veritium, literal."""
+    from synaptum import Phase, ToolStep
+
+    def responder(peticion):
+        entregas = sum(1 for m in peticion.messages if m.role is Role.TOOL)
+        if entregas == 0:
+            return calls("submit", id="s1", veredicto="aprueba")      # falta puntuacion
+        return calls("submit", id="s2", veredicto="aprueba", puntuacion=7)
+
+    agente = Agent("evaluador", model="fake:m", output=Evaluacion, submit_tool=True)
+    store = MemoryCheckpointer()
+    eventos = drain(agente, "evalúa", Session("run-1", FakeGateway(*[responder] * 6), store))
+
+    entregas = [
+        e for e in eventos
+        if isinstance(e, ToolStep) and e.phase is Phase.COMPLETED and e.call.name == "submit"
+    ]
+    assert len(entregas) == 2, "una entrega fallida y una buena"
+    assert entregas[0].result.is_error
+    assert "no valida" in entregas[0].result.content[0].text
+    assert not entregas[1].result.is_error
+
+    final = next(e for e in eventos if isinstance(e, FinalStep))
+    assert (final.output.veredicto, final.output.puntuacion) == ("aprueba", 7), (
+        "el objeto validado también llega al FinalStep, no solo al ToolResult"
+    )
+
+    # (3) todo queda en el journal
+    import asyncio
+
+    estado = asyncio.run(store.load("run-1"))
+    pasos = [e.step_id for e in estado.events]
+    assert pasos.count("000001-tool") == 2, "la entrega fallida también se registra"
+    assert any(e.step_id.endswith("-final") for e in estado.events)
+
+
+def test_a_run_that_never_submits_fails_differently_from_one_that_never_validates():
+    """Dos diagnósticos distintos, separados **por tipo** y no por el texto.
+
+    Uno se arregla con el prompt y el otro con el esquema, así que quien atrapa
+    el error suele querer actuar distinto — y leer un mensaje para decidirlo es
+    la clase de contrato que se rompe al reescribirlo.
+    """
+    from synaptum import LimitExceeded
+    from synaptum.agent.agent import Limits
+
+    callado = Agent(
+        "evaluador", model="fake:m", output=Evaluacion, submit_tool=True,
+        limits=Limits(max_steps=3),
+    )
+    with pytest.raises(LimitExceeded, match="nunca llegó a entregar"):
+        drain(callado, "evalúa", Session("r1", FakeGateway(*["hablo pero no entrego"] * 9)))
+
+    def siempre_mal(_peticion):
+        return calls("submit", id="s", veredicto="aprueba")        # nunca valida
+
+    insistente = Agent(
+        "evaluador", model="fake:m", output=Evaluacion, submit_tool=True,
+        limits=Limits(max_steps=3),
+    )
+    with pytest.raises(NoObjectGeneratedError) as fallo:
+        drain(insistente, "evalúa", Session("r2", FakeGateway(*[siempre_mal] * 9)))
+    assert "ninguna validó" in str(fallo.value)
+    assert fallo.value.raw, "el error lleva dentro lo último que no validó"
