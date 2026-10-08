@@ -5,6 +5,20 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ## [Sin publicar]
 
+Nada todavía.
+
+## [1.0.0rc4] — 2026-10-07
+
+**Cortada a petición del segundo consumidor**, cuatro días después de la `rc3` y por un motivo
+concreto: tenía cinco capacidades suyas entregadas en `main` y ninguna publicada, y dos de las que
+faltan dependen de un tercer equipo. *«No tiene sentido retener cinco capacidades entregadas
+esperando a dos que no controlan»* — y tienen razón.
+
+Todo lo de esta versión salió de alguien portando su plataforma encima: lo que encontró al hacerlo
+está aquí, y dos de las cosas que pidió no eran carencias nuestras sino fallos.
+
+**Sin rupturas de superficie.** Cambia una conducta, y está dicha abajo.
+
 ### Añadido
 
 - **`generate(task, model=…, session=…, output=…)`** — una llamada al modelo gobernada y durable sin
