@@ -96,6 +96,7 @@
  "fmt_dict",
  "fmt_list",
  "fmt_records",
+ "generate",
  "idempotency_key",
  "json_schema_for",
  "make_step_id",

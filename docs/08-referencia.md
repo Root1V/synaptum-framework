@@ -23,7 +23,7 @@ Agent(name: str, *, model: str, instructions: Any = None, tools: Sequence[Any] =
 
 | Miembro | Firma | |
 |---|---|---|
-| `run` | `run(self, task: str, *, session: Session) -> AsyncIterator[StepEvent]` | Ejecuta el agente cediendo cada paso. |
+| `run` | `run(self, task: Entrada, *, session: Session) -> AsyncIterator[StepEvent]` | Ejecuta el agente cediendo cada paso. |
 | `stream` | `stream(self, task: str, *, session: Session) -> AsyncIterator[StepEvent \| StreamEvent]` | Lo mismo, entregando además los fragmentos del modelo según llegan. |
 
 ### `Session`
@@ -109,6 +109,31 @@ Un subagente, tal como lo ve quien delega.
 Se presenta al modelo como una herramienta de **un solo parámetro**: el
 brief. No se le ofrecen las herramientas del subagente, y eso es lo que hace
 barato delegar — el catálogo del padre no crece con el del hijo.
+
+### `generate`
+
+```python
+async def generate(task: Entrada, *, model: str, session: Session, instructions: Any = None, output: Any = None, sampling: Sampling | None = None, max_steps: int = 4) -> Any
+```
+
+Pide una respuesta y devuelve el objeto tipado, o el texto.
+
+Args:
+    task: la petición — texto, un mensaje, o las partes de uno.
+    model: qué modelo.
+    session: por dónde sale y dónde se recuerda.  **Hace falta**: sin ella
+        no habría diario, y sin diario esto sería la llamada suelta que
+        viene a sustituir.
+    instructions: prompt de sistema, o una plantilla versionada.
+    output: el esquema de la respuesta.  Sin él, devuelve texto.
+    sampling: temperatura y demás.  Sin él, lo que decida quien ejecuta.
+    max_steps: techo de turnos.  Más de uno porque una salida que no valida
+        se vuelve a pedir **enseñando el error**, y eso cuesta un turno; con
+        uno solo, un modelo que falla la primera vez no tendría ocasión de
+        corregir.
+
+Returns:
+    El objeto validado contra ``output``, o el texto si no se pidió esquema.
 
 ### `tool`
 
@@ -1421,6 +1446,7 @@ Un prompt con su versión.
 |---|---|---|
 | `content` | `str` | **obligatorio** |
 | `version` | `str` | `'1.0'` |
+| `name` | `str` | `''` |
 | `description` | `str` | `''` |
 | `variables` | `Mapping[str, Any]` | *(fábrica)* |
 

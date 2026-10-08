@@ -11,6 +11,8 @@ cuantos sobrescritos en local sin tocar el fichero compartido.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import json
 from pathlib import Path
 from typing import Mapping, Protocol, runtime_checkable
@@ -37,6 +39,18 @@ class PromptProvider(Protocol):
     def exists(self, name: str) -> bool: ...
 
 
+def _con_nombre(template: PromptTemplate, name: str) -> PromptTemplate:
+    """Sella la plantilla con la clave por la que se pidió.
+
+    El nombre vive en el registro y la versión en la plantilla, así que una
+    plantilla servida sin nombre obliga a quien audite un run a cruzar las dos
+    cosas — y solo puede hacerlo si alguien guardó las dos. Un nombre declarado
+    en la propia plantilla gana al de la clave: quien lo escribió sabía algo que
+    el registro no.
+    """
+    return template if template.name else replace(template, name=name)
+
+
 class InMemoryPrompts:
     """Prompts en un diccionario.  Para tests y para sobrescribir en local."""
 
@@ -51,7 +65,7 @@ class InMemoryPrompts:
     def get(self, name: str) -> PromptTemplate:
         if name not in self._prompts:
             raise KeyError(f"Prompt '{name}' no está. Hay: {sorted(self._prompts)}.")
-        return self._prompts[name]
+        return _con_nombre(self._prompts[name], name)
 
     def exists(self, name: str) -> bool:
         return name in self._prompts
@@ -78,7 +92,7 @@ class FilePrompts:
             raise KeyError(
                 f"Prompt '{name}' no está en {self.path}. Hay: {sorted(prompts)}."
             )
-        return prompts[name]
+        return _con_nombre(prompts[name], name)
 
     def exists(self, name: str) -> bool:
         return name in self._load()

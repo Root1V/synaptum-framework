@@ -7,6 +7,22 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ### Añadido
 
+- **`generate(task, model=…, session=…, output=…)`** — una llamada al modelo gobernada y durable sin
+  escribir un agente. Es **un run de un solo turno, no un atajo por fuera**: registra su `ModelStep`,
+  así que al reanudar no vuelve a inferir. Existe porque una plataforma tiene llamadas sueltas
+  —clasificar, segmentar, enrutar— que si no pasan por la misma puerta quedan sin presupuesto, sin
+  atribución y sin diario.
+
+- **Entrada multimodal.** Una imagen viaja como `image_url` data-URI, y `run()` acepta
+  `str | Message | Sequence[ContentPart]` además de texto. Un `Document` **se rechaza a propósito**:
+  convertirlo sería decidir por quien lo manda cómo se ve una página, y eso lo decide quien la
+  recortó.
+
+- **`PromptTemplate.name`**, que el proveedor sella al servir la plantilla por su clave, y que junto
+  con la versión viaja en el `meta` de cada paso de modelo y en el span del turno. El agente
+  renderizaba la plantilla y se quedaba solo con el texto, así que la versión se perdía justo donde
+  más falta hace: cuando una respuesta sale mal y la primera pregunta es con qué prompt se generó.
+
 - **`Agent(submit_tool=True)`** — la salida final se entrega **llamando a una herramienta** cuyo
   esquema es el `output`, y una entrega que no valida vuelve al modelo con el error dentro para que
   corrija en el turno siguiente. **Sustituye a `response_format`** en vez de acompañarlo: dos

@@ -191,3 +191,23 @@ def test_unconfigured_tracing_says_it_goes_nowhere():
         assert "EN NINGUNA PARTE" in describe_tracing()
     finally:
         trace._TRACER_PROVIDER = anterior
+
+
+def test_the_prompt_version_reaches_the_span(spans):
+    """S-8 · La misma pregunta contestada en los dos sitios.
+
+    La versión vive en el `meta` del paso, que es donde queda en el diario.
+    Copiarla al span evita que una traza y una auditoría digan cosas distintas
+    sobre el mismo run — o que haya que cruzar dos sistemas para saber con qué
+    prompt se generó una respuesta que salió mal.
+    """
+    from synaptum import InMemoryPrompts, PromptTemplate
+
+    registro = InMemoryPrompts({"vigilancia": PromptTemplate("Mira.", version="2.1")})
+    agente = Agent("vigía", model="fake:m", instructions=registro.get("vigilancia"))
+
+    _correr(agente, FakeGateway(says("Bien.")))
+    turno = next(s for s in spans.get_finished_spans() if s.name == "agent.turn")
+
+    assert turno.attributes["prompt.name"] == "vigilancia"
+    assert turno.attributes["prompt.version"] == "2.1"

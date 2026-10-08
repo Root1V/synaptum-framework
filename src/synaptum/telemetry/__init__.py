@@ -193,11 +193,16 @@ def _observar(tracer, paso, raiz, turno, numero, abiertos, run_id, guardrail):
         if turno is not None:
             turno.end(end_time=_ns(paso))
         numero += 1
+        atributos = {"synaptum.turn": numero, "synaptum.run_id": run_id}
+        # Qué prompt produjo este turno. Está en el `meta` del paso porque ahí
+        # queda **en el diario**; aquí se copia para que una traza y una
+        # auditoría contesten lo mismo sin cruzar dos sistemas.
+        atributos.update(
+            {k: v for k, v in (paso.meta or {}).items() if k.startswith("prompt.")}
+        )
         with trace.use_span(raiz, end_on_exit=False):
             turno = tracer.start_span(
-                "agent.turn",
-                start_time=_ns(paso),
-                attributes={"synaptum.turn": numero, "synaptum.run_id": run_id},
+                "agent.turn", start_time=_ns(paso), attributes=atributos,
             )
 
     padre = turno if turno is not None else raiz

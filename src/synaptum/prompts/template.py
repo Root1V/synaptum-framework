@@ -42,6 +42,11 @@ class PromptTemplate:
 
     content: str
     version: str = "1.0"
+    name: str = ""
+    """Cómo se llama este prompt.  Lo rellena el proveedor al servirlo por su
+    clave, porque una plantilla que no sabe su nombre obliga a quien audita un
+    run a cruzar la versión con un registro aparte — y eso solo se puede hacer
+    si alguien guardó las dos cosas."""
     description: str = ""
     variables: Mapping[str, Any] = field(default_factory=dict)
 
