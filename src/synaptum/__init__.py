@@ -86,7 +86,7 @@ from .core import (
 )
 from .core import UncertainEffect
 from .core import __all__ as _core_all
-from .agent import Agent, Delegate, Limits, Sampling, Session
+from .agent import Agent, Delegate, Limits, Sampling, Session, generate
 from .context import ContextEconomy, TurnEconomy, cap_tool_output, economy
 from .run import (
     Check,
@@ -118,6 +118,7 @@ __all__ = [
     "Delegate",
     "Limits",
     "Sampling",
+    "generate",
     "Session",
     "cap_tool_output",
     "economy",

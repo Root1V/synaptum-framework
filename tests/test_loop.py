@@ -794,3 +794,76 @@ def test_resuming_with_other_sampling_is_refused():
     caliente = Agent("a", model="fake:m", instructions="Extrae.", sampling=Sampling(temperature=0.7))
     with pytest.raises(ConfigurationError, match="muestreo"):
         run(caliente, "extrae", Session("r1", FakeGateway(says("otra")), store))
+
+
+# ── VRT-SYN-003 · lo que no dependía de nadie ────────────────────────────────
+
+def test_a_single_shot_call_is_a_run_of_one_turn_and_replays(tmp_path):
+    """S-6 · Una llamada suelta que **no** se sale del gobierno.
+
+    Su criterio era «se exporta en `__all__`, y su replay no vuelve a inferir».
+    Lo segundo es lo que la distingue de llamar al proveedor por su cuenta: sin
+    diario, cada reintento de un paso durable paga otra generación.
+    """
+    from dataclasses import dataclass
+
+    from synaptum import SqliteCheckpointer, generate
+    from synaptum.testing import FakeGateway, says
+
+    @dataclass
+    class Clase:
+        tipo: str
+
+    db = tmp_path / "runs.db"
+
+    with SqliteCheckpointer(db) as store:
+        primera = FakeGateway(says('{"tipo": "boleta_de_pago"}'))
+        salida = asyncio.run(generate(
+            "clasifica", model="fake:m", output=Clase,
+            session=Session("clasif-1", primera, store),
+        ))
+    assert salida.tipo == "boleta_de_pago"
+    assert primera.model_calls == 1
+
+    with SqliteCheckpointer(db) as store:
+        segunda = FakeGateway(says('{"tipo": "otra cosa"}'))
+        repetida = asyncio.run(generate(
+            "clasifica", model="fake:m", output=Clase,
+            session=Session("clasif-1", segunda, store),
+        ))
+    assert repetida.tipo == "boleta_de_pago", "el replay devolvió otra cosa"
+    assert segunda.model_calls == 0, "volvió a inferir lo que ya estaba pagado"
+
+
+def test_a_task_can_carry_an_image(tmp_path):
+    """S-7 · Una tarea no siempre es una frase.
+
+    Un agente que mira una página recibe texto **y** la imagen; obligar a quien
+    llama a construir el `Message` entero para eso convierte el caso común en
+    el caso raro.
+    """
+    from synaptum import Image, Text
+    from synaptum.testing import FakeGateway, says
+
+    agente = Agent("vista", model="fake:m", instructions="Mira.")
+    puerta = FakeGateway(says("Es una boleta."))
+
+    run(agente, [Text("¿qué ves?"), Image(data="QUJD", media_type="image/png")],
+        Session("r", puerta))
+
+    partes = [p.kind for p in puerta.requests[0].messages[0].content]
+    assert partes == ["text", "image"], "la imagen no llegó al mensaje"
+
+
+def test_a_task_given_as_an_assistant_message_is_refused():
+    """Una tarea la pide quien llama, así que es un mensaje de usuario.
+
+    Aceptar cualquier rol dejaría meter un prompt de sistema por una puerta que
+    no es la suya, y entonces habría dos sitios donde buscarlo.
+    """
+    from synaptum import ConfigurationError
+    from synaptum.testing import FakeGateway, says
+
+    agente = Agent("vista", model="fake:m", instructions="Mira.")
+    with pytest.raises(ConfigurationError, match="instructions"):
+        run(agente, Message.assistant("yo no pido nada"), Session("r", FakeGateway(says("x"))))

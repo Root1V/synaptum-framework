@@ -216,7 +216,7 @@ aparece aquí puede cambiar sin aviso, aunque se pueda importar.</p>
 <tbody>
 <tr>
 <td><code>run</code></td>
-<td><code>run(self, task: str, *, session: Session) -&gt; AsyncIterator[StepEvent]</code></td>
+<td><code>run(self, task: Entrada, *, session: Session) -&gt; AsyncIterator[StepEvent]</code></td>
 <td>Ejecuta el agente cediendo cada paso.</td>
 </tr>
 <tr>
@@ -440,6 +440,25 @@ ninguna configuración produjo.</p>
 <p>Se presenta al modelo como una herramienta de <strong>un solo parámetro</strong>: el
 brief. No se le ofrecen las herramientas del subagente, y eso es lo que hace
 barato delegar — el catálogo del padre no crece con el del hijo.</p>
+<h3><code>generate</code></h3>
+<pre data-lenguaje="python"><code><span class="p-k">async</span> <span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">generate</span><span class="p-p">(</span><span class="p-n">task</span><span class="p-p">:</span> <span class="p-n">Entrada</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">model</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">session</span><span class="p-p">:</span> <span class="p-n">Session</span><span class="p-p">,</span> <span class="p-n">instructions</span><span class="p-p">:</span> <span class="p-n">Any</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">output</span><span class="p-p">:</span> <span class="p-n">Any</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">sampling</span><span class="p-p">:</span> <span class="p-n">Sampling</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">max_steps</span><span class="p-p">:</span> <span class="p-nb">int</span> <span class="p-o">=</span> <span class="p-mi">4</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Any</span>
+</code></pre>
+<p>Pide una respuesta y devuelve el objeto tipado, o el texto.</p>
+<p>Args:
+task: la petición — texto, un mensaje, o las partes de uno.
+model: qué modelo.
+session: por dónde sale y dónde se recuerda.  <strong>Hace falta</strong>: sin ella
+no habría diario, y sin diario esto sería la llamada suelta que
+viene a sustituir.
+instructions: prompt de sistema, o una plantilla versionada.
+output: el esquema de la respuesta.  Sin él, devuelve texto.
+sampling: temperatura y demás.  Sin él, lo que decida quien ejecuta.
+max_steps: techo de turnos.  Más de uno porque una salida que no valida
+se vuelve a pedir <strong>enseñando el error</strong>, y eso cuesta un turno; con
+uno solo, un modelo que falla la primera vez no tendría ocasión de
+corregir.</p>
+<p>Returns:
+El objeto validado contra <code>output</code>, o el texto si no se pidió esquema.</p>
 <h3><code>tool</code></h3>
 <pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">tool</span><span class="p-p">(</span><span class="p-n">fn</span><span class="p-p">:</span> <span class="p-n">Callable</span><span class="p-p">[</span><span class="p-o">...</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">name</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">description</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">risk</span><span class="p-p">:</span> <span class="p-n">Risk</span> <span class="p-o">=</span> <span class="p-o">&lt;</span><span class="p-n">Risk</span><span class="p-o">.</span><span class="p-n">READ</span><span class="p-p">:</span> <span class="p-n">read</span><span class="p-o">&gt;</span><span class="p-p">,</span> <span class="p-n">idempotent</span><span class="p-p">:</span> <span class="p-nb">bool</span> <span class="p-o">=</span> <span class="p-kc">False</span><span class="p-p">,</span> <span class="p-n">parameters</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-n">Any</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Any</span>
 </code></pre>
@@ -3133,6 +3152,11 @@ Pydantic, un dataclass, o un JSON Schema como diccionario.</p>
 <td><code>version</code></td>
 <td><code>str</code></td>
 <td><code>'1.0'</code></td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td><code>''</code></td>
 </tr>
 <tr>
 <td><code>description</code></td>

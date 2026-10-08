@@ -332,7 +332,21 @@ def _message_to_wire(message: Message) -> list[dict[str, Any]]:
     wire: dict[str, Any] = {"role": message.role.value}
     text = message.text
     calls = message.tool_calls
-    wire["content"] = text or None
+    imagenes = [p for p in message.content if p.kind == "image"]
+
+    if imagenes:
+        # Con partes no textuales, `content` deja de ser una cadena y pasa a ser
+        # una lista de partes.  Es la forma que espera el dialecto, y la cadena
+        # simple se conserva cuando no hay imágenes: cambiarla siempre haría
+        # distinto el cuerpo de todos los runs que hoy funcionan.
+        partes: list[dict[str, Any]] = []
+        if text:
+            partes.append({"type": "text", "text": text})
+        partes.extend({"type": "image_url", "image_url": {"url": _imagen_a_url(p)}}
+                      for p in imagenes)
+        wire["content"] = partes
+    else:
+        wire["content"] = text or None
     if calls:
         wire["tool_calls"] = [
             {
@@ -347,7 +361,9 @@ def _message_to_wire(message: Message) -> list[dict[str, Any]]:
 
 #: Lo que este adaptador sabe poner en el cable.  El razonamiento se omite a
 #: propósito —no se devuelve al proveedor— y por eso no cuenta como pérdida.
-_TRANSPORTABLE = {"text", "tool_call", "tool_result", "thinking", "redacted_thinking"}
+_TRANSPORTABLE = {
+    "text", "image", "tool_call", "tool_result", "thinking", "redacted_thinking",
+}
 
 
 def _rechaza_lo_que_no_sabe_mandar(message: Message) -> None:
@@ -368,8 +384,21 @@ def _rechaza_lo_que_no_sabe_mandar(message: Message) -> None:
         raise ConfigurationError(
             f"El adaptador `openai-compatible` no sabe transportar {perdidas} y "
             f"no lo descarta en silencio: el modelo respondería sin eso y nadie "
-            f"se enteraría. Entrada multimodal: todavía no está."
+            f"se enteraría. Las imágenes sí viajan; un documento **se rechaza a "
+            f"propósito** — convertirlo aquí sería decidir por quien lo manda "
+            f"cómo se ve una página, y eso lo decide quien la recortó."
         )
+
+
+def _imagen_a_url(imagen: Any) -> str:
+    """Una imagen, como la pide el dialecto: una URL o un *data URI*.
+
+    El tipo ya garantiza que hay exactamente una de las dos —lo comprueba al
+    construirse— así que aquí no hay caso ambiguo que resolver.
+    """
+    if imagen.url:
+        return imagen.url
+    return f"data:{imagen.media_type};base64,{imagen.data}"
 
 
 def _format_to_wire(response_format: Any) -> dict[str, Any]:

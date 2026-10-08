@@ -138,8 +138,38 @@ def test_a_second_sentinel_cannot_change_the_result():
     assert split_sse(uno) == split_sse(dos)
 
 
-def test_a_part_the_adapter_cannot_send_is_refused_instead_of_dropped():
-    """VRT-SYN-001 (S-7, primera mitad) · lo que no se sabe mandar, no se calla.
+def test_an_image_travels_and_a_document_is_refused():
+    """S-7 · Las imágenes viajan; un documento se rechaza **a propósito**.
+
+    Convertir un PDF aquí sería decidir por quien lo manda cómo se ve una
+    página, y eso lo decide quien la recortó. Veritium lo pidió así:
+    *«para `Document`, preferimos que el adaptador lo rechace»*.
+    """
+    from synaptum import ConfigurationError, Document, Image, Message, Role, Text
+    from synaptum.providers.openai_compatible import _message_to_wire
+
+    con_imagen = _message_to_wire(Message(
+        role=Role.USER,
+        content=(Text("¿qué dice esta boleta?"), Image(data="QUJD", media_type="image/png")),
+    ))[0]
+    assert con_imagen["content"] == [
+        {"type": "text", "text": "¿qué dice esta boleta?"},
+        {"type": "image_url", "image_url": {"url": "data:image/png;base64,QUJD"}},
+    ]
+
+    # Sin partes no textuales, `content` sigue siendo una cadena: cambiarlo
+    # siempre haría distinto el cuerpo de todos los runs que hoy funcionan.
+    assert _message_to_wire(Message.user("hola"))[0]["content"] == "hola"
+
+    with pytest.raises(ConfigurationError, match="document"):
+        _message_to_wire(Message(
+            role=Role.USER,
+            content=(Document(data="x", media_type="application/pdf"),),
+        ))
+
+
+def _descartado_en_silencio_ya_no_pasa():
+    """Lo que no se sabe mandar, no se calla.
 
     Una imagen puesta en el mensaje desaparecía del cuerpo, el modelo contestaba
     sobre un texto sin ella y **nada fallaba**: la respuesta parecía mala y lo
@@ -149,16 +179,5 @@ def test_a_part_the_adapter_cannot_send_is_refused_instead_of_dropped():
     Un fallo ruidoso se arregla una vez; uno silencioso se paga en cada
     respuesta sin que nadie sepa por qué.
     """
-    from synaptum import ConfigurationError, Image, Message, Role, Text
-    from synaptum.providers.openai_compatible import _message_to_wire
-
-    con_imagen = Message(
-        role=Role.USER,
-        content=(Text("¿qué dice esta boleta?"), Image(data="xx", media_type="image/png")),
-    )
-
-    with pytest.raises(ConfigurationError, match="image"):
-        _message_to_wire(con_imagen)
-
-    # Y lo que sí sabe mandar sigue pasando igual.
-    assert _message_to_wire(Message.user("hola"))[0]["content"] == "hola"
+    # Conservado como nota: la primera mitad de S-7 fue negarse en vez de
+    # descartar, y la segunda hacer que las imágenes viajen de verdad.

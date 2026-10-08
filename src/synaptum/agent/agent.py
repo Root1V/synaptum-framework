@@ -41,7 +41,7 @@ import json
 import random
 import time
 from dataclasses import dataclass, field, replace
-from typing import Any, AsyncIterator, Mapping, Sequence
+from typing import Any, AsyncIterator, Mapping, Sequence, Union
 
 from ..core.errors import (
     ConfigurationError,
@@ -68,6 +68,7 @@ from ..core.protocols import CallContext, Checkpointer, Gateway, RunState
 from ..core.types import (
     AUTO,
     Message,
+    Role,
     Request,
     Response,
     ResponseFormat,
@@ -87,6 +88,31 @@ from .delegation import Delegate, delegate_risk, sub_run_id
 from ..run.journal import Journal, MemoryCheckpointer, Replay
 
 __all__ = ["Limits", "Sampling", "Session", "Agent"]
+
+#: Lo que se le puede pedir a un agente: texto, un mensaje ya armado, o las
+#: partes de uno.
+#:
+#: Las tres formas existen porque una tarea no siempre es una frase. Un agente
+#: que mira una página recibe texto **y** la imagen, y obligar a quien llama a
+#: construir el `Message` entero para eso convierte el caso común en el caso
+#: raro.
+Entrada = Union[str, "Message", Sequence[Any]]
+
+
+def _como_mensaje(task: "Entrada") -> "Message":
+    """Normaliza la tarea a un mensaje de usuario."""
+    if isinstance(task, Message):
+        if task.role is not Role.USER:
+            raise ConfigurationError(
+                f"La tarea llegó como un mensaje de rol {task.role.value!r}. "
+                "Una tarea la pide quien llama, así que es un mensaje de usuario; "
+                "el prompt de sistema va en `instructions`."
+            )
+        return task
+    if isinstance(task, str):
+        return Message.user(task)
+    return Message(role=Role.USER, content=tuple(task))
+
 
 #: Nombre de la herramienta con la que un agente entrega su salida final.
 #:
@@ -222,6 +248,19 @@ class Agent:
         self.instructions: str | None = (
             instructions.render() if hasattr(instructions, "render") else instructions
         )
+        #: Qué prompt produjo estas instrucciones, si vino de uno versionado.
+        #:
+        #: El agente renderizaba la plantilla y se quedaba solo con el texto, así
+        #: que la versión se perdía justo donde más falta hace: cuando una
+        #: respuesta sale mal en producción y la primera pregunta es con qué
+        #: prompt se generó. Viaja en el `meta` de cada paso de modelo, que es
+        #: donde queda **en el diario** y sobrevive al proceso.
+        self.prompt: Mapping[str, str] = {
+            k: v for k, v in (
+                ("prompt.name", getattr(instructions, "name", "") or ""),
+                ("prompt.version", getattr(instructions, "version", "") or ""),
+            ) if v
+        }
         # Acepta ToolDefinition o cualquier objeto que la exponga — un `@tool`,
         # sin que el bucle tenga que importar el decorador.
         # Un subagente se presenta al modelo como una herramienta de un solo
@@ -307,7 +346,7 @@ class Agent:
 
     # ── Bucle ─────────────────────────────────────────────────────────────────
 
-    def run(self, task: str, *, session: Session) -> AsyncIterator[StepEvent]:
+    def run(self, task: Entrada, *, session: Session) -> AsyncIterator[StepEvent]:
         """Ejecuta el agente cediendo cada paso.
 
         La cancelación se propaga: cerrar el generador o cancelar la tarea que
@@ -346,7 +385,7 @@ class Agent:
         return self._loop(task, session, stream=True)
 
     async def _loop(
-        self, task: str, session: Session, *, stream: bool, depth: int = 0
+        self, task: Entrada, session: Session, *, stream: bool, depth: int = 0
     ) -> AsyncIterator[Any]:
         # La profundidad viaja por parámetro y no en el objeto: un `Agent` es
         # configuración reutilizable, y el mismo puede estar en mil runs a la
@@ -366,7 +405,7 @@ class Agent:
         # Al reanudar se comprueba contra el que quedó en el journal.
         self._check_prefix(state, replay)
 
-        messages: list[Message] = [Message.user(task)]
+        messages: list[Message] = [_como_mensaje(task)]
         total = Usage.zero()
         seq = 0
         turns = 0
@@ -424,6 +463,7 @@ class Agent:
                     yield done
                 else:
                     intent = ModelStep(
+                        meta=dict(self.prompt),
                         run_id=session.run_id, step_id=step_id, step_seq=seq - 1,
                         phase=Phase.ATTEMPTED, at=time.time(), request=request,
                     )
