@@ -74,8 +74,11 @@ jobs:
           # versión que solo está en TestPyPI fallaba con «no existe» en vez de
           # buscarla donde se le dijo. Y no hace falta ninguno más: el paquete
           # no tiene dependencias de ejecución.
+          # `--refresh-package` por lo mismo que en `verify`: sin él, una
+          # consulta anterior cacheada puede contestar por el índice.
           if ! uv run --isolated --no-project \
                 --index-url https://test.pypi.org/simple/ \
+                --refresh-package synaptum \
                 --with "synaptum==$VERSION" python -c "import synaptum" ; then
             echo "::error::synaptum==$VERSION no se puede instalar desde TestPyPI."
             echo "Publica primero ahí: Run workflow → index=testpypi."
@@ -159,15 +162,26 @@ jobs:
           import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])
           ")" >> "$GITHUB_ENV"
 
-      # Un índice tarda en servir lo que acaba de aceptar, y cuánto es variable:
-      # medido, TestPyPI sirvió al primer intento y PyPI tardó **más de cinco
-      # minutos** para la misma versión el mismo día. La espera anterior eran
-      # treinta intentos de diez segundos y se quedó corta, así que el job dio
-      # rojo sobre una release que estaba perfectamente publicada.
+      # Un índice tarda en servir lo que acaba de aceptar, así que esto
+      # reintenta. Y durante tres releases **el reintento no reintentaba**:
       #
-      # Ahora espera **veinte minutos** —veinte intentos, con el intervalo
-      # creciendo de 5s a 60s— porque los primeros son baratos y los últimos no
-      # necesitan ser frecuentes.
+      #     cache-control: max-age=600, public      ← lo que manda el índice
+      #
+      # `uv` respeta el caché HTTP, así que el primer intento guardaba «no
+      # existe esa versión» y los siguientes releían esa respuesta. El bucle
+      # parecía estar preguntando y estaba releyendo. Medido en el run de la
+      # `rc4`: «verificado tras 12 intento(s)», y entre el primero y el que pasó
+      # hay **10 min 37 s** — el `max-age` caducando, no el índice despertando.
+      #
+      # Encaja con todo el historial: o acertaba al primer intento (caché vacía)
+      # o no acertaba ninguno. Nunca se recuperó en un reintento.
+      #
+      # `--refresh-package` es el arreglo: obliga a volver a preguntar. Sin él,
+      # ampliar la ventana solo hacía esperar a que el caché caducara — que es
+      # lo que hicimos antes y pasó por suerte, no por estar bien.
+      #
+      # Con el reintento arreglado la ventana vuelve a ser corta: **cinco
+      # minutos**, diez intentos con el intervalo creciendo de 5s a 30s.
       # La espera y la comprobación son **el mismo paso** a propósito: una sonda
       # aparte puede decir que sí por un motivo que no es el índice —lo hizo, en
       # local, mirando el entorno en vez del índice— y entonces la verificación
@@ -175,17 +189,18 @@ jobs:
       - name: instalar desde el índice y usarlo como un consumidor
         run: |
           espera=5
-          for intento in $(seq 1 20); do
+          for intento in $(seq 1 10); do
             if uv run --isolated --no-project --index-url "$INDEX" \
+                 --refresh-package synaptum \
                  --with "synaptum==$VERSION" python "$GITHUB_WORKSPACE/.github/humo.py"; then
               echo "verificado tras ${intento} intento(s)"
               exit 0
             fi
             echo "intento ${intento}: el índice todavía no lo sirve (siguiente en ${espera}s)"
             sleep "$espera"
-            [ "$espera" -lt 60 ] && espera=$((espera * 2))
+            [ "$espera" -lt 30 ] && espera=$((espera * 2))
           done
-          echo "::error::synaptum==$VERSION no se pudo instalar desde $INDEX en veinte minutos."
+          echo "::error::synaptum==$VERSION no se pudo instalar desde $INDEX en cinco minutos."
           echo "OJO: esto NO significa que la publicación fallara. El paso anterior la subió;"
           echo "lo que no se ha podido confirmar es que el índice la sirva. Comprueba a mano"
           echo "antes de concluir nada, y si instala, lo que falló fue esta comprobación:"
