@@ -1232,12 +1232,12 @@ Tres respuestas posibles para cada paso, y la tercera es la interesante:
 Llama a un endpoint HTTP y devuelve respuestas ya normalizadas.
 
 ```python
-HttpModel(base_url: str, *, api_key: str | None = None, provider: str | None = None, path: str = '/chat/completions', headers: Mapping[str, str] | None = None, timeout: float = 120.0) -> None
+HttpModel(base_url: str, *, api_key: str | None = None, provider: str | None = None, path: str = '/chat/completions', headers: Mapping[str, str] | Callable[[Any], Mapping[str, str]] | None = None, timeout: float = 120.0) -> None
 ```
 
 | Miembro | Firma | |
 |---|---|---|
-| `stream` | `stream(self, request: Request) -> AsyncIterator[StreamEvent]` |  |
+| `stream` | `stream(self, request: Request, ctx: Any = None) -> AsyncIterator[StreamEvent]` |  |
 
 Args:
     base_url: raíz del servicio, por ejemplo ``http://localhost:8080/v1``.

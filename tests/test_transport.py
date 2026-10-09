@@ -237,3 +237,63 @@ def test_leaving_the_iterator_stops_the_upstream(servidor):
         "el cliente se fuera: irse del iterador no cerró el cuerpo"
     )
     assert al_irse < len(muchos), "el servidor terminó antes de que se pudiera cancelar"
+
+
+# ── S-4 (mitad del modelo) · lo que un gateway gobernado necesita por llamada ─
+
+def test_the_step_identity_travels_as_an_idempotency_key():
+    """Sin clave, un reintento tras una caída es una segunda generación facturable.
+
+    El journal solo no puede taparlo: el agujero está **entre** mandar la
+    petición y registrar su resultado, y ahí no hay nada escrito.
+    """
+    from synaptum.core.protocols import CallContext
+    from synaptum.run.transport import idempotencia
+
+    ctx = CallContext(run_id="caso-7", step_id="000002-model")
+    cuerpo = {"model": "m", "messages": [{"role": "user", "content": "hola"}]}
+
+    clave = idempotencia(ctx, cuerpo)
+    assert clave.startswith("caso-7/000002-model/")
+
+    # Determinista: reanudar vuelve a derivar el mismo contexto, así que el
+    # cuerpo es idéntico y la clave también.
+    assert idempotencia(ctx, dict(cuerpo)) == clave
+
+    # Y cambia con el cuerpo, que es lo que la corrige: una clave identifica
+    # **una** petición, y reutilizarla para otra es un rechazo, no un replay.
+    otro = dict(cuerpo, messages=[{"role": "user", "content": "otra cosa"}])
+    assert idempotencia(ctx, otro) != clave
+
+    # Sin contexto no se inventa: una clave no determinista convierte cada
+    # reintento en una generación nueva con la etiqueta de que no lo es.
+    assert idempotencia(None, cuerpo) is None
+
+
+def test_headers_can_be_a_function_of_the_call():
+    """Un gateway gobernado pide cabeceras que cambian en cada llamada.
+
+    Un diccionario construido una vez no puede llevar de qué run viene la
+    petición. Y es una función, y no una lista de nombres nuestros, porque cómo
+    se llaman esas cabeceras lo decide quien las recibe — escribirlas aquí
+    metería su vocabulario dentro del framework.
+    """
+    from synaptum.core.protocols import CallContext
+
+    modelo = HttpModel(
+        "http://nada.invalido/v1",
+        headers=lambda ctx: {"X-Run": getattr(ctx, "run_id", "")},
+    )
+    peticion = modelo._request({"model": "m"}, CallContext(run_id="r9", step_id="000000-model"))
+
+    assert peticion.headers["X-run"] == "r9"
+    assert peticion.headers["Idempotency-key"].startswith("r9/000000-model/")
+
+
+def test_a_caller_supplied_key_wins():
+    """Quien pase la suya manda: puede tener un motivo que nosotros no sabemos."""
+    modelo = HttpModel("http://nada.invalido/v1", headers={"Idempotency-Key": "la-mia"})
+    from synaptum.core.protocols import CallContext
+
+    peticion = modelo._request({"model": "m"}, CallContext(run_id="r", step_id="000000-model"))
+    assert peticion.headers["Idempotency-key"] == "la-mia"

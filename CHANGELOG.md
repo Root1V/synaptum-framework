@@ -18,6 +18,16 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
   Un run de primer nivel **omite** la clave en vez de mandarla vacía, porque «no sé de sub-runs» y
   «digo que no hay» son cosas distintas para quien la recibe.
 
+- **`HttpModel` acepta cabeceras por llamada**, como una función del contexto, y manda la **clave de
+  idempotencia** derivada de la identidad del paso más la huella del cuerpo — la misma regla que ya
+  usaba el puente de SDK. Sin ella, un reintento tras una caída es una segunda generación
+  facturable: el journal no puede taparlo porque el agujero está entre mandar la petición y
+  registrar su resultado.
+
+  Es una función y no una lista de nombres nuestros a propósito: cómo se llaman las cabeceras que
+  un gateway gobernado necesita lo decide quien las recibe, y escribirlas aquí metería su
+  vocabulario dentro del framework. Quien pase su propia clave manda.
+
 ## [1.0.0rc4] — 2026-10-07
 
 **Cortada a petición del segundo consumidor**, cuatro días después de la `rc3` y por un motivo
