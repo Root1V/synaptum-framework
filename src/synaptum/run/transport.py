@@ -35,15 +35,16 @@ cerrando no es sitio para mandar el aviso de que se cierra.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import queue
 import threading
 import urllib.error
 import urllib.request
-from typing import Any, AsyncIterator, Iterator, Mapping
+from typing import Any, AsyncIterator, Callable, Iterator, Mapping
 
 from ..core.errors import NetworkError, ProviderError, RequestTimeoutError
-from ..core.types import Request, Response, StreamEvent
+from ..core.types import Request, Response, StreamEvent, dumps
 from ..providers import base as _providers
 
 __all__ = ["HttpModel"]
@@ -76,7 +77,7 @@ class HttpModel:
         api_key: str | None = None,
         provider: str | None = None,
         path: str = "/chat/completions",
-        headers: Mapping[str, str] | None = None,
+        headers: Mapping[str, str] | Callable[[Any], Mapping[str, str]] | None = None,
         timeout: float = 120.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -84,13 +85,22 @@ class HttpModel:
         self.api_key = api_key
         self.provider = provider
         self.timeout = timeout
-        self._extra = dict(headers or {})
+        #: Cabeceras fijas, o **una función del contexto de la llamada**.
+        #:
+        #: Lo segundo existe porque un gateway gobernado pide cabeceras que
+        #: cambian en cada llamada —de qué run viene, qué manifiesto la
+        #: autoriza— y un diccionario construido una vez no puede llevarlas.
+        #:
+        #: Es una función y no una lista de nombres nuestros a propósito: cómo
+        #: se llaman esas cabeceras lo decide el arnés que las recibe, y
+        #: escribirlas aquí metería su vocabulario dentro del framework.
+        self._extra = headers if callable(headers) else dict(headers or {})
 
     # ── Respuesta completa ────────────────────────────────────────────────────
 
-    async def __call__(self, request: Request) -> Response:
+    async def __call__(self, request: Request, ctx: Any = None) -> Response:
         adapter, body = self._prepare(request, stream=False)
-        raw = await asyncio.to_thread(self._post, body)
+        raw = await asyncio.to_thread(self._post, body, ctx)
         return adapter.from_wire(json.loads(raw))
 
     # ── Stream ────────────────────────────────────────────────────────────────
@@ -100,7 +110,9 @@ class HttpModel:
     # normalizar— y por la cola solo pasan eventos ya tipados.  El bucle de
     # eventos nunca se bloquea leyendo.
 
-    async def stream(self, request: Request) -> AsyncIterator[StreamEvent]:
+    async def stream(
+        self, request: Request, ctx: Any = None
+    ) -> AsyncIterator[StreamEvent]:
         adapter, body = self._prepare(request, stream=True)
 
         buzon: queue.Queue[Any] = queue.Queue(maxsize=64)
@@ -109,7 +121,7 @@ class HttpModel:
 
         def trabajar() -> None:
             try:
-                with self._open(body) as respuesta:
+                with self._open(body, ctx) as respuesta:
                     abierto.append(respuesta)
                     for event in adapter.stream_from_wire(_chunks(respuesta, parar)):
                         if parar.is_set():
@@ -186,8 +198,25 @@ class HttpModel:
             body.setdefault("stream_options", {"include_usage": True})
         return adapter, body
 
-    def _request(self, body: Mapping[str, Any]) -> urllib.request.Request:
-        cabeceras = {"content-type": "application/json", **self._extra}
+    def _request(self, body: Mapping[str, Any], ctx: Any = None) -> urllib.request.Request:
+        extra = self._extra(ctx) if callable(self._extra) else self._extra
+        cabeceras = {"content-type": "application/json", **extra}
+
+        # La identidad del paso viaja como clave de idempotencia, igual que por
+        # el puente de SDK. Sin ella, un reintento tras una caída **es una
+        # segunda generación facturable**: el journal solo no puede taparlo,
+        # porque el agujero está entre mandar la petición y registrar su
+        # resultado.
+        #
+        # Quien pase la suya manda: puede tener un motivo que no sabemos. La
+        # comprobación es **insensible a mayúsculas** porque las cabeceras HTTP
+        # lo son, y un `setdefault` sobre un diccionario normal no: dejaba
+        # `Idempotency-Key` e `idempotency-key` conviviendo, y ganaba la que el
+        # cliente no había escrito.
+        clave = idempotencia(ctx, body)
+        if clave and not any(k.lower() == "idempotency-key" for k in cabeceras):
+            cabeceras["idempotency-key"] = clave
+
         if self.api_key:
             cabeceras.setdefault("authorization", f"Bearer {self.api_key}")
         return urllib.request.Request(
@@ -197,9 +226,9 @@ class HttpModel:
             method="POST",
         )
 
-    def _open(self, body: Mapping[str, Any]):
+    def _open(self, body: Mapping[str, Any], ctx: Any = None):
         try:
-            return urllib.request.urlopen(self._request(body), timeout=self.timeout)
+            return urllib.request.urlopen(self._request(body, ctx), timeout=self.timeout)
         except urllib.error.HTTPError as fallo:
             detalle = fallo.read().decode(errors="replace")[:500]
             # El estado decide si se reintenta, y lo decide el tipo del error:
@@ -216,9 +245,35 @@ class HttpModel:
                 raise RequestTimeoutError(f"sin respuesta en {self.timeout}s") from fallo
             raise NetworkError(f"no se pudo llegar a {self.base_url}: {fallo.reason}") from fallo
 
-    def _post(self, body: Mapping[str, Any]) -> str:
-        with self._open(body) as respuesta:
+    def _post(self, body: Mapping[str, Any], ctx: Any = None) -> str:
+        with self._open(body, ctx) as respuesta:
             return respuesta.read().decode()
+
+
+def idempotencia(ctx: Any, body: Mapping[str, Any]) -> str | None:
+    """La identidad del paso **más la huella del cuerpo**.
+
+    ``(run_id, step_id)`` es determinista por construcción —el ordinal del paso
+    dentro del run, nunca un UUID ni un reloj— así que reanudar produce la misma
+    clave sin coordinar nada con el otro extremo.
+
+    **La huella no es prudencia: corrige la clave.** Una clave identifica *una*
+    petición, y reutilizarla para otra distinta es un rechazo, no un replay. Sin
+    ella chocaban dos runs con el mismo ``run_id`` y distinta tarea — y también
+    un mismo run tras cambiar las instrucciones, que es lo que pasa mientras se
+    desarrolla.
+
+    Sin ``ctx`` no se manda clave. Inventar una sería peor que no mandarla: una
+    clave no determinista convierte cada reintento en una generación nueva con
+    la etiqueta de que no lo es.
+    """
+    run_id = getattr(ctx, "run_id", None)
+    step_id = getattr(ctx, "step_id", None)
+    if not run_id or not step_id:
+        return None
+    huella = hashlib.sha256(dumps(body).encode()).hexdigest()[:16]
+    # Se recorta por delante: lo que distingue dos peticiones está al final.
+    return f"{run_id}/{step_id}/{huella}"[-255:]
 
 
 def _chunks(respuesta, parar: threading.Event) -> Iterator[dict[str, Any]]:

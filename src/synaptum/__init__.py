@@ -90,6 +90,7 @@ from .agent import Agent, Delegate, Limits, Sampling, Session, generate
 from .context import ContextEconomy, TurnEconomy, cap_tool_output, economy
 from .run import (
     Check,
+    HttpCheckpointer,
     HttpModel,
     Journal,
     LocalGateway,
@@ -124,6 +125,7 @@ __all__ = [
     "economy",
     "ContextEconomy",
     "TurnEconomy",
+    "HttpCheckpointer",
     "Journal",
     "MemoryCheckpointer",
     "Replay",

@@ -1156,6 +1156,28 @@ SqliteCheckpointer(path: str | Path = ':memory:') -> None
 | `load` | `async load(self, run_id: str) -> RunState` | Reconstruye el estado del run, o ``None`` si no existe. |
 | `runs` | `runs(self) -> list[str]` | Identificadores de los runs almacenados.  Fuera del protocolo. |
 
+### `HttpCheckpointer`
+
+Habla con `POST/GET /runs/{run_id}/checkpoints`.
+
+```python
+HttpCheckpointer(base_url: str, *, token: str | None = None, timeout: float = 30.0) -> None
+```
+
+| Miembro | Firma | |
+|---|---|---|
+| `append` | `async append(self, run_id: str, event: StepEvent) -> AppendResult` |  |
+| `load` | `async load(self, run_id: str) -> RunState` |  |
+
+Args:
+    base_url: raíz del servicio que **posee el diario**.  Ojo: no es
+        necesariamente el mismo que arranca los runs — en el despliegue
+        donde se midió, `POST /runs` y `POST /runs/{id}/checkpoints` son el
+        mismo prefijo en dos servicios distintos, así que un cliente con un
+        solo `base_url` recibe 404 en uno de los dos.
+    token: bearer.  El diario está detrás de autenticación como el resto.
+    timeout: segundos por petición.
+
 ### `Journal`
 
 Escribe eventos respetando la durabilidad que cada uno declara.
@@ -1210,12 +1232,12 @@ Tres respuestas posibles para cada paso, y la tercera es la interesante:
 Llama a un endpoint HTTP y devuelve respuestas ya normalizadas.
 
 ```python
-HttpModel(base_url: str, *, api_key: str | None = None, provider: str | None = None, path: str = '/chat/completions', headers: Mapping[str, str] | None = None, timeout: float = 120.0) -> None
+HttpModel(base_url: str, *, api_key: str | None = None, provider: str | None = None, path: str = '/chat/completions', headers: Mapping[str, str] | Callable[[Any], Mapping[str, str]] | None = None, timeout: float = 120.0) -> None
 ```
 
 | Miembro | Firma | |
 |---|---|---|
-| `stream` | `stream(self, request: Request) -> AsyncIterator[StreamEvent]` |  |
+| `stream` | `stream(self, request: Request, ctx: Any = None) -> AsyncIterator[StreamEvent]` |  |
 
 Args:
     base_url: raíz del servicio, por ejemplo ``http://localhost:8080/v1``.

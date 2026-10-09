@@ -5,7 +5,28 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ## [Sin publicar]
 
-Nada todavía.
+### Añadido
+
+- **`HttpCheckpointer`** — el journal deja de vivir en el proceso y pasa a vivir donde un arnés lo
+  gobierna, con presupuestos, atribución y durabilidad compartidas. El bucle no se entera: la
+  costura es un protocolo y esto es otro relleno.
+
+  La identidad de un sub-run se **parte**: el run padre va en la ruta —un segmento, sin escapes— y
+  el resto viaja en el cuerpo como `sub_run_id`. Una barra cruda no enruta, y `%2F` funciona hoy y
+  es lo que normalizan o rechazan los proxies: pasa en el test y falla detrás de un gateway.
+
+  Un run de primer nivel **omite** la clave en vez de mandarla vacía, porque «no sé de sub-runs» y
+  «digo que no hay» son cosas distintas para quien la recibe.
+
+- **`HttpModel` acepta cabeceras por llamada**, como una función del contexto, y manda la **clave de
+  idempotencia** derivada de la identidad del paso más la huella del cuerpo — la misma regla que ya
+  usaba el puente de SDK. Sin ella, un reintento tras una caída es una segunda generación
+  facturable: el journal no puede taparlo porque el agujero está entre mandar la petición y
+  registrar su resultado.
+
+  Es una función y no una lista de nombres nuestros a propósito: cómo se llaman las cabeceras que
+  un gateway gobernado necesita lo decide quien las recibe, y escribirlas aquí metería su
+  vocabulario dentro del framework. Quien pase su propia clave manda.
 
 ## [1.0.0rc4] — 2026-10-07
 

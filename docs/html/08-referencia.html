@@ -2863,6 +2863,39 @@ motor de producción y no pretende serlo.</p>
 </tr>
 </tbody>
 </table></div>
+<h3><code>HttpCheckpointer</code></h3>
+<p>Habla con <code>POST/GET /runs/{run_id}/checkpoints</code>.</p>
+<pre data-lenguaje="python"><code><span class="p-n">HttpCheckpointer</span><span class="p-p">(</span><span class="p-n">base_url</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">token</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">timeout</span><span class="p-p">:</span> <span class="p-nb">float</span> <span class="p-o">=</span> <span class="p-mf">30.0</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+</code></pre>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Miembro</th>
+<th>Firma</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>append</code></td>
+<td><code>async append(self, run_id: str, event: StepEvent) -&gt; AppendResult</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>load</code></td>
+<td><code>async load(self, run_id: str) -&gt; RunState</code></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Args:
+base_url: raíz del servicio que <strong>posee el diario</strong>.  Ojo: no es
+necesariamente el mismo que arranca los runs — en el despliegue
+donde se midió, <code>POST /runs</code> y <code>POST /runs/{id}/checkpoints</code> son el
+mismo prefijo en dos servicios distintos, así que un cliente con un
+solo <code>base_url</code> recibe 404 en uno de los dos.
+token: bearer.  El diario está detrás de autenticación como el resto.
+timeout: segundos por petición.</p>
 <h3><code>Journal</code></h3>
 <p>Escribe eventos respetando la durabilidad que cada uno declara.</p>
 <pre data-lenguaje="python"><code><span class="p-n">Journal</span><span class="p-p">(</span><span class="p-n">checkpointer</span><span class="p-p">:</span> <span class="p-n">Checkpointer</span><span class="p-p">,</span> <span class="p-n">run_id</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
@@ -2945,7 +2978,7 @@ que el efecto <strong>pudo haber ocurrido</strong>.</li>
 </ul>
 <h3><code>HttpModel</code></h3>
 <p>Llama a un endpoint HTTP y devuelve respuestas ya normalizadas.</p>
-<pre data-lenguaje="python"><code><span class="p-n">HttpModel</span><span class="p-p">(</span><span class="p-n">base_url</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">api_key</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">provider</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">path</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">'/chat/completions'</span><span class="p-p">,</span> <span class="p-n">headers</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-nb">str</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">timeout</span><span class="p-p">:</span> <span class="p-nb">float</span> <span class="p-o">=</span> <span class="p-mf">120.0</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
+<pre data-lenguaje="python"><code><span class="p-n">HttpModel</span><span class="p-p">(</span><span class="p-n">base_url</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">api_key</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">provider</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">path</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">'/chat/completions'</span><span class="p-p">,</span> <span class="p-n">headers</span><span class="p-p">:</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-nb">str</span><span class="p-p">]</span> <span class="p-o">|</span> <span class="p-n">Callable</span><span class="p-p">[[</span><span class="p-n">Any</span><span class="p-p">],</span> <span class="p-n">Mapping</span><span class="p-p">[</span><span class="p-nb">str</span><span class="p-p">,</span> <span class="p-nb">str</span><span class="p-p">]]</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">timeout</span><span class="p-p">:</span> <span class="p-nb">float</span> <span class="p-o">=</span> <span class="p-mf">120.0</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-kc">None</span>
 </code></pre>
 <div class="tabla"><table>
 <thead>
@@ -2958,7 +2991,7 @@ que el efecto <strong>pudo haber ocurrido</strong>.</li>
 <tbody>
 <tr>
 <td><code>stream</code></td>
-<td><code>stream(self, request: Request) -&gt; AsyncIterator[StreamEvent]</code></td>
+<td><code>stream(self, request: Request, ctx: Any = None) -&gt; AsyncIterator[StreamEvent]</code></td>
 <td></td>
 </tr>
 </tbody>
