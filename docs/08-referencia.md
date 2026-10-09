@@ -1156,6 +1156,28 @@ SqliteCheckpointer(path: str | Path = ':memory:') -> None
 | `load` | `async load(self, run_id: str) -> RunState` | Reconstruye el estado del run, o ``None`` si no existe. |
 | `runs` | `runs(self) -> list[str]` | Identificadores de los runs almacenados.  Fuera del protocolo. |
 
+### `HttpCheckpointer`
+
+Habla con `POST/GET /runs/{run_id}/checkpoints`.
+
+```python
+HttpCheckpointer(base_url: str, *, token: str | None = None, timeout: float = 30.0) -> None
+```
+
+| Miembro | Firma | |
+|---|---|---|
+| `append` | `async append(self, run_id: str, event: StepEvent) -> AppendResult` |  |
+| `load` | `async load(self, run_id: str) -> RunState` |  |
+
+Args:
+    base_url: raíz del servicio que **posee el diario**.  Ojo: no es
+        necesariamente el mismo que arranca los runs — en el despliegue
+        donde se midió, `POST /runs` y `POST /runs/{id}/checkpoints` son el
+        mismo prefijo en dos servicios distintos, así que un cliente con un
+        solo `base_url` recibe 404 en uno de los dos.
+    token: bearer.  El diario está detrás de autenticación como el resto.
+    timeout: segundos por petición.
+
 ### `Journal`
 
 Escribe eventos respetando la durabilidad que cada uno declara.

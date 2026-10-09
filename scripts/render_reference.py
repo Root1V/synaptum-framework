@@ -71,7 +71,8 @@ GRUPOS: list[tuple[str, str, tuple[str, ...]]] = [
     (
         "Runtime",
         "Implementaciones de referencia. Ninguna es para producción a escala.",
-        ("LocalGateway", "Check", "MemoryCheckpointer", "SqliteCheckpointer", "Journal",
+        ("LocalGateway", "Check", "MemoryCheckpointer", "SqliteCheckpointer",
+         "HttpCheckpointer", "Journal",
          "Replay", "HttpModel"),
     ),
     (

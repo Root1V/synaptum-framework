@@ -25,6 +25,7 @@
  "FinishReason",
  "Gateway",
  "Hello",
+ "HttpCheckpointer",
  "HttpModel",
  "Image",
  "InMemoryPrompts",
