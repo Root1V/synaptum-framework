@@ -612,6 +612,16 @@ def test_the_normalization_corpus_is_well_formed(name: str, case: dict, root: Pa
     body = root / case["body_file"]
     assert body.exists(), f"{case['name']}: falta el cuerpo {case['body_file']}"
 
+    # Un caso sin afirmaciones no es un caso: es un cuerpo que se parsea y un
+    # verde que no significa nada. Lo avisó Aeon de su propio runner —ahí un
+    # caso sin `expect` vuelve temprano y pasa sin comprobar nada— y en el
+    # nuestro reventaba por `KeyError`, que es fallar por suerte y no por
+    # regla. Dicho como regla, el mensaje explica qué hacer.
+    assert case.get("expect"), (
+        f"{case['name']}: el caso no trae `expect`. Un caso sin afirmaciones "
+        "pasa siempre y no es evidencia de nada: dale afirmaciones o quítalo."
+    )
+
     direccion = case.get("direction", "response")
     assert direccion in {"request", "response"}, (
         f"{case['name']}: dirección {direccion!r} — solo hay request y response"

@@ -113,6 +113,11 @@ tenía.
   cable; sus claves son nuevas a propósito, para que un runner que solo conozca la dirección
   *response* falle a gritos en vez de saltárselas.
 
+  Y un caso del corpus **sin afirmaciones** ya no pasa: en nuestro runner reventaba por `KeyError`,
+  que es fallar por suerte y no por regla, y ahora lo dice con el mensaje que explica qué hacer. El
+  aviso vino del otro equipo, que lo encontró en el suyo — ahí un caso sin `expect` volvía temprano y
+  pasaba sin comprobar nada.
+
 - **La referencia generada ya no desentrecomilla un valor por defecto.** Quitar las comillas es para
   las anotaciones —`task: 'str'` es ruido—, pero se las quitaba también a lo que viene detrás de un
   `=`: `current: str = 0.1` donde el valor es `'0.1'` invita a pasar un número donde va una cadena.
