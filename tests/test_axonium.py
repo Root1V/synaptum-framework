@@ -106,16 +106,21 @@ def test_tool_call_arguments_arrive_decoded():
 
 
 def test_unreadable_arguments_are_not_turned_into_an_empty_object():
-    """Un `{}` silencioso ejecutaría la herramienta sin argumentos."""
-    from synaptum import ProviderError
+    """Un `{}` silencioso ejecutaría la herramienta sin argumentos.
 
+    Y tampoco mata el run, que es lo que hacía antes: el texto crudo viaja en la
+    llamada —`arguments` vacío, nadie la ejecuta— y el bucle la devuelve al
+    modelo como resultado de error. `VRT-SYN-005`: para el modelo es el mismo
+    error que unos argumentos que no cumplen el esquema, y le cuesta un turno.
+    """
     completion = _completion(
         content=None,
         tool_calls=[{"id": "c", "type": "function",
                      "function": {"name": "t", "arguments": "{roto"}}],
     )
-    with pytest.raises(ProviderError, match="ilegibles"):
-        message_from_axonium(completion.choices[0].message)
+    call = message_from_axonium(completion.choices[0].message).tool_calls[0]
+    assert call.arguments == {}
+    assert call.unreadable_arguments == "{roto"
 
 
 # ── El modelo, contra un cliente falso ────────────────────────────────────────

@@ -44,7 +44,7 @@ from ..core.types import (
     dumps,
 )
 
-__all__ = ["OpenAICompatible"]
+__all__ = ["OpenAICompatible", "tool_call_from_wire"]
 
 
 _FINISH = {
@@ -211,14 +211,10 @@ class OpenAICompatible:
             parts.append(Text("".join(text)))
         for index in sorted(calls):
             entry = calls[index]
+            # Los fragmentos no son JSON válido hasta el final: se acumulan y
+            # se parsean una sola vez, aquí.
             parts.append(
-                ToolCall(
-                    id=entry["id"],
-                    name=entry["name"],
-                    # Los fragmentos no son JSON válido hasta el final: se
-                    # acumulan y se parsean una sola vez, aquí.
-                    arguments=_parse_arguments("".join(entry["args"]), entry["name"]),
-                )
+                tool_call_from_wire(entry["id"], entry["name"], "".join(entry["args"]))
             )
 
         yield Finish(
@@ -247,35 +243,46 @@ def _content_from_wire(wire: Mapping[str, Any]) -> tuple[Any, ...]:
 
     for raw in wire.get("tool_calls") or ():
         function = raw.get("function") or {}
-        name = str(function.get("name", ""))
-        parts.append(
-            ToolCall(
-                id=str(raw.get("id", "")),
-                name=name,
-                arguments=_parse_arguments(function.get("arguments"), name),
-            )
-        )
+        parts.append(tool_call_from_wire(
+            str(raw.get("id", "")),
+            str(function.get("name", "")),
+            function.get("arguments"),
+        ))
 
     return tuple(parts)
 
 
-def _parse_arguments(raw: Any, tool: str) -> Mapping[str, Any]:
-    """El cable entrega los argumentos como cadena JSON; aquí llegan decodificados.
+def tool_call_from_wire(id: str, name: str, raw: Any) -> ToolCall:
+    """Una tool call del cable, con sus argumentos leídos — o sin leer.
 
-    Una cadena que no parsea **no se convierte en objeto vacío**: un ``{}``
-    silencioso ejecutaría la herramienta sin argumentos.
+    El cable entrega los argumentos como cadena JSON. Una cadena que no parsea
+    **no se convierte en objeto vacío**: un ``{}`` silencioso ejecutaría la
+    herramienta sin argumentos, y el modelo vería un resultado en vez de su
+    error. Tampoco mata el run, que es lo que hacía antes —un `ProviderError`
+    no reintentable por un argumento mal escrito— y lo que pidió Veritium
+    cambiar en `VRT-SYN-005`: el texto crudo viaja en la llamada, el bucle lo
+    devuelve al modelo como resultado de error y le cuesta **un turno**.
+
+    Lo mismo con algo que parsea y no es un objeto: `"[1,2]"` son argumentos
+    tan inservibles como `"{roto"`, y antes se volvía `{}` **en silencio** —el
+    caso que el aviso de arriba decía estar cubriendo y no cubría—.
+
+    Vive aquí y la usan los dos lectores del dialecto —este y el del puente de
+    SDK— porque es una regla, no dos: dos copias escritas a mano del mismo
+    criterio es exactamente lo que acabamos de ver fallar en otro equipo, donde
+    las dos perdieron el campo nuevo.
     """
     if raw is None or raw == "":
-        return {}
+        return ToolCall(id=id, name=name)
     if isinstance(raw, Mapping):
-        return dict(raw)
+        return ToolCall(id=id, name=name, arguments=dict(raw))
     try:
         parsed = json.loads(raw)
-    except json.JSONDecodeError as broken:
-        raise ProviderError(
-            f"Argumentos ilegibles para '{tool}': {broken}", retryable=False
-        ) from broken
-    return parsed if isinstance(parsed, Mapping) else {}
+    except json.JSONDecodeError:
+        return ToolCall(id=id, name=name, unreadable_arguments=str(raw))
+    if not isinstance(parsed, Mapping):
+        return ToolCall(id=id, name=name, unreadable_arguments=str(raw))
+    return ToolCall(id=id, name=name, arguments=parsed)
 
 
 def _usage_from_wire(body: Mapping[str, Any]) -> Usage:

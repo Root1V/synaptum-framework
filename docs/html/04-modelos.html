@@ -358,10 +358,14 @@ un bloque de texto vacío, así que la forma «válida» dependería de quién e
 mandar nada vale en todos.</p>
 </li>
 <li>
-<p><strong>Un turno sin respuesta no cierra el run.</strong> Se vuelve a preguntar, igual que con una salida que no
-valida. Cerrarlo devolvería la cadena vacía sin que nada falle, que es el peor de los dos
-resultados: lo acota <code>max_steps</code>, y un modelo que nunca llega a contestar acaba en <code>LimitExceeded</code>,
-que dice lo que pasó.</p>
+<p><strong>Un turno que terminó solo y no trae respuesta no cierra el run.</strong> Se vuelve a preguntar, igual
+que con una salida que no valida. Cerrarlo devolvería la cadena vacía sin que nada falle, que es el
+peor de los dos resultados: lo acota <code>max_steps</code>, y un modelo que nunca llega a contestar acaba en
+<code>LimitExceeded</code>, que dice lo que pasó.</p>
+<p><strong>Solo si terminó solo.</strong> Un razonamiento que se queda sin tokens —<code>finish_reason: length</code>— sí
+cierra el run: volver a preguntar eso es pedir la misma respuesta con el contexto más largo, se
+trunca igual y se paga cada intento. Un turno cortado no es un turno que no dijo nada, y la
+diferencia la cuentan el consumo y el <code>finish_reason</code> del paso.</p>
 </li>
 </ul>
 <h2>Reintentos</h2>

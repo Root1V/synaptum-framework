@@ -32,6 +32,12 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
   antes solo se alcanzaba con un modelo real y de forma intermitente. En streaming el razonamiento
   también tiene su ciclo: un turno que no emitía **ningún** evento era el doble mintiendo.
 
+- **`calls(..., raw="{roto")`** — una llamada con los argumentos ilegibles, para poder escribir el
+  test del caso de abajo sin un modelo real.
+
+- **`ToolCall.unreadable_arguments`** — el texto de los argumentos tal como llegó, cuando no se
+  pudieron leer. Entonces `arguments` queda vacío y **la llamada no se ejecuta**.
+
 ### Corregido
 
 - **Un turno del asistente con solo razonamiento ya no mata el run** (reportado por Veritium contra
@@ -47,6 +53,11 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
   «válida» dependería de quién esté al otro lado. Y el bucle **vuelve a preguntar** en vez de cerrar
   el run con un turno sin respuesta, que devolvía la cadena vacía sin que nada fallara.
 
+  Lo segundo solo cuando el turno **terminó solo**, y el corte lo puso una grabación real: el caso
+  que existe en el corpus es un razonamiento que se queda sin tokens —`finish_reason: length`—, y
+  volver a preguntar eso es pedir la misma respuesta con el contexto más largo. Se trunca igual y se
+  paga cada intento.
+
   El turno no se pierde: sigue en el diario, que es de donde lee el replay. Lo que desaparece es un
   envoltorio sin nada dentro.
 
@@ -55,6 +66,25 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
   normalización dice que la dirección request «no se normaliza» y que el documento trata la response,
   así que el corpus que ejecutan las dos implementaciones no podía ver esto en ninguno de los dos
   lenguajes.
+
+- **Una tool call con los argumentos ilegibles ya no mata el run** (reportado por Veritium, mismo
+  día y mismo modelo). El modelo escribe un `tool_call` con el JSON de `arguments` cortado, y la
+  conversión de la respuesta lo convertía en un `ProviderError` **no reintentable**: se perdía el
+  turno, el resto del mensaje y el run entero por un argumento mal escrito — y el run se reintentaba
+  completo, que cuesta un run en vez de un turno.
+
+  Ahora el texto crudo viaja en la llamada y vuelve al modelo como resultado de error, con lo que
+  escribió dentro: el mismo trato que una llamada cuyos argumentos no validan, porque para el modelo
+  es el mismo error. **No sale por la costura:** nadie puede ejecutarla, así que no llega al arnés ni
+  hace que una persona apruebe algo cuyos argumentos no se entienden.
+
+  Sigue sin convertirse en `{}`: un objeto vacío silencioso ejecutaría la herramienta sin argumentos.
+  Y ahora tampoco cuando el texto *parsea* y no es un objeto —`"[1,2]"`—, que era el caso que el
+  aviso escrito en esa función decía cubrir y no cubría.
+
+  El criterio lo lee **una sola función** que usan los dos lectores del dialecto. Dos copias escritas
+  a mano del mismo criterio es lo que otro equipo acaba de ver fallar, con las dos perdiendo el campo
+  nuevo a la vez.
 
 - **La referencia generada ya no desentrecomilla un valor por defecto.** Quitar las comillas es para
   las anotaciones —`task: 'str'` es ruido—, pero se las quitaba también a lo que viene detrás de un

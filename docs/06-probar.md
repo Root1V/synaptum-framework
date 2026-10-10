@@ -27,6 +27,7 @@ El guion se consume en orden y admite más que respuestas:
 |---|---|
 | `says("...")` / `calls(...)` | Respuesta guionizada |
 | `thinks("...")` | Un turno que **solo razona**: ni texto ni llamadas |
+| `calls(..., raw="{roto")` | Una llamada con los argumentos **ilegibles**, tal como los escribió el modelo |
 | `str` | Atajo de `says` |
 | `BaseException` | Se lanza — con `ProviderError` ejercitas los reintentos |
 | `Decision` | Se lanza como `Denied`: las tres disposiciones sin montar un motor de políticas |

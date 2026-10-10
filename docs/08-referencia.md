@@ -610,11 +610,25 @@ Invocación pedida por el modelo.
 | `id` | `str` | **obligatorio** |
 | `name` | `str` | **obligatorio** |
 | `arguments` | `Mapping[str, Any]` | *(fábrica)* |
+| `unreadable_arguments` | `str \| None` | `None` |
 | `kind` | `Literal['tool_call']` | `'tool_call'` |
 
 ``arguments`` ya viene decodificado.  Los proveedores que lo entregan como
 cadena JSON lo parsean en su adaptador: el bucle no debería tener que
 adivinar si recibió un objeto o su serialización.
+
+``unreadable_arguments`` lleva el texto **tal como llegó** cuando no se pudo
+leer —JSON cortado, o algo que parsea pero no es un objeto—.  Entonces
+``arguments`` queda vacío y **esta llamada no se ejecuta**: un ``{}``
+silencioso correría la herramienta sin argumentos, que es peor que no
+correrla.  El bucle la devuelve al modelo como un resultado de error, igual
+que una llamada cuyos argumentos no validan, y le cuesta un turno en vez de
+un run.
+
+Al reenviar el turno al proveedor viaja el ``{}``, no el texto roto: lo que
+el modelo necesita ver está en el resultado de error, que lo lleva dentro, y
+poner JSON inválido en el cable es volver a mandar algo que el otro extremo
+puede rechazar.
 
 ### `ToolResult`
 
@@ -1820,10 +1834,16 @@ Respuesta de texto que cierra el turno.
 ### `calls`
 
 ```python
-def calls(name: str, *, id: str = 'call-1', usage: Usage | None = None, **arguments: Any) -> Response
+def calls(name: str, *, id: str = 'call-1', usage: Usage | None = None, raw: str | None = None, **arguments: Any) -> Response
 ```
 
 Respuesta que pide una herramienta.
+
+Con ``raw`` la pide **con los argumentos ilegibles**: el texto tal como lo
+escribió el modelo, sin parsear, que es lo que llega cuando el JSON sale
+cortado. Está en el kit porque antes ese caso mataba el run y solo se
+alcanzaba con un modelo real —`raw='{"a": "sin cerrar'`— y porque sin él un
+test no puede comprobar que vuelve al modelo (`VRT-SYN-005`).
 
 ### `thinks`
 

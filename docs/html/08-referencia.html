@@ -1650,6 +1650,11 @@ ejecución sin índice adicional.</p>
 <td><em>(fábrica)</em></td>
 </tr>
 <tr>
+<td><code>unreadable_arguments</code></td>
+<td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
 <td><code>kind</code></td>
 <td><code>Literal['tool_call']</code></td>
 <td><code>'tool_call'</code></td>
@@ -1659,6 +1664,17 @@ ejecución sin índice adicional.</p>
 <p><code>arguments</code> ya viene decodificado.  Los proveedores que lo entregan como
 cadena JSON lo parsean en su adaptador: el bucle no debería tener que
 adivinar si recibió un objeto o su serialización.</p>
+<p><code>unreadable_arguments</code> lleva el texto <strong>tal como llegó</strong> cuando no se pudo
+leer —JSON cortado, o algo que parsea pero no es un objeto—.  Entonces
+<code>arguments</code> queda vacío y <strong>esta llamada no se ejecuta</strong>: un <code>{}</code>
+silencioso correría la herramienta sin argumentos, que es peor que no
+correrla.  El bucle la devuelve al modelo como un resultado de error, igual
+que una llamada cuyos argumentos no validan, y le cuesta un turno en vez de
+un run.</p>
+<p>Al reenviar el turno al proveedor viaja el <code>{}</code>, no el texto roto: lo que
+el modelo necesita ver está en el resultado de error, que lo lleva dentro, y
+poner JSON inválido en el cable es volver a mandar algo que el otro extremo
+puede rechazar.</p>
 <h3><code>ToolResult</code></h3>
 <p>Resultado devuelto al modelo.</p>
 <div class="tabla"><table>
@@ -3635,9 +3651,14 @@ deny_tools: denegaciones simuladas por nombre de herramienta.</p>
 </code></pre>
 <p>Respuesta de texto que cierra el turno.</p>
 <h3><code>calls</code></h3>
-<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">calls</span><span class="p-p">(</span><span class="p-n">name</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-nb">id</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">'call-1'</span><span class="p-p">,</span> <span class="p-n">usage</span><span class="p-p">:</span> <span class="p-n">Usage</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-o">**</span><span class="p-n">arguments</span><span class="p-p">:</span> <span class="p-n">Any</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Response</span>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">calls</span><span class="p-p">(</span><span class="p-n">name</span><span class="p-p">:</span> <span class="p-nb">str</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-nb">id</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">'call-1'</span><span class="p-p">,</span> <span class="p-n">usage</span><span class="p-p">:</span> <span class="p-n">Usage</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-n">raw</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">,</span> <span class="p-o">**</span><span class="p-n">arguments</span><span class="p-p">:</span> <span class="p-n">Any</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Response</span>
 </code></pre>
 <p>Respuesta que pide una herramienta.</p>
+<p>Con <code>raw</code> la pide <strong>con los argumentos ilegibles</strong>: el texto tal como lo
+escribió el modelo, sin parsear, que es lo que llega cuando el JSON sale
+cortado. Está en el kit porque antes ese caso mataba el run y solo se
+alcanzaba con un modelo real —<code>raw='{&quot;a&quot;: &quot;sin cerrar'</code>— y porque sin él un
+test no puede comprobar que vuelve al modelo (<code>VRT-SYN-005</code>).</p>
 <h3><code>thinks</code></h3>
 <pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">thinks</span><span class="p-p">(</span><span class="p-n">text</span><span class="p-p">:</span> <span class="p-nb">str</span> <span class="p-o">=</span> <span class="p-s1">'déjame pensarlo'</span><span class="p-p">,</span> <span class="p-o">*</span><span class="p-p">,</span> <span class="p-n">usage</span><span class="p-p">:</span> <span class="p-n">Usage</span> <span class="p-o">|</span> <span class="p-kc">None</span> <span class="p-o">=</span> <span class="p-kc">None</span><span class="p-p">)</span> <span class="p-o">-&gt;</span> <span class="p-n">Response</span>
 </code></pre>

@@ -948,3 +948,95 @@ def test_a_turn_that_only_reasoned_is_visible_while_it_streams():
         "el ciclo del razonamiento se cierra antes de que empiece el del texto"
     )
     assert eventos[-1].output == "42"
+
+
+def test_an_unreadable_tool_call_comes_back_as_evidence_instead_of_killing_the_run():
+    """VRT-SYN-005 · El criterio de aceptación que pidió Veritium.
+
+    El modelo escribió un `tool_call` con el JSON de `arguments` cortado. Antes
+    eso subía como `ProviderError` no reintentable desde la conversión de la
+    respuesta y el run moría; Veritium lo estaba pagando reintentando la
+    investigación entera con otra temperatura, que cuesta un run en vez de un
+    turno.
+
+    Es el mismo trato que una tool llamada con argumentos que no validan (S-3),
+    y por la misma razón: para el modelo son el mismo error, y el que ve el
+    error suele corregirlo.
+
+    **La llamada ilegible no sale por la costura.** Nadie puede ejecutarla, así
+    que no tiene que llegar al arnés — y menos hacer que una persona apruebe
+    algo cuyos argumentos no se pueden leer. Lo mide `tool_calls == 1`: la
+    herramienta se ejecutó una vez, la buena.
+    """
+    from synaptum import Text, tool
+    from synaptum.testing import FakeGateway, calls, says
+
+    @tool(idempotent=True)
+    def search_document(q: str) -> str:
+        """Busca en el documento."""
+        return "TOTAL 42"
+
+    gateway = FakeGateway(
+        calls("search_document", raw='{"a": "sin cerrar'),
+        calls("search_document", id="c2", q="total"),
+        says("el total es 42"),
+        tools=[search_document],
+    )
+    agente = Agent("investigador", model="openai-compatible:m", tools=[search_document])
+    events = run(agente, "busca el total", Session("run-1", gateway))
+
+    assert events[-1].output == "el total es 42", "el run termina"
+    assert gateway.tool_calls == 1, "la llamada ilegible no se ejecutó"
+
+    # El segundo request lleva el error del primero, que es lo que el modelo
+    # necesita para corregir: con qué falló y qué había escrito.
+    segunda = gateway.requests[1]
+    evidencia = [
+        p.text
+        for m in segunda.messages if m.role is Role.TOOL
+        for parte in m.content
+        for p in parte.content if isinstance(p, Text)
+    ]
+    assert any("no son JSON válido" in t for t in evidencia), evidencia
+    assert any('{"a": "sin cerrar' in t for t in evidencia), "el modelo ve lo que escribió"
+
+    fallidos = [
+        e for e in events
+        if isinstance(e, ToolStep) and e.result is not None and e.result.is_error
+    ]
+    assert len(fallidos) == 1, "queda registrado como un paso de herramienta que falló"
+
+
+def test_a_reasoning_turn_cut_off_by_the_token_limit_closes_the_run():
+    """El otro lado del corte, y lo puso una grabación real.
+
+    Volver a preguntar tiene sentido cuando el turno **terminó solo** y no trajo
+    nada. Un razonamiento que se queda sin tokens —`finish_reason: length`— es
+    otra cosa: la misma pregunta con el contexto más largo se vuelve a truncar,
+    así que re-preguntar agota los turnos pagando cada intento para acabar en
+    `LimitExceeded`.
+
+    El caso existe de verdad en el corpus de grabaciones —`chat_completion.json`
+    y `chat_stream_ok.sse` son las dos un razonamiento sin texto con
+    `finish_reason: length`— y esos tests no corren en CI, que es donde hace
+    falta que esto quede sujeto.
+
+    Lo que el run devuelve es la cadena vacía, y la explicación no se pierde: el
+    consumo que hubo que pagar y el `finish_reason` están en el paso.
+    """
+    from synaptum import Thinking
+    from synaptum.testing import FakeGateway
+
+    truncado = Response(
+        message=Message(Role.ASSISTANT, (Thinking(text="Vale, el usuario quiere"),)),
+        finish_reason=FinishReason.LENGTH,
+        usage=USAGE,
+    )
+    gateway = FakeGateway(truncado)
+    events = run(Agent("a", model="openai-compatible:m"), "di hola", Session("r", gateway))
+
+    assert events[-1].output == "", "no hubo texto"
+    assert gateway.model_calls == 1, "no se vuelve a preguntar lo que se va a truncar igual"
+    assert events[-1].usage.output == USAGE.output, "pero sí hubo tokens que pagar"
+    paso = [e for e in events if isinstance(e, ModelStep) and e.phase is Phase.COMPLETED][-1]
+    assert paso.response.finish_reason is FinishReason.LENGTH, "la explicación llega"

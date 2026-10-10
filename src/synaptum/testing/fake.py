@@ -102,10 +102,29 @@ def thinks(text: str = "déjame pensarlo", *, usage: Usage | None = None) -> Res
     )
 
 
-def calls(name: str, *, id: str = "call-1", usage: Usage | None = None, **arguments: Any) -> Response:
-    """Respuesta que pide una herramienta."""
+def calls(
+    name: str,
+    *,
+    id: str = "call-1",
+    usage: Usage | None = None,
+    raw: str | None = None,
+    **arguments: Any,
+) -> Response:
+    """Respuesta que pide una herramienta.
+
+    Con ``raw`` la pide **con los argumentos ilegibles**: el texto tal como lo
+    escribió el modelo, sin parsear, que es lo que llega cuando el JSON sale
+    cortado. Está en el kit porque antes ese caso mataba el run y solo se
+    alcanzaba con un modelo real —`raw='{"a": "sin cerrar'`— y porque sin él un
+    test no puede comprobar que vuelve al modelo (`VRT-SYN-005`).
+    """
+    call = (
+        ToolCall(id=id, name=name, unreadable_arguments=raw)
+        if raw is not None
+        else ToolCall(id=id, name=name, arguments=arguments)
+    )
     return Response(
-        message=Message(Role.ASSISTANT, (ToolCall(id=id, name=name, arguments=arguments),)),
+        message=Message(Role.ASSISTANT, (call,)),
         finish_reason=FinishReason.TOOL_CALLS,
         usage=usage or DEFAULT_USAGE,
         model="fake",

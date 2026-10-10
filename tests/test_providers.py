@@ -248,3 +248,53 @@ def test_an_assistant_turn_with_only_reasoning_is_not_sent_as_an_empty_envelope(
         Thinking(text="mmm"), Text("el total es 42"),
     )))[0]
     assert con_texto["content"] == "el total es 42"
+
+
+# ── VRT-SYN-005 · argumentos que no se pueden leer ───────────────────────────
+
+def test_arguments_that_cannot_be_read_travel_in_the_call_instead_of_killing_the_run():
+    """El modelo escribió un JSON cortado. Eso es una muestra mala, no un run roto.
+
+    Antes salía un `ProviderError` no reintentable desde la conversión de la
+    respuesta, así que se perdía el turno, los demás contenidos del mensaje y el
+    run entero por un argumento mal escrito — y el run se reintentaba completo,
+    que es lo que Veritium estaba pagando.
+
+    El texto crudo viaja dentro de la llamada y `arguments` queda vacío: un
+    ``{}`` silencioso ejecutaría la herramienta sin argumentos, que es peor que
+    no ejecutarla. Quien decide qué hacer con eso es el bucle.
+    """
+    from synaptum import Text
+    from synaptum.providers.openai_compatible import OpenAICompatible
+
+    adaptador = OpenAICompatible()
+    respuesta = adaptador.from_wire({"choices": [{"message": {
+        "content": "voy a buscarlo",
+        "tool_calls": [{"id": "c1", "type": "function", "function": {
+            "name": "search_document", "arguments": '{"a": "sin cerrar'}}],
+    }}]})
+
+    llamada = respuesta.message.tool_calls[0]
+    assert llamada.arguments == {}
+    assert llamada.unreadable_arguments == '{"a": "sin cerrar'
+    assert [p for p in respuesta.message.content if isinstance(p, Text)], (
+        "el resto del mensaje no se pierde con la llamada ilegible"
+    )
+
+    # Algo que parsea y no es un objeto son argumentos igual de inservibles, y
+    # antes se convertía en `{}` **en silencio**: el caso que el aviso de la
+    # función decía cubrir y no cubría.
+    lista = adaptador.from_wire({"choices": [{"message": {"tool_calls": [
+        {"id": "c2", "type": "function", "function": {"name": "t", "arguments": "[1,2]"}},
+    ]}}]}).message.tool_calls[0]
+    assert lista.arguments == {} and lista.unreadable_arguments == "[1,2]"
+
+    # Y lo mismo por el camino del stream, que acumula los fragmentos y parsea
+    # al final: es el camino por el que llegan de verdad.
+    eventos = list(adaptador.stream_from_wire([
+        {"choices": [{"delta": {"tool_calls": [
+            {"index": 0, "id": "c3", "function": {"name": "t", "arguments": '{"a": "sin'}},
+        ]}}]},
+    ]))
+    troceada = eventos[-1].response.message.tool_calls[0]
+    assert troceada.unreadable_arguments == '{"a": "sin'

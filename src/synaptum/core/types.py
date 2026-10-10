@@ -166,11 +166,25 @@ class ToolCall:
     ``arguments`` ya viene decodificado.  Los proveedores que lo entregan como
     cadena JSON lo parsean en su adaptador: el bucle no debería tener que
     adivinar si recibió un objeto o su serialización.
+
+    ``unreadable_arguments`` lleva el texto **tal como llegó** cuando no se pudo
+    leer —JSON cortado, o algo que parsea pero no es un objeto—.  Entonces
+    ``arguments`` queda vacío y **esta llamada no se ejecuta**: un ``{}``
+    silencioso correría la herramienta sin argumentos, que es peor que no
+    correrla.  El bucle la devuelve al modelo como un resultado de error, igual
+    que una llamada cuyos argumentos no validan, y le cuesta un turno en vez de
+    un run.
+
+    Al reenviar el turno al proveedor viaja el ``{}``, no el texto roto: lo que
+    el modelo necesita ver está en el resultado de error, que lo lleva dentro, y
+    poner JSON inválido en el cable es volver a mandar algo que el otro extremo
+    puede rechazar.
     """
 
     id: str
     name: str
     arguments: Mapping[str, Any] = field(default_factory=dict)
+    unreadable_arguments: str | None = None
     kind: Literal["tool_call"] = "tool_call"
 
 

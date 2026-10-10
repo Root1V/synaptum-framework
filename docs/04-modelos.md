@@ -210,10 +210,15 @@ hay dos reglas sobre él, y las dos existen porque sin ellas el run se pierde o 
   un bloque de texto vacío, así que la forma «válida» dependería de quién esté al otro lado. No
   mandar nada vale en todos.
 
-- **Un turno sin respuesta no cierra el run.** Se vuelve a preguntar, igual que con una salida que no
-  valida. Cerrarlo devolvería la cadena vacía sin que nada falle, que es el peor de los dos
-  resultados: lo acota `max_steps`, y un modelo que nunca llega a contestar acaba en `LimitExceeded`,
-  que dice lo que pasó.
+- **Un turno que terminó solo y no trae respuesta no cierra el run.** Se vuelve a preguntar, igual
+  que con una salida que no valida. Cerrarlo devolvería la cadena vacía sin que nada falle, que es el
+  peor de los dos resultados: lo acota `max_steps`, y un modelo que nunca llega a contestar acaba en
+  `LimitExceeded`, que dice lo que pasó.
+
+  **Solo si terminó solo.** Un razonamiento que se queda sin tokens —`finish_reason: length`— sí
+  cierra el run: volver a preguntar eso es pedir la misma respuesta con el contexto más largo, se
+  trunca igual y se paga cada intento. Un turno cortado no es un turno que no dijo nada, y la
+  diferencia la cuentan el consumo y el `finish_reason` del paso.
 
 ## Reintentos
 
