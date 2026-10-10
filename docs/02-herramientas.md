@@ -77,9 +77,16 @@ negar «capturar» sin ver el importe no es una política, es un interruptor.
 Un fallo dentro de la función **no rompe el run**: vuelve como `ToolResult` con `is_error=True`, y
 el modelo lo ve y suele corregir. Un modelo que no ve el error no puede corregirlo.
 
-Lo que **sí** se propaga es una llamada mal formada: argumentos que no encajan en la firma no son
-algo que el modelo pueda arreglar leyendo un mensaje, son un desajuste entre el esquema y la
-función.
+Y una **llamada mal formada tampoco**, aunque la herramienta se niegue a ejecutarla: argumentos que
+no encajan en la firma, o que ni siquiera se pueden leer —un JSON cortado, que es lo que escribe un
+modelo cuando se le acaba el turno a mitad— vuelven igual como `ToolResult` con `is_error=True`, con
+el error y con lo que el modelo había escrito dentro. Son una muestra mala, no un run roto, y le
+cuestan un turno. Una llamada que no se puede leer **no sale del proceso**: nadie puede ejecutarla,
+así que no llega a la costura ni hace que una persona apruebe algo cuyos argumentos no se entienden.
+
+Lo que sí rompe el run es lo que ningún turno puede arreglar: un error del proveedor que no se
+declara reintentable, o una configuración imposible —un contenido que el adaptador no sabe
+transportar, por ejemplo—.
 
 ## La salida se recorta antes de entrar en el contexto
 

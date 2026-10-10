@@ -114,12 +114,18 @@ def _firma(obj: Any) -> str:
     Con `from __future__ import annotations` las anotaciones son cadenas, así que
     `inspect` las devuelve entrecomilladas: `task: 'str'`. Es ruido — quien lee
     una referencia quiere el tipo, no saber cómo se evaluó.
+
+    Lo que **no** se desentrecomilla es lo que viene detrás de un `=`: ahí no hay
+    una anotación sino un valor por defecto, y quitarle las comillas documenta un
+    defecto que no se puede copiar. Pasaba: `current: str = 0.1` donde el valor
+    es `'0.1'`, que invita a pasar un número donde va una cadena.
     """
     try:
         texto = str(inspect.signature(obj))
     except (TypeError, ValueError):
         return "(...)"
-    return re.sub(r"'([\w\[\]., |]+)'", r"\1", texto).replace("synaptum.core.types.", "")
+    texto = re.sub(r"(?<!= )'([\w\[\]., |]+)'", r"\1", texto)
+    return texto.replace("synaptum.core.types.", "")
 
 
 def _resumen(obj: Any) -> str:

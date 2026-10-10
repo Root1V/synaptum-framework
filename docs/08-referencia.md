@@ -610,11 +610,25 @@ Invocación pedida por el modelo.
 | `id` | `str` | **obligatorio** |
 | `name` | `str` | **obligatorio** |
 | `arguments` | `Mapping[str, Any]` | *(fábrica)* |
+| `unreadable_arguments` | `str \| None` | `None` |
 | `kind` | `Literal['tool_call']` | `'tool_call'` |
 
 ``arguments`` ya viene decodificado.  Los proveedores que lo entregan como
 cadena JSON lo parsean en su adaptador: el bucle no debería tener que
 adivinar si recibió un objeto o su serialización.
+
+``unreadable_arguments`` lleva el texto **tal como llegó** cuando no se pudo
+leer —JSON cortado, o algo que parsea pero no es un objeto—.  Entonces
+``arguments`` queda vacío y **esta llamada no se ejecuta**: un ``{}``
+silencioso correría la herramienta sin argumentos, que es peor que no
+correrla.  El bucle la devuelve al modelo como un resultado de error, igual
+que una llamada cuyos argumentos no validan, y le cuesta un turno en vez de
+un run.
+
+Al reenviar el turno al proveedor viaja el ``{}``, no el texto roto: lo que
+el modelo necesita ver está en el resultado de error, que lo lleva dentro, y
+poner JSON inválido en el cable es volver a mandar algo que el otro extremo
+puede rechazar.
 
 ### `ToolResult`
 
@@ -1056,7 +1070,7 @@ int([x]) -> integer int(x, base=10) -> integer
 ### `negotiate`
 
 ```python
-def negotiate(peer: Sequence[str], *, current: str = 0.1) -> str
+def negotiate(peer: Sequence[str], *, current: str = '0.1') -> str
 ```
 
 Elige la versión más alta que ambos extremos hablan.
@@ -1071,7 +1085,7 @@ Raises:
 ### `supported_versions`
 
 ```python
-def supported_versions(current: str = 0.1, window: int = 2) -> tuple[str, ...]
+def supported_versions(current: str = '0.1', window: int = 2) -> tuple[str, ...]
 ```
 
 Versiones que este extremo acepta, de la más nueva a la más vieja.
@@ -1820,10 +1834,31 @@ Respuesta de texto que cierra el turno.
 ### `calls`
 
 ```python
-def calls(name: str, *, id: str = 'call-1', usage: Usage | None = None, **arguments: Any) -> Response
+def calls(name: str, *, id: str = 'call-1', usage: Usage | None = None, raw: str | None = None, **arguments: Any) -> Response
 ```
 
 Respuesta que pide una herramienta.
+
+Con ``raw`` la pide **con los argumentos ilegibles**: el texto tal como lo
+escribió el modelo, sin parsear, que es lo que llega cuando el JSON sale
+cortado. Está en el kit porque antes ese caso mataba el run y solo se
+alcanzaba con un modelo real —`raw='{"a": "sin cerrar'`— y porque sin él un
+test no puede comprobar que vuelve al modelo (`VRT-SYN-005`).
+
+### `thinks`
+
+```python
+def thinks(text: str = 'déjame pensarlo', *, usage: Usage | None = None) -> Response
+```
+
+Turno que **solo** razona: ni texto ni llamadas.
+
+Pasa de verdad con los modelos de razonamiento —el servidor devuelve
+`reasoning_content` y nada más—, y es el turno que rompía el run siguiente:
+el razonamiento no se devuelve al proveedor, así que el mensaje salía al
+cable sin `content` y sin `tool_calls`, y un servidor compatible con OpenAI
+lo rechaza con un 400 no reintentable (VRT-SYN-004).  Sin esto en el kit, el
+caso solo se alcanzaba con un modelo real y de forma intermitente.
 
 ### `split_sse`
 

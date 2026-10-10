@@ -67,6 +67,7 @@ from ..core.errors import NoObjectGeneratedError
 from ..core.protocols import CallContext, Checkpointer, Gateway, RunState
 from ..core.types import (
     AUTO,
+    FinishReason,
     Message,
     Role,
     Request,
@@ -112,6 +113,21 @@ def _como_mensaje(task: "Entrada") -> "Message":
     if isinstance(task, str):
         return Message.user(task)
     return Message(role=Role.USER, content=tuple(task))
+
+
+def _por_que_no_se_leen(crudo: str) -> str:
+    """Por qué ese texto no son argumentos, dicho para que lo lea el modelo.
+
+    Se vuelve a parsear aquí en vez de guardar el mensaje del decodificador en
+    la llamada: el texto crudo es lo único que hace falta conservar y el motivo
+    se deriva de él siempre igual. Dos campos que describen lo mismo pueden
+    discrepar; uno, no.
+    """
+    try:
+        json.loads(crudo)
+    except json.JSONDecodeError as roto:
+        return str(roto)
+    return "parsea, pero no es un objeto"
 
 
 #: Nombre de la herramienta con la que un agente entrega su salida final.
@@ -557,6 +573,41 @@ class Agent:
                             "resultado para terminar."
                         ))
                         continue
+                    if (
+                        response.finish_reason is FinishReason.STOP
+                        and not response.message.text.strip()
+                    ):
+                        # Un turno que **terminó solo** y no trae nada que
+                        # mostrar no es una respuesta, y cerrar el run con él
+                        # devuelve la cadena vacía sin que nada falle: el peor de
+                        # los dos resultados posibles. Pasa de verdad con los
+                        # modelos de razonamiento —el servidor devuelve
+                        # `reasoning_content` y nada más— y es la mitad que el
+                        # adaptador no puede arreglar: él evita el sobre vacío en
+                        # el cable, pero el turno sigue sin llevar respuesta
+                        # (VRT-SYN-004).
+                        #
+                        # Se vuelve a preguntar, que es lo que ya se hace con una
+                        # salida que no valida, y lo acota `max_steps`: un modelo
+                        # que nunca contesta acaba en `LimitExceeded`, que dice
+                        # lo que pasó, en vez de en un resultado vacío que no
+                        # dice nada.
+                        #
+                        # **Solo si terminó solo**, y el corte lo puso una
+                        # grabación real: el caso que existe de verdad en el
+                        # corpus es un razonamiento que se queda sin tokens
+                        # —`finish_reason: length`— y volver a preguntar eso es
+                        # pedir la misma respuesta con el contexto más largo. Se
+                        # trunca igual, agota los turnos y acaba en
+                        # `LimitExceeded` habiendo pagado cada intento. Un turno
+                        # cortado no es un turno que no dijo nada: el consumo y
+                        # el `finish_reason` son la explicación, y ésos sí
+                        # llegan.
+                        messages.append(Message.user(
+                            "Ese turno llegó sin respuesta: ni texto ni llamada "
+                            "a herramienta. Continúa y responde."
+                        ))
+                        continue
                     break
 
                 # ── Pasos de herramienta ──────────────────────────────────────
@@ -566,7 +617,7 @@ class Agent:
                     # tiene su propio diario, su propio consumo y su propio punto
                     # de reanudación. Por eso se despacha aparte.
                     sub = self._delegates_by_name.get(call.name)
-                    if sub is not None:
+                    if sub is not None and call.unreadable_arguments is None:
                         step_id = make_step_id(seq, "delegate")
                         seq += 1
                         async for evento, resultado in self._delegate(
@@ -835,6 +886,25 @@ class Agent:
     async def _call_tool(
         self, session: Session, call: ToolCall, step_id: str, spec: ToolDefinition | None
     ) -> ToolResult:
+        if call.unreadable_arguments is not None:
+            # Los argumentos venían ilegibles del proveedor —JSON cortado, o
+            # algo que parsea y no es un objeto—. Para el modelo es el mismo
+            # error que unos argumentos que no cumplen el esquema, así que sale
+            # por la misma puerta y vuelve a él como resultado de error: le
+            # cuesta un turno y no el run (VRT-SYN-005).
+            #
+            # Se niega **antes** de la costura, y eso es deliberado: una llamada
+            # que nadie puede ejecutar no tiene que llegar al arnés, y menos
+            # hacer que una persona apruebe algo cuyos argumentos no se pueden
+            # leer.
+            raise InvalidToolCallError(
+                f"Los argumentos de '{call.name}' no son JSON válido "
+                f"({_por_que_no_se_leen(call.unreadable_arguments)}): "
+                f"{call.unreadable_arguments[:200]!r}",
+                tool=call.name,
+                call_id=call.id,
+            )
+
         ctx = self._ctx(session, step_id)
         risk = spec.risk if spec else Risk.READ
         ref = spec.ref if spec else None

@@ -90,9 +90,12 @@ class Tool:
 
         Un fallo de la función **no se propaga**: vuelve como ``ToolResult`` con
         ``is_error``, porque un modelo que no ve el error no puede corregirlo.
-        Lo que sí se propaga es una llamada mal formada — argumentos que no
-        encajan en la firma no son algo que el modelo pueda arreglar leyendo un
-        mensaje, son un desajuste entre el esquema y la función.
+
+        Lo que sí se propaga es una llamada mal formada: argumentos que no
+        encajan en la firma no son algo que *esta* función pueda ejecutar. Quien
+        decide qué hacer con eso es el bucle, y lo que hace es devolvérselo al
+        modelo como resultado de error para que rectifique — así que al nivel
+        del run tampoco rompe nada.
         """
         try:
             bound = inspect.signature(self.fn).bind(**arguments)

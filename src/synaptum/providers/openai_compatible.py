@@ -44,7 +44,7 @@ from ..core.types import (
     dumps,
 )
 
-__all__ = ["OpenAICompatible"]
+__all__ = ["OpenAICompatible", "tool_call_from_wire"]
 
 
 _FINISH = {
@@ -211,14 +211,10 @@ class OpenAICompatible:
             parts.append(Text("".join(text)))
         for index in sorted(calls):
             entry = calls[index]
+            # Los fragmentos no son JSON válido hasta el final: se acumulan y
+            # se parsean una sola vez, aquí.
             parts.append(
-                ToolCall(
-                    id=entry["id"],
-                    name=entry["name"],
-                    # Los fragmentos no son JSON válido hasta el final: se
-                    # acumulan y se parsean una sola vez, aquí.
-                    arguments=_parse_arguments("".join(entry["args"]), entry["name"]),
-                )
+                tool_call_from_wire(entry["id"], entry["name"], "".join(entry["args"]))
             )
 
         yield Finish(
@@ -247,35 +243,46 @@ def _content_from_wire(wire: Mapping[str, Any]) -> tuple[Any, ...]:
 
     for raw in wire.get("tool_calls") or ():
         function = raw.get("function") or {}
-        name = str(function.get("name", ""))
-        parts.append(
-            ToolCall(
-                id=str(raw.get("id", "")),
-                name=name,
-                arguments=_parse_arguments(function.get("arguments"), name),
-            )
-        )
+        parts.append(tool_call_from_wire(
+            str(raw.get("id", "")),
+            str(function.get("name", "")),
+            function.get("arguments"),
+        ))
 
     return tuple(parts)
 
 
-def _parse_arguments(raw: Any, tool: str) -> Mapping[str, Any]:
-    """El cable entrega los argumentos como cadena JSON; aquí llegan decodificados.
+def tool_call_from_wire(id: str, name: str, raw: Any) -> ToolCall:
+    """Una tool call del cable, con sus argumentos leídos — o sin leer.
 
-    Una cadena que no parsea **no se convierte en objeto vacío**: un ``{}``
-    silencioso ejecutaría la herramienta sin argumentos.
+    El cable entrega los argumentos como cadena JSON. Una cadena que no parsea
+    **no se convierte en objeto vacío**: un ``{}`` silencioso ejecutaría la
+    herramienta sin argumentos, y el modelo vería un resultado en vez de su
+    error. Tampoco mata el run, que es lo que hacía antes —un `ProviderError`
+    no reintentable por un argumento mal escrito— y lo que pidió Veritium
+    cambiar en `VRT-SYN-005`: el texto crudo viaja en la llamada, el bucle lo
+    devuelve al modelo como resultado de error y le cuesta **un turno**.
+
+    Lo mismo con algo que parsea y no es un objeto: `"[1,2]"` son argumentos
+    tan inservibles como `"{roto"`, y antes se volvía `{}` **en silencio** —el
+    caso que el aviso de arriba decía estar cubriendo y no cubría—.
+
+    Vive aquí y la usan los dos lectores del dialecto —este y el del puente de
+    SDK— porque es una regla, no dos: dos copias escritas a mano del mismo
+    criterio es exactamente lo que acabamos de ver fallar en otro equipo, donde
+    las dos perdieron el campo nuevo.
     """
     if raw is None or raw == "":
-        return {}
+        return ToolCall(id=id, name=name)
     if isinstance(raw, Mapping):
-        return dict(raw)
+        return ToolCall(id=id, name=name, arguments=dict(raw))
     try:
         parsed = json.loads(raw)
-    except json.JSONDecodeError as broken:
-        raise ProviderError(
-            f"Argumentos ilegibles para '{tool}': {broken}", retryable=False
-        ) from broken
-    return parsed if isinstance(parsed, Mapping) else {}
+    except json.JSONDecodeError:
+        return ToolCall(id=id, name=name, unreadable_arguments=str(raw))
+    if not isinstance(parsed, Mapping):
+        return ToolCall(id=id, name=name, unreadable_arguments=str(raw))
+    return ToolCall(id=id, name=name, arguments=parsed)
 
 
 def _usage_from_wire(body: Mapping[str, Any]) -> Usage:
@@ -329,10 +336,36 @@ def _message_to_wire(message: Message) -> list[dict[str, Any]]:
 
     _rechaza_lo_que_no_sabe_mandar(message)
 
-    wire: dict[str, Any] = {"role": message.role.value}
     text = message.text
     calls = message.tool_calls
     imagenes = [p for p in message.content if p.kind == "image"]
+
+    if message.role is Role.ASSISTANT and not (text or calls or imagenes):
+        # **Un turno del asistente que no lleva nada enviable no se envuelve.**
+        # El caso real: el modelo contesta solo con `reasoning_content`, la
+        # respuesta se normaliza a un mensaje cuya única parte es `Thinking`, y
+        # el razonamiento no se devuelve al proveedor —eso está decidido arriba,
+        # en `_TRANSPORTABLE`—.  Lo que quedaba era el sobre vacío,
+        # `{"role": "assistant", "content": null}`, que **el propio dialecto
+        # declara inválido**: un mensaje del asistente lleva `content` o
+        # `tool_calls`.  llama-server lo rechaza con un 400 no reintentable y se
+        # pierde el run entero, en el turno *siguiente* y solo cuando el modelo
+        # razona sin hablar — intermitente, y más probable cuanto más largo es el
+        # run (VRT-SYN-004).
+        #
+        # Omitir el sobre no es descartar en silencio, que es lo que este
+        # adaptador se niega a hacer: la parte que no viaja ya no viajaba, y el
+        # turno sigue completo donde importa que lo esté —en el diario, que es
+        # de donde lee el replay—.  Lo que desaparece es un envoltorio sin nada
+        # dentro.
+        #
+        # No se manda `content: ""` en su lugar, aunque este servidor lo
+        # aceptaría: hay dialectos que rechazan un bloque de texto vacío, así
+        # que la forma «válida» dependería de quién esté al otro lado.  No
+        # mandar nada vale en todos.
+        return []
+
+    wire: dict[str, Any] = {"role": message.role.value}
 
     if imagenes:
         # Con partes no textuales, `content` deja de ser una cadena y pasa a ser

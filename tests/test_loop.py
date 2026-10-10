@@ -867,3 +867,176 @@ def test_a_task_given_as_an_assistant_message_is_refused():
     agente = Agent("vista", model="fake:m", instructions="Mira.")
     with pytest.raises(ConfigurationError, match="instructions"):
         run(agente, Message.assistant("yo no pido nada"), Session("r", FakeGateway(says("x"))))
+
+
+def test_a_turn_that_only_reasoned_does_not_kill_the_next_one():
+    """VRT-SYN-004 · El criterio de aceptación que pidió Veritium.
+
+    Un modelo de razonamiento contesta a veces solo con `reasoning_content`, sin
+    texto y sin llamadas. Ese turno se guarda en el historial y se reenvía al
+    siguiente; el razonamiento no vuelve al proveedor, así que el mensaje salía
+    al cable sin `content` y sin `tool_calls` y llama-server lo rechazaba con un
+    400 **no reintentable**: el run entero perdido, en el turno siguiente y solo
+    cuando el modelo razona sin hablar.
+
+    Son dos arreglos y hacen falta los dos. El adaptador deja de poner un sobre
+    vacío en el cable; el bucle deja de cerrar el run con un turno que no trae
+    respuesta —antes devolvía la cadena vacía sin que nada fallara, y entonces
+    no había segundo turno que comprobar—.
+
+    Se mira el cuerpo de **todas** las peticiones del run y no solo la segunda,
+    porque el 400 lo provoca cualquier mensaje del asistente que salga sin
+    ninguna de las dos claves, y el turno culpable ya pasó. Y se mira el cuerpo
+    del adaptador, no el `Request`: la parte `Thinking` sigue ahí — lo que
+    desaparece es el sobre.
+    """
+    from test_providers import _sin_sobres_vacios  # la invariante vive con el cable
+
+    from synaptum import tool
+    from synaptum.providers.openai_compatible import OpenAICompatible
+    from synaptum.testing import FakeGateway, calls, says, thinks
+
+    @tool(idempotent=True)
+    def leer(path: str) -> str:
+        """Lee un fichero."""
+        return "TOTAL 42"
+
+    store = MemoryCheckpointer()
+    gateway = FakeGateway(
+        thinks("el usuario quiere el total; debería leer el fichero"),
+        calls("leer", path="/boleta.txt"),
+        says("el total es 42"),
+        tools=[leer],
+    )
+    agente = Agent("extractor", model="openai-compatible:m", tools=[leer])
+    events = run(agente, "extrae el total de /boleta.txt", Session("run-1", gateway, store))
+
+    assert events[-1].output == "el total es 42", "el run termina"
+    assert gateway.model_calls == 3 and gateway.tool_calls == 1
+
+    adaptador = OpenAICompatible()
+    for peticion in gateway.requests:
+        _sin_sobres_vacios(adaptador.to_wire(peticion))
+
+    # El turno sigue completo donde importa que lo esté: el diario es de donde
+    # lee el replay, y ahí el razonamiento no se ha perdido.
+    razonado = [
+        e for e in asyncio.run(store.load("run-1")).events
+        if isinstance(e, ModelStep) and e.response is not None
+        and any(p.kind == "thinking" for p in e.response.message.content)
+    ]
+    assert len(razonado) == 1
+
+
+def test_a_turn_that_only_reasoned_is_visible_while_it_streams():
+    """Y el mismo turno, en streaming: el razonamiento tiene su ciclo.
+
+    Un turno que solo razona sin emitir **ningún** evento sería el doble
+    mintiendo: el guion dice que el modelo razonó y quien consume no ve nada.
+    Hay respuestas que son solo razonamiento, y mientras duran son lo único que
+    hay que mostrar.
+    """
+    from synaptum.testing import FakeGateway, says, thinks
+
+    agente = Agent("a", model="openai-compatible:m")
+    puerta = FakeGateway(thinks("déjame pensarlo"), says("42"))
+    eventos = _stream(agente, "¿cuánto?", Session("run-1", puerta))
+
+    tipos = [e.kind for e in eventos]
+    assert tipos.index("reasoning_start") < tipos.index("reasoning_delta") < tipos.index("reasoning_end")
+    assert tipos.index("reasoning_end") < tipos.index("text_start"), (
+        "el ciclo del razonamiento se cierra antes de que empiece el del texto"
+    )
+    assert eventos[-1].output == "42"
+
+
+def test_an_unreadable_tool_call_comes_back_as_evidence_instead_of_killing_the_run():
+    """VRT-SYN-005 · El criterio de aceptación que pidió Veritium.
+
+    El modelo escribió un `tool_call` con el JSON de `arguments` cortado. Antes
+    eso subía como `ProviderError` no reintentable desde la conversión de la
+    respuesta y el run moría; Veritium lo estaba pagando reintentando la
+    investigación entera con otra temperatura, que cuesta un run en vez de un
+    turno.
+
+    Es el mismo trato que una tool llamada con argumentos que no validan (S-3),
+    y por la misma razón: para el modelo son el mismo error, y el que ve el
+    error suele corregirlo.
+
+    **La llamada ilegible no sale por la costura.** Nadie puede ejecutarla, así
+    que no tiene que llegar al arnés — y menos hacer que una persona apruebe
+    algo cuyos argumentos no se pueden leer. Lo mide `tool_calls == 1`: la
+    herramienta se ejecutó una vez, la buena.
+    """
+    from synaptum import Text, tool
+    from synaptum.testing import FakeGateway, calls, says
+
+    @tool(idempotent=True)
+    def search_document(q: str) -> str:
+        """Busca en el documento."""
+        return "TOTAL 42"
+
+    gateway = FakeGateway(
+        calls("search_document", raw='{"a": "sin cerrar'),
+        calls("search_document", id="c2", q="total"),
+        says("el total es 42"),
+        tools=[search_document],
+    )
+    agente = Agent("investigador", model="openai-compatible:m", tools=[search_document])
+    events = run(agente, "busca el total", Session("run-1", gateway))
+
+    assert events[-1].output == "el total es 42", "el run termina"
+    assert gateway.tool_calls == 1, "la llamada ilegible no se ejecutó"
+
+    # El segundo request lleva el error del primero, que es lo que el modelo
+    # necesita para corregir: con qué falló y qué había escrito.
+    segunda = gateway.requests[1]
+    evidencia = [
+        p.text
+        for m in segunda.messages if m.role is Role.TOOL
+        for parte in m.content
+        for p in parte.content if isinstance(p, Text)
+    ]
+    assert any("no son JSON válido" in t for t in evidencia), evidencia
+    assert any('{"a": "sin cerrar' in t for t in evidencia), "el modelo ve lo que escribió"
+
+    fallidos = [
+        e for e in events
+        if isinstance(e, ToolStep) and e.result is not None and e.result.is_error
+    ]
+    assert len(fallidos) == 1, "queda registrado como un paso de herramienta que falló"
+
+
+def test_a_reasoning_turn_cut_off_by_the_token_limit_closes_the_run():
+    """El otro lado del corte, y lo puso una grabación real.
+
+    Volver a preguntar tiene sentido cuando el turno **terminó solo** y no trajo
+    nada. Un razonamiento que se queda sin tokens —`finish_reason: length`— es
+    otra cosa: la misma pregunta con el contexto más largo se vuelve a truncar,
+    así que re-preguntar agota los turnos pagando cada intento para acabar en
+    `LimitExceeded`.
+
+    El caso existe de verdad en el corpus de grabaciones —`chat_completion.json`
+    y `chat_stream_ok.sse` son las dos un razonamiento sin texto con
+    `finish_reason: length`— y esos tests no corren en CI, que es donde hace
+    falta que esto quede sujeto.
+
+    Lo que el run devuelve es la cadena vacía, y la explicación no se pierde: el
+    consumo que hubo que pagar y el `finish_reason` están en el paso.
+    """
+    from synaptum import Thinking
+    from synaptum.testing import FakeGateway
+
+    truncado = Response(
+        message=Message(Role.ASSISTANT, (Thinking(text="Vale, el usuario quiere"),)),
+        finish_reason=FinishReason.LENGTH,
+        usage=USAGE,
+    )
+    gateway = FakeGateway(truncado)
+    events = run(Agent("a", model="openai-compatible:m"), "di hola", Session("r", gateway))
+
+    assert events[-1].output == "", "no hubo texto"
+    assert gateway.model_calls == 1, "no se vuelve a preguntar lo que se va a truncar igual"
+    assert events[-1].usage.output == USAGE.output, "pero sí hubo tokens que pagar"
+    paso = [e for e in events if isinstance(e, ModelStep) and e.phase is Phase.COMPLETED][-1]
+    assert paso.response.finish_reason is FinishReason.LENGTH, "la explicación llega"

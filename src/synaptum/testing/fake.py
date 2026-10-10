@@ -39,6 +39,9 @@ from ..core.types import (
     Finish,
     FinishReason,
     Message,
+    ReasoningDelta,
+    ReasoningEnd,
+    ReasoningStart,
     Request,
     Response,
     Risk,
@@ -49,6 +52,7 @@ from ..core.types import (
     TextDelta,
     TextEnd,
     TextStart,
+    Thinking,
     ToolCall,
     ToolCallDelta,
     ToolCallEnd,
@@ -58,7 +62,7 @@ from ..core.types import (
 )
 from ..tools.decorator import Tool
 
-__all__ = ["FakeGateway", "says", "calls", "DEFAULT_USAGE"]
+__all__ = ["FakeGateway", "says", "calls", "thinks", "DEFAULT_USAGE"]
 
 
 DEFAULT_USAGE = Usage(input=100, output=20, reasoning=0, cache_read=0, cache_write=0)
@@ -80,10 +84,47 @@ def says(text: str, *, usage: Usage | None = None) -> Response:
     )
 
 
-def calls(name: str, *, id: str = "call-1", usage: Usage | None = None, **arguments: Any) -> Response:
-    """Respuesta que pide una herramienta."""
+def thinks(text: str = "déjame pensarlo", *, usage: Usage | None = None) -> Response:
+    """Turno que **solo** razona: ni texto ni llamadas.
+
+    Pasa de verdad con los modelos de razonamiento —el servidor devuelve
+    `reasoning_content` y nada más—, y es el turno que rompía el run siguiente:
+    el razonamiento no se devuelve al proveedor, así que el mensaje salía al
+    cable sin `content` y sin `tool_calls`, y un servidor compatible con OpenAI
+    lo rechaza con un 400 no reintentable (VRT-SYN-004).  Sin esto en el kit, el
+    caso solo se alcanzaba con un modelo real y de forma intermitente.
+    """
     return Response(
-        message=Message(Role.ASSISTANT, (ToolCall(id=id, name=name, arguments=arguments),)),
+        message=Message(Role.ASSISTANT, (Thinking(text=text),)),
+        finish_reason=FinishReason.STOP,
+        usage=usage or DEFAULT_USAGE,
+        model="fake",
+    )
+
+
+def calls(
+    name: str,
+    *,
+    id: str = "call-1",
+    usage: Usage | None = None,
+    raw: str | None = None,
+    **arguments: Any,
+) -> Response:
+    """Respuesta que pide una herramienta.
+
+    Con ``raw`` la pide **con los argumentos ilegibles**: el texto tal como lo
+    escribió el modelo, sin parsear, que es lo que llega cuando el JSON sale
+    cortado. Está en el kit porque antes ese caso mataba el run y solo se
+    alcanzaba con un modelo real —`raw='{"a": "sin cerrar'`— y porque sin él un
+    test no puede comprobar que vuelve al modelo (`VRT-SYN-005`).
+    """
+    call = (
+        ToolCall(id=id, name=name, unreadable_arguments=raw)
+        if raw is not None
+        else ToolCall(id=id, name=name, arguments=arguments)
+    )
+    return Response(
+        message=Message(Role.ASSISTANT, (call,)),
         finish_reason=FinishReason.TOOL_CALLS,
         usage=usage or DEFAULT_USAGE,
         model="fake",
@@ -176,6 +217,18 @@ class FakeGateway:
                         yield TextDelta(text=piece, index=index)
                         await asyncio.sleep(0)
                     yield TextEnd(index=index)
+                elif isinstance(part, Thinking):
+                    # El razonamiento tiene su ciclo igual que el texto. Sin
+                    # esto, un turno que solo razona no producía **ningún**
+                    # evento en streaming: el guion decía una cosa y quien
+                    # consume no veía nada, que es justo la clase de hueco que
+                    # este fake existe para no tener.
+                    yield ReasoningStart(index=index)
+                    for piece in _slice(part.text, self.chunk_size):
+                        self.chunks_emitted += 1
+                        yield ReasoningDelta(text=piece, index=index)
+                        await asyncio.sleep(0)
+                    yield ReasoningEnd(index=index)
                 elif isinstance(part, ToolCall):
                     yield ToolCallStart(id=part.id, name=part.name, index=index)
                     from ..core.types import dumps

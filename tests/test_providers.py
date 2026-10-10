@@ -181,3 +181,120 @@ def _descartado_en_silencio_ya_no_pasa():
     """
     # Conservado como nota: la primera mitad de S-7 fue negarse en vez de
     # descartar, y la segunda hacer que las imágenes viajen de verdad.
+
+
+# ── VRT-SYN-004 · un turno que solo razona ───────────────────────────────────
+#
+# Reportado por Veritium contra 1.0.0rc4: un `Agent` contra llama-server se
+# cortaba con `HTTP 400 · Assistant message must contain either 'content' or
+# 'tool_calls'!` en el turno **siguiente** a uno en que el modelo respondió solo
+# con `reasoning_content`.
+#
+# Las dos direcciones del adaptador no son independientes, y ahí estaba el
+# hueco: la dirección *response* **produce** la parte (`Thinking`) que la
+# dirección *request* no sabe mandar. `contratos/normalizacion/spec.md` dice que
+# la dirección request «no se normaliza» y que el documento trata la response —
+# así que el corpus dorado que ejecutan las dos implementaciones no podía ver
+# esto en ninguno de los dos lenguajes.
+
+def _sin_sobres_vacios(body: dict) -> None:
+    """La invariante del dialecto, afirmada sobre el cuerpo entero.
+
+    Se comprueba así y no solo sobre el mensaje del caso porque el 400 no lo
+    provoca el turno que razona: lo provoca **cualquier** mensaje del asistente
+    que salga sin ninguna de las dos claves, y el turno culpable ya pasó.
+    """
+    for mensaje in body["messages"]:
+        if mensaje["role"] != "assistant":
+            continue
+        assert mensaje.get("content") or mensaje.get("tool_calls"), (
+            f"un mensaje del asistente sale sin `content` ni `tool_calls`: {mensaje}"
+        )
+
+
+def test_an_assistant_turn_with_only_reasoning_is_not_sent_as_an_empty_envelope():
+    """VRT-SYN-004 · El razonamiento no vuelve al proveedor; el sobre tampoco.
+
+    Antes el mensaje salía como `{"role": "assistant", "content": null}`, que el
+    propio dialecto declara inválido. No se manda `content: ""` en su lugar:
+    este servidor lo aceptaría, pero hay dialectos que rechazan un bloque de
+    texto vacío, así que la forma «válida» dependería de quién esté al otro
+    lado. No mandar nada vale en todos.
+    """
+    from synaptum import Message, Request, Role, Text, Thinking, ToolCall
+    from synaptum.providers.openai_compatible import OpenAICompatible, _message_to_wire
+
+    assert _message_to_wire(Message(Role.ASSISTANT, (Thinking(text="mmm"),))) == []
+
+    cuerpo = OpenAICompatible().to_wire(Request(model="m", messages=(
+        Message.user("extrae el total"),
+        Message(Role.ASSISTANT, (Thinking(text="el usuario quiere el total..."),)),
+        Message.user("sigue"),
+    )))
+    _sin_sobres_vacios(cuerpo)
+    assert [m["role"] for m in cuerpo["messages"]] == ["user", "user"], (
+        "el turno que no lleva nada enviable no deja un sobre vacío detrás"
+    )
+
+    # Y lo que sí lleva algo no cambia: el razonamiento se sigue omitiendo, pero
+    # el mensaje viaja por lo demás.  Un turno de razonar y llamar a una tool es
+    # lo normal en un modelo de razonamiento, y ahí el sobre es obligatorio.
+    con_tool = _message_to_wire(Message(Role.ASSISTANT, (
+        Thinking(text="voy a leerlo"), ToolCall(id="c1", name="leer", arguments={"path": "/x"}),
+    )))[0]
+    assert con_tool["content"] is None and con_tool["tool_calls"][0]["id"] == "c1"
+
+    con_texto = _message_to_wire(Message(Role.ASSISTANT, (
+        Thinking(text="mmm"), Text("el total es 42"),
+    )))[0]
+    assert con_texto["content"] == "el total es 42"
+
+
+# ── VRT-SYN-005 · argumentos que no se pueden leer ───────────────────────────
+
+def test_arguments_that_cannot_be_read_travel_in_the_call_instead_of_killing_the_run():
+    """El modelo escribió un JSON cortado. Eso es una muestra mala, no un run roto.
+
+    Antes salía un `ProviderError` no reintentable desde la conversión de la
+    respuesta, así que se perdía el turno, los demás contenidos del mensaje y el
+    run entero por un argumento mal escrito — y el run se reintentaba completo,
+    que es lo que Veritium estaba pagando.
+
+    El texto crudo viaja dentro de la llamada y `arguments` queda vacío: un
+    ``{}`` silencioso ejecutaría la herramienta sin argumentos, que es peor que
+    no ejecutarla. Quien decide qué hacer con eso es el bucle.
+    """
+    from synaptum import Text
+    from synaptum.providers.openai_compatible import OpenAICompatible
+
+    adaptador = OpenAICompatible()
+    respuesta = adaptador.from_wire({"choices": [{"message": {
+        "content": "voy a buscarlo",
+        "tool_calls": [{"id": "c1", "type": "function", "function": {
+            "name": "search_document", "arguments": '{"a": "sin cerrar'}}],
+    }}]})
+
+    llamada = respuesta.message.tool_calls[0]
+    assert llamada.arguments == {}
+    assert llamada.unreadable_arguments == '{"a": "sin cerrar'
+    assert [p for p in respuesta.message.content if isinstance(p, Text)], (
+        "el resto del mensaje no se pierde con la llamada ilegible"
+    )
+
+    # Algo que parsea y no es un objeto son argumentos igual de inservibles, y
+    # antes se convertía en `{}` **en silencio**: el caso que el aviso de la
+    # función decía cubrir y no cubría.
+    lista = adaptador.from_wire({"choices": [{"message": {"tool_calls": [
+        {"id": "c2", "type": "function", "function": {"name": "t", "arguments": "[1,2]"}},
+    ]}}]}).message.tool_calls[0]
+    assert lista.arguments == {} and lista.unreadable_arguments == "[1,2]"
+
+    # Y lo mismo por el camino del stream, que acumula los fragmentos y parsea
+    # al final: es el camino por el que llegan de verdad.
+    eventos = list(adaptador.stream_from_wire([
+        {"choices": [{"delta": {"tool_calls": [
+            {"index": 0, "id": "c3", "function": {"name": "t", "arguments": '{"a": "sin'}},
+        ]}}]},
+    ]))
+    troceada = eventos[-1].response.message.tool_calls[0]
+    assert troceada.unreadable_arguments == '{"a": "sin'

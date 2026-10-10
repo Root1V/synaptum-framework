@@ -28,7 +28,6 @@ hace el gateway del arnés con Axonium-Go dentro, porque ahí vive la credencial
 from __future__ import annotations
 
 import hashlib
-import json
 from typing import Any, AsyncIterator, Mapping
 
 from ..core.errors import ConfigurationError, ProviderError
@@ -49,14 +48,13 @@ from ..core.types import (
     TextEnd,
     TextStart,
     Thinking,
-    ToolCall,
     ToolCallDelta,
     ToolCallEnd,
     ToolCallStart,
     Usage,
     dumps,
 )
-from .openai_compatible import OpenAICompatible
+from .openai_compatible import OpenAICompatible, tool_call_from_wire
 
 __all__ = ["AxoniumModel", "message_from_axonium", "usage_from_axonium"]
 
@@ -219,11 +217,7 @@ class AxoniumModel:
         for index in sorted(calls):
             entry = calls[index]
             parts.append(
-                ToolCall(
-                    id=entry["id"],
-                    name=entry["name"],
-                    arguments=_arguments("".join(entry["args"]), entry["name"]),
-                )
+                tool_call_from_wire(entry["id"], entry["name"], "".join(entry["args"]))
             )
 
         yield Finish(
@@ -274,13 +268,9 @@ def message_from_axonium(source: Any) -> Message:
     for raw in _field(source, "tool_calls") or ():
         function = _field(raw, "function")
         name = _field(function, "name", "") or ""
-        parts.append(
-            ToolCall(
-                id=_field(raw, "id", "") or "",
-                name=name,
-                arguments=_arguments(_field(function, "arguments"), name),
-            )
-        )
+        parts.append(tool_call_from_wire(
+            _field(raw, "id", "") or "", name, _field(function, "arguments"),
+        ))
 
     return Message(Role.ASSISTANT, tuple(parts))
 
@@ -350,22 +340,6 @@ def metadata_from_axonium(source: Any) -> dict[str, Any]:
         )
     }
     return {campo: valor for campo, valor in recogido.items() if valor is not None}
-
-
-def _arguments(raw: Any, tool: str) -> Mapping[str, Any]:
-    if raw is None or raw == "":
-        return {}
-    if isinstance(raw, Mapping):
-        return dict(raw)
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as broken:
-        raise ProviderError(
-            f"Argumentos ilegibles para '{tool}': {broken}",
-            provider="axonium",
-            retryable=False,
-        ) from broken
-    return parsed if isinstance(parsed, Mapping) else {}
 
 
 # ── Errores ───────────────────────────────────────────────────────────────────
