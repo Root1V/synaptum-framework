@@ -11,7 +11,7 @@ Dos formas, con virtudes distintas:
   se le ocurren.
 """
 
-from .fake import DEFAULT_USAGE, FakeGateway, calls, says
+from .fake import DEFAULT_USAGE, FakeGateway, calls, says, thinks
 from .replay import ReplayGateway, split_sse
 
 __all__ = [
@@ -19,6 +19,7 @@ __all__ = [
     "ReplayGateway",
     "says",
     "calls",
+    "thinks",
     "split_sse",
     "DEFAULT_USAGE",
 ]

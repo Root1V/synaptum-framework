@@ -220,6 +220,10 @@ calcula. Lo único que no hace es inferir.</p>
 <td>Respuesta guionizada</td>
 </tr>
 <tr>
+<td><code>thinks(&quot;...&quot;)</code></td>
+<td>Un turno que <strong>solo razona</strong>: ni texto ni llamadas</td>
+</tr>
+<tr>
 <td><code>str</code></td>
 <td>Atajo de <code>says</code></td>
 </tr>
@@ -243,6 +247,17 @@ mediría lo contrario de lo que afirma:</p>
 <pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">responder</span><span class="p-p">(</span><span class="p-n">peticion</span><span class="p-p">):</span>
     <span class="p-n">ya_consultado</span> <span class="p-o">=</span> <span class="p-nb">any</span><span class="p-p">(</span><span class="p-n">m</span><span class="p-o">.</span><span class="p-n">role</span> <span class="p-ow">is</span> <span class="p-n">Role</span><span class="p-o">.</span><span class="p-n">TOOL</span> <span class="p-k">for</span> <span class="p-n">m</span> <span class="p-ow">in</span> <span class="p-n">peticion</span><span class="p-o">.</span><span class="p-n">messages</span><span class="p-p">)</span>
     <span class="p-k">return</span> <span class="p-n">says</span><span class="p-p">(</span><span class="p-s2">"el saldo es 4.200 €"</span><span class="p-p">)</span> <span class="p-k">if</span> <span class="p-n">ya_consultado</span> <span class="p-k">else</span> <span class="p-n">calls</span><span class="p-p">(</span><span class="p-s2">"consultar_saldo"</span><span class="p-p">,</span> <span class="p-n">cuenta</span><span class="p-o">=</span><span class="p-s2">"ES91"</span><span class="p-p">)</span>
+</code></pre>
+<p><code>thinks</code> está ahí porque ese turno pasa de verdad —un modelo de razonamiento contesta a veces solo
+con su razonamiento— y porque es un turno que rompe cosas: el razonamiento no se devuelve al
+proveedor, así que un mensaje del asistente que solo lo lleva no tiene nada que mandar. El adaptador
+no deja un sobre vacío detrás, pero el turno existió, y en el guion se escribe así:</p>
+<pre data-lenguaje="python"><code><span class="p-n">gateway</span> <span class="p-o">=</span> <span class="p-n">FakeGateway</span><span class="p-p">(</span>
+    <span class="p-n">thinks</span><span class="p-p">(</span><span class="p-s2">"el usuario quiere el total; debería leer el fichero"</span><span class="p-p">),</span>
+    <span class="p-n">calls</span><span class="p-p">(</span><span class="p-s2">"leer"</span><span class="p-p">,</span> <span class="p-n">path</span><span class="p-o">=</span><span class="p-s2">"/boleta.txt"</span><span class="p-p">),</span>
+    <span class="p-n">says</span><span class="p-p">(</span><span class="p-s1">'{"total": 42}'</span><span class="p-p">),</span>
+    <span class="p-n">tools</span><span class="p-o">=</span><span class="p-p">[</span><span class="p-n">leer</span><span class="p-p">],</span>
+<span class="p-p">)</span>
 </code></pre>
 <h3>Comprobar la cancelación</h3>
 <pre data-lenguaje="python"><code><span class="p-n">gateway</span><span class="p-o">.</span><span class="p-n">chunks_emitted</span>   <span class="p-c1"># cuántos fragmentos llegó a producir</span>

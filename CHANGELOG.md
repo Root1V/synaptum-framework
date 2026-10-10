@@ -28,6 +28,38 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
   un gateway gobernado necesita lo decide quien las recibe, y escribirlas aquí metería su
   vocabulario dentro del framework. Quien pase su propia clave manda.
 
+- **`thinks()` en el kit de dobles** — un turno que solo razona, que es el que destapó lo de abajo y
+  antes solo se alcanzaba con un modelo real y de forma intermitente. En streaming el razonamiento
+  también tiene su ciclo: un turno que no emitía **ningún** evento era el doble mintiendo.
+
+### Corregido
+
+- **Un turno del asistente con solo razonamiento ya no mata el run** (reportado por Veritium contra
+  la `rc4`, visto contra llama-server con `gpt-oss-20b`). El razonamiento no se devuelve al
+  proveedor, así que el mensaje salía al cable sin `content` y sin `tool_calls` —
+  `{"role": "assistant", "content": null}`, que el propio dialecto declara inválido— y el servidor lo
+  rechazaba con un **400 no reintentable**: el run entero perdido, en el turno *siguiente* al que
+  razonó y solo cuando el modelo razona sin hablar. Intermitente, y más probable cuanto más largo es
+  el run.
+
+  Son dos arreglos. El adaptador **no envuelve** un turno que no lleva nada enviable, y no manda
+  `content: ""` en su lugar: hay dialectos que rechazan un bloque de texto vacío, así que la forma
+  «válida» dependería de quién esté al otro lado. Y el bucle **vuelve a preguntar** en vez de cerrar
+  el run con un turno sin respuesta, que devolvía la cadena vacía sin que nada fallara.
+
+  El turno no se pierde: sigue en el diario, que es de donde lee el replay. Lo que desaparece es un
+  envoltorio sin nada dentro.
+
+  Las dos direcciones del adaptador no son independientes, y ahí estaba el hueco: la dirección
+  *response* **produce** la parte que la dirección *request* no sabe mandar. El contrato de
+  normalización dice que la dirección request «no se normaliza» y que el documento trata la response,
+  así que el corpus que ejecutan las dos implementaciones no podía ver esto en ninguno de los dos
+  lenguajes.
+
+- **La referencia generada ya no desentrecomilla un valor por defecto.** Quitar las comillas es para
+  las anotaciones —`task: 'str'` es ruido—, pero se las quitaba también a lo que viene detrás de un
+  `=`: `current: str = 0.1` donde el valor es `'0.1'` invita a pasar un número donde va una cadena.
+
 ## [1.0.0rc4] — 2026-10-07
 
 **Cortada a petición del segundo consumidor**, cuatro días después de la `rc3` y por un motivo

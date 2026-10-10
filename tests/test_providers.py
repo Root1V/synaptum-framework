@@ -181,3 +181,70 @@ def _descartado_en_silencio_ya_no_pasa():
     """
     # Conservado como nota: la primera mitad de S-7 fue negarse en vez de
     # descartar, y la segunda hacer que las imágenes viajen de verdad.
+
+
+# ── VRT-SYN-004 · un turno que solo razona ───────────────────────────────────
+#
+# Reportado por Veritium contra 1.0.0rc4: un `Agent` contra llama-server se
+# cortaba con `HTTP 400 · Assistant message must contain either 'content' or
+# 'tool_calls'!` en el turno **siguiente** a uno en que el modelo respondió solo
+# con `reasoning_content`.
+#
+# Las dos direcciones del adaptador no son independientes, y ahí estaba el
+# hueco: la dirección *response* **produce** la parte (`Thinking`) que la
+# dirección *request* no sabe mandar. `contratos/normalizacion/spec.md` dice que
+# la dirección request «no se normaliza» y que el documento trata la response —
+# así que el corpus dorado que ejecutan las dos implementaciones no podía ver
+# esto en ninguno de los dos lenguajes.
+
+def _sin_sobres_vacios(body: dict) -> None:
+    """La invariante del dialecto, afirmada sobre el cuerpo entero.
+
+    Se comprueba así y no solo sobre el mensaje del caso porque el 400 no lo
+    provoca el turno que razona: lo provoca **cualquier** mensaje del asistente
+    que salga sin ninguna de las dos claves, y el turno culpable ya pasó.
+    """
+    for mensaje in body["messages"]:
+        if mensaje["role"] != "assistant":
+            continue
+        assert mensaje.get("content") or mensaje.get("tool_calls"), (
+            f"un mensaje del asistente sale sin `content` ni `tool_calls`: {mensaje}"
+        )
+
+
+def test_an_assistant_turn_with_only_reasoning_is_not_sent_as_an_empty_envelope():
+    """VRT-SYN-004 · El razonamiento no vuelve al proveedor; el sobre tampoco.
+
+    Antes el mensaje salía como `{"role": "assistant", "content": null}`, que el
+    propio dialecto declara inválido. No se manda `content: ""` en su lugar:
+    este servidor lo aceptaría, pero hay dialectos que rechazan un bloque de
+    texto vacío, así que la forma «válida» dependería de quién esté al otro
+    lado. No mandar nada vale en todos.
+    """
+    from synaptum import Message, Request, Role, Text, Thinking, ToolCall
+    from synaptum.providers.openai_compatible import OpenAICompatible, _message_to_wire
+
+    assert _message_to_wire(Message(Role.ASSISTANT, (Thinking(text="mmm"),))) == []
+
+    cuerpo = OpenAICompatible().to_wire(Request(model="m", messages=(
+        Message.user("extrae el total"),
+        Message(Role.ASSISTANT, (Thinking(text="el usuario quiere el total..."),)),
+        Message.user("sigue"),
+    )))
+    _sin_sobres_vacios(cuerpo)
+    assert [m["role"] for m in cuerpo["messages"]] == ["user", "user"], (
+        "el turno que no lleva nada enviable no deja un sobre vacío detrás"
+    )
+
+    # Y lo que sí lleva algo no cambia: el razonamiento se sigue omitiendo, pero
+    # el mensaje viaja por lo demás.  Un turno de razonar y llamar a una tool es
+    # lo normal en un modelo de razonamiento, y ahí el sobre es obligatorio.
+    con_tool = _message_to_wire(Message(Role.ASSISTANT, (
+        Thinking(text="voy a leerlo"), ToolCall(id="c1", name="leer", arguments={"path": "/x"}),
+    )))[0]
+    assert con_tool["content"] is None and con_tool["tool_calls"][0]["id"] == "c1"
+
+    con_texto = _message_to_wire(Message(Role.ASSISTANT, (
+        Thinking(text="mmm"), Text("el total es 42"),
+    )))[0]
+    assert con_texto["content"] == "el total es 42"

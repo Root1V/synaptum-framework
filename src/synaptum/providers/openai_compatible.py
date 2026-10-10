@@ -329,10 +329,36 @@ def _message_to_wire(message: Message) -> list[dict[str, Any]]:
 
     _rechaza_lo_que_no_sabe_mandar(message)
 
-    wire: dict[str, Any] = {"role": message.role.value}
     text = message.text
     calls = message.tool_calls
     imagenes = [p for p in message.content if p.kind == "image"]
+
+    if message.role is Role.ASSISTANT and not (text or calls or imagenes):
+        # **Un turno del asistente que no lleva nada enviable no se envuelve.**
+        # El caso real: el modelo contesta solo con `reasoning_content`, la
+        # respuesta se normaliza a un mensaje cuya única parte es `Thinking`, y
+        # el razonamiento no se devuelve al proveedor —eso está decidido arriba,
+        # en `_TRANSPORTABLE`—.  Lo que quedaba era el sobre vacío,
+        # `{"role": "assistant", "content": null}`, que **el propio dialecto
+        # declara inválido**: un mensaje del asistente lleva `content` o
+        # `tool_calls`.  llama-server lo rechaza con un 400 no reintentable y se
+        # pierde el run entero, en el turno *siguiente* y solo cuando el modelo
+        # razona sin hablar — intermitente, y más probable cuanto más largo es el
+        # run (VRT-SYN-004).
+        #
+        # Omitir el sobre no es descartar en silencio, que es lo que este
+        # adaptador se niega a hacer: la parte que no viaja ya no viajaba, y el
+        # turno sigue completo donde importa que lo esté —en el diario, que es
+        # de donde lee el replay—.  Lo que desaparece es un envoltorio sin nada
+        # dentro.
+        #
+        # No se manda `content: ""` en su lugar, aunque este servidor lo
+        # aceptaría: hay dialectos que rechazan un bloque de texto vacío, así
+        # que la forma «válida» dependería de quién esté al otro lado.  No
+        # mandar nada vale en todos.
+        return []
+
+    wire: dict[str, Any] = {"role": message.role.value}
 
     if imagenes:
         # Con partes no textuales, `content` deja de ser una cadena y pasa a ser

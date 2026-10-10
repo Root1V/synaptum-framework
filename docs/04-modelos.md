@@ -196,6 +196,25 @@ async for evento in flujo:
 await flujo.aclose()          # esto es la señal
 ```
 
+## Un turno que solo razona
+
+Un modelo de razonamiento contesta a veces solo con su razonamiento: ni texto ni llamada a
+herramienta. Ese turno no se descarta —queda en el diario, con su razonamiento y su consumo— pero
+hay dos reglas sobre él, y las dos existen porque sin ellas el run se pierde o se vacía:
+
+- **No sale al cable un sobre vacío.** El razonamiento no se devuelve al proveedor, así que un
+  mensaje del asistente que solo lo lleva no tiene nada que mandar — y
+  `{"role": "assistant", "content": null}` es un mensaje que el propio dialecto declara inválido: un
+  servidor compatible con OpenAI lo rechaza con un **400 no reintentable**, en el turno *siguiente* y
+  solo cuando el modelo razonó sin hablar. Tampoco se manda `content: ""`: hay dialectos que rechazan
+  un bloque de texto vacío, así que la forma «válida» dependería de quién esté al otro lado. No
+  mandar nada vale en todos.
+
+- **Un turno sin respuesta no cierra el run.** Se vuelve a preguntar, igual que con una salida que no
+  valida. Cerrarlo devolvería la cadena vacía sin que nada falle, que es el peor de los dos
+  resultados: lo acota `max_steps`, y un modelo que nunca llega a contestar acaba en `LimitExceeded`,
+  que dice lo que pasó.
+
 ## Reintentos
 
 Un error trae en su **tipo** si es reintentable — la decisión no es del bucle, la sabe quien habló

@@ -1056,7 +1056,7 @@ int([x]) -> integer int(x, base=10) -> integer
 ### `negotiate`
 
 ```python
-def negotiate(peer: Sequence[str], *, current: str = 0.1) -> str
+def negotiate(peer: Sequence[str], *, current: str = '0.1') -> str
 ```
 
 Elige la versión más alta que ambos extremos hablan.
@@ -1071,7 +1071,7 @@ Raises:
 ### `supported_versions`
 
 ```python
-def supported_versions(current: str = 0.1, window: int = 2) -> tuple[str, ...]
+def supported_versions(current: str = '0.1', window: int = 2) -> tuple[str, ...]
 ```
 
 Versiones que este extremo acepta, de la más nueva a la más vieja.
@@ -1824,6 +1824,21 @@ def calls(name: str, *, id: str = 'call-1', usage: Usage | None = None, **argume
 ```
 
 Respuesta que pide una herramienta.
+
+### `thinks`
+
+```python
+def thinks(text: str = 'déjame pensarlo', *, usage: Usage | None = None) -> Response
+```
+
+Turno que **solo** razona: ni texto ni llamadas.
+
+Pasa de verdad con los modelos de razonamiento —el servidor devuelve
+`reasoning_content` y nada más—, y es el turno que rompía el run siguiente:
+el razonamiento no se devuelve al proveedor, así que el mensaje salía al
+cable sin `content` y sin `tool_calls`, y un servidor compatible con OpenAI
+lo rechaza con un 400 no reintentable (VRT-SYN-004).  Sin esto en el kit, el
+caso solo se alcanzaba con un modelo real y de forma intermitente.
 
 ### `split_sse`
 

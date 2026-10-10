@@ -26,6 +26,7 @@ El guion se consume en orden y admite más que respuestas:
 | Elemento | Qué hace |
 |---|---|
 | `says("...")` / `calls(...)` | Respuesta guionizada |
+| `thinks("...")` | Un turno que **solo razona**: ni texto ni llamadas |
 | `str` | Atajo de `says` |
 | `BaseException` | Se lanza — con `ProviderError` ejercitas los reintentos |
 | `Decision` | Se lanza como `Denied`: las tres disposiciones sin montar un motor de políticas |
@@ -39,6 +40,20 @@ mediría lo contrario de lo que afirma:
 def responder(peticion):
     ya_consultado = any(m.role is Role.TOOL for m in peticion.messages)
     return says("el saldo es 4.200 €") if ya_consultado else calls("consultar_saldo", cuenta="ES91")
+```
+
+`thinks` está ahí porque ese turno pasa de verdad —un modelo de razonamiento contesta a veces solo
+con su razonamiento— y porque es un turno que rompe cosas: el razonamiento no se devuelve al
+proveedor, así que un mensaje del asistente que solo lo lleva no tiene nada que mandar. El adaptador
+no deja un sobre vacío detrás, pero el turno existió, y en el guion se escribe así:
+
+```python
+gateway = FakeGateway(
+    thinks("el usuario quiere el total; debería leer el fichero"),
+    calls("leer", path="/boleta.txt"),
+    says('{"total": 42}'),
+    tools=[leer],
+)
 ```
 
 ### Comprobar la cancelación

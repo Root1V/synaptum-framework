@@ -557,6 +557,26 @@ class Agent:
                             "resultado para terminar."
                         ))
                         continue
+                    if not response.message.text.strip():
+                        # Un turno sin nada que mostrar **no es una respuesta**,
+                        # y cerrar el run con él devuelve la cadena vacía sin
+                        # que nada falle: el peor de los dos resultados posibles.
+                        # Pasa de verdad con los modelos de razonamiento —el
+                        # servidor devuelve `reasoning_content` y nada más— y es
+                        # la mitad que el adaptador no puede arreglar: él evita
+                        # el sobre vacío en el cable, pero el turno sigue sin
+                        # llevar respuesta (VRT-SYN-004).
+                        #
+                        # Se vuelve a preguntar, que es lo que ya se hace con una
+                        # salida que no valida, y lo acota `max_steps`: un modelo
+                        # que nunca contesta acaba en `LimitExceeded`, que dice
+                        # lo que pasó, en vez de en un resultado vacío que no
+                        # dice nada.
+                        messages.append(Message.user(
+                            "Ese turno llegó sin respuesta: ni texto ni llamada "
+                            "a herramienta. Continúa y responde."
+                        ))
+                        continue
                     break
 
                 # ── Pasos de herramienta ──────────────────────────────────────

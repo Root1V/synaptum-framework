@@ -867,3 +867,84 @@ def test_a_task_given_as_an_assistant_message_is_refused():
     agente = Agent("vista", model="fake:m", instructions="Mira.")
     with pytest.raises(ConfigurationError, match="instructions"):
         run(agente, Message.assistant("yo no pido nada"), Session("r", FakeGateway(says("x"))))
+
+
+def test_a_turn_that_only_reasoned_does_not_kill_the_next_one():
+    """VRT-SYN-004 · El criterio de aceptación que pidió Veritium.
+
+    Un modelo de razonamiento contesta a veces solo con `reasoning_content`, sin
+    texto y sin llamadas. Ese turno se guarda en el historial y se reenvía al
+    siguiente; el razonamiento no vuelve al proveedor, así que el mensaje salía
+    al cable sin `content` y sin `tool_calls` y llama-server lo rechazaba con un
+    400 **no reintentable**: el run entero perdido, en el turno siguiente y solo
+    cuando el modelo razona sin hablar.
+
+    Son dos arreglos y hacen falta los dos. El adaptador deja de poner un sobre
+    vacío en el cable; el bucle deja de cerrar el run con un turno que no trae
+    respuesta —antes devolvía la cadena vacía sin que nada fallara, y entonces
+    no había segundo turno que comprobar—.
+
+    Se mira el cuerpo de **todas** las peticiones del run y no solo la segunda,
+    porque el 400 lo provoca cualquier mensaje del asistente que salga sin
+    ninguna de las dos claves, y el turno culpable ya pasó. Y se mira el cuerpo
+    del adaptador, no el `Request`: la parte `Thinking` sigue ahí — lo que
+    desaparece es el sobre.
+    """
+    from test_providers import _sin_sobres_vacios  # la invariante vive con el cable
+
+    from synaptum import tool
+    from synaptum.providers.openai_compatible import OpenAICompatible
+    from synaptum.testing import FakeGateway, calls, says, thinks
+
+    @tool(idempotent=True)
+    def leer(path: str) -> str:
+        """Lee un fichero."""
+        return "TOTAL 42"
+
+    store = MemoryCheckpointer()
+    gateway = FakeGateway(
+        thinks("el usuario quiere el total; debería leer el fichero"),
+        calls("leer", path="/boleta.txt"),
+        says("el total es 42"),
+        tools=[leer],
+    )
+    agente = Agent("extractor", model="openai-compatible:m", tools=[leer])
+    events = run(agente, "extrae el total de /boleta.txt", Session("run-1", gateway, store))
+
+    assert events[-1].output == "el total es 42", "el run termina"
+    assert gateway.model_calls == 3 and gateway.tool_calls == 1
+
+    adaptador = OpenAICompatible()
+    for peticion in gateway.requests:
+        _sin_sobres_vacios(adaptador.to_wire(peticion))
+
+    # El turno sigue completo donde importa que lo esté: el diario es de donde
+    # lee el replay, y ahí el razonamiento no se ha perdido.
+    razonado = [
+        e for e in asyncio.run(store.load("run-1")).events
+        if isinstance(e, ModelStep) and e.response is not None
+        and any(p.kind == "thinking" for p in e.response.message.content)
+    ]
+    assert len(razonado) == 1
+
+
+def test_a_turn_that_only_reasoned_is_visible_while_it_streams():
+    """Y el mismo turno, en streaming: el razonamiento tiene su ciclo.
+
+    Un turno que solo razona sin emitir **ningún** evento sería el doble
+    mintiendo: el guion dice que el modelo razonó y quien consume no ve nada.
+    Hay respuestas que son solo razonamiento, y mientras duran son lo único que
+    hay que mostrar.
+    """
+    from synaptum.testing import FakeGateway, says, thinks
+
+    agente = Agent("a", model="openai-compatible:m")
+    puerta = FakeGateway(thinks("déjame pensarlo"), says("42"))
+    eventos = _stream(agente, "¿cuánto?", Session("run-1", puerta))
+
+    tipos = [e.kind for e in eventos]
+    assert tipos.index("reasoning_start") < tipos.index("reasoning_delta") < tipos.index("reasoning_end")
+    assert tipos.index("reasoning_end") < tipos.index("text_start"), (
+        "el ciclo del razonamiento se cierra antes de que empiece el del texto"
+    )
+    assert eventos[-1].output == "42"
