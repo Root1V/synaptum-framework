@@ -5,6 +5,21 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ## [Sin publicar]
 
+## [1.0.0rc5] — 2026-10-10
+
+**Cortada porque el segundo consumidor no puede cerrar dos P1 sin ella.** Los dos fallos de esta
+versión los reportó él contra la `rc4`, los verificó contra `main` instalándolo solo para eso, y los
+cierra cuando pueda fijar una versión publicada. El tercer equipo afectado dijo que su mitad ya no
+depende de la nuestra, así que el motivo de la fecha es uno solo y es ése.
+
+**Los dos fallos son de la misma familia:** algo que el modelo escribe mal —un turno sin respuesta,
+unos argumentos ilegibles— mataba el run entero en vez de costar un turno. Y los dos aparecieron
+donde no había corpus que mirara: uno en la dirección del adaptador que el contrato declaraba que no
+había que normalizar, y el otro en una función cuyo propio comentario describía la protección que no
+tenía.
+
+**Sin rupturas de superficie.** Cambian dos conductas, las dos dichas abajo.
+
 ### Añadido
 
 - **`HttpCheckpointer`** — el journal deja de vivir en el proceso y pasa a vivir donde un arnés lo

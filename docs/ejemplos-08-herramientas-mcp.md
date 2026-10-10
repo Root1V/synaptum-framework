@@ -50,7 +50,7 @@ sin inferencia · respuestas guionizadas (exporta SYNAPTUM_BASE_URL para usar un
   → repo.leer_fichero(ruta, lineas)
     [project]
 
-  El agente vive en `src/synaptum/agent/agent.py` y el paquete se llama synaptum, versión 1.0.0rc4, sin dependencias duras.
+  El agente vive en `src/synaptum/agent/agent.py` y el paquete se llama synaptum, versión 1.0.0rc5, sin dependencias duras.
 
   (el servidor se cerró al salir del `async with`)
 ```
@@ -122,7 +122,7 @@ async def main() -> None:
             calls("repo.buscar", patron="class Agent", extension=".py"),
             calls("repo.leer_fichero", ruta="pyproject.toml", lineas=6),
             says("El agente vive en `src/synaptum/agent/agent.py` y el paquete se "
-                 "llama synaptum, versión 1.0.0rc4, sin dependencias duras."),
+                 "llama synaptum, versión 1.0.0rc5, sin dependencias duras."),
         ]
 
         puerta = gateway(
