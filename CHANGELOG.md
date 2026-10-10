@@ -86,6 +86,18 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
   a mano del mismo criterio es lo que otro equipo acaba de ver fallar, con las dos perdiendo el campo
   nuevo a la vez.
 
+- **Un turno del asistente que dijo la cadena vacía viaja con `content: ""`**, y solo se queda sin
+  sobre el que no tiene **ninguna** parte de texto. Las dos cosas salían como `null`, que es la forma
+  que el dialecto rechaza. La distinción la midió el equipo del arnés contra su servidor al arreglar
+  su mitad del mismo fallo: `content: ""` devuelve 200 y `null` sin `tool_calls` devuelve 400, así
+  que colapsarlas cambia el cuerpo de peticiones que hoy funcionan.
+
+  Las dos formas quedan fijadas en el corpus compartido, en **dos casos de dirección `request`** —la
+  dirección que el contrato declaraba que no había que normalizar, y donde falló—. El cuerpo de un
+  caso así es un `Request` del vocabulario compartido y lo que se afirma es el cuerpo que sale al
+  cable; sus claves son nuevas a propósito, para que un runner que solo conozca la dirección
+  *response* falle a gritos en vez de saltárselas.
+
 - **La referencia generada ya no desentrecomilla un valor por defecto.** Quitar las comillas es para
   las anotaciones —`task: 'str'` es ruido—, pero se las quitaba también a lo que viene detrás de un
   `=`: `current: str = 0.1` donde el valor es `'0.1'` invita a pasar un número donde va una cadena.

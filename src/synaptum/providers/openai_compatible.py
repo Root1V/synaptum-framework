@@ -340,7 +340,15 @@ def _message_to_wire(message: Message) -> list[dict[str, Any]]:
     calls = message.tool_calls
     imagenes = [p for p in message.content if p.kind == "image"]
 
-    if message.role is Role.ASSISTANT and not (text or calls or imagenes):
+    # Que **haya** una parte de texto, aunque esté vacía, no es lo mismo que que
+    # no haya ninguna: la primera es un turno que dijo la cadena vacía y la
+    # segunda es un turno que no tiene nada que decir. El dialecto también las
+    # distingue —`content: ""` es enviable y lo acepta el servidor; medido por
+    # el equipo del arnés contra el suyo al arreglar su mitad de VRT-SYN-004— y
+    # colapsarlas aquí cambiaría el cuerpo de peticiones que hoy funcionan.
+    dijo_algo = any(parte.kind == "text" for parte in message.content)
+
+    if message.role is Role.ASSISTANT and not (dijo_algo or calls or imagenes):
         # **Un turno del asistente que no lleva nada enviable no se envuelve.**
         # El caso real: el modelo contesta solo con `reasoning_content`, la
         # respuesta se normaliza a un mensaje cuya única parte es `Thinking`, y
@@ -379,7 +387,10 @@ def _message_to_wire(message: Message) -> list[dict[str, Any]]:
                       for p in imagenes)
         wire["content"] = partes
     else:
-        wire["content"] = text or None
+        # `None` y `""` no son lo mismo: el primero es «este turno no trae
+        # texto» —lo normal junto a unas tool calls— y el segundo es «dijo la
+        # cadena vacía». Con `text or None` los dos salían como `null`.
+        wire["content"] = text if dijo_algo else None
     if calls:
         wire["tool_calls"] = [
             {

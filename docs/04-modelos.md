@@ -206,9 +206,17 @@ hay dos reglas sobre él, y las dos existen porque sin ellas el run se pierde o 
   mensaje del asistente que solo lo lleva no tiene nada que mandar — y
   `{"role": "assistant", "content": null}` es un mensaje que el propio dialecto declara inválido: un
   servidor compatible con OpenAI lo rechaza con un **400 no reintentable**, en el turno *siguiente* y
-  solo cuando el modelo razonó sin hablar. Tampoco se manda `content: ""`: hay dialectos que rechazan
-  un bloque de texto vacío, así que la forma «válida» dependería de quién esté al otro lado. No
-  mandar nada vale en todos.
+  solo cuando el modelo razonó sin hablar. Devolver el razonamiento en su lugar tampoco vale, y está
+  medido contra un servidor real: el dialecto pide `content` o `tool_calls`, y no acepta razonamiento
+  como sustituto de ninguno de los dos. Tampoco se manda `content: ""`: hay dialectos que rechazan un
+  bloque de texto vacío, así que la forma «válida» dependería de quién esté al otro lado. No mandar
+  nada vale en todos.
+
+- **Pero un turno que dijo la cadena vacía sí viaja**, con `content: ""`. Que haya una parte de texto
+  vacía no es lo mismo que que no haya ninguna: la primera dice «dijo la cadena vacía» y la segunda
+  «no tiene nada que decir». El dialecto también las distingue —`content: ""` lo acepta el servidor;
+  `null` sin `tool_calls`, no— así que colapsarlas cambiaría el cuerpo de peticiones que hoy
+  funcionan. `content = texto or None` las colapsa sin enterarse, y es como estaba escrito esto.
 
 - **Un turno que terminó solo y no trae respuesta no cierra el run.** Se vuelve a preguntar, igual
   que con una salida que no valida. Cerrarlo devolvería la cadena vacía sin que nada falle, que es el

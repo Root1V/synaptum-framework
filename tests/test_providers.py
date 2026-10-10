@@ -250,6 +250,36 @@ def test_an_assistant_turn_with_only_reasoning_is_not_sent_as_an_empty_envelope(
     assert con_texto["content"] == "el total es 42"
 
 
+def test_an_assistant_turn_that_said_the_empty_string_does_travel():
+    """El otro lado de la regla, y lo midió el equipo del arnés en su mitad.
+
+    Que **haya** una parte de texto vacía no es lo mismo que que no haya
+    ninguna: la primera es un turno que dijo la cadena vacía, la segunda un
+    turno que no tiene nada que decir. El dialecto también las distingue —
+    `content: ""` lo acepta el servidor, medido contra el suyo— así que
+    colapsarlas aquí cambiaría el cuerpo de peticiones que hoy funcionan.
+
+    Y `None` no vale en su lugar: con `text or None` los dos salían como `null`,
+    que es la forma que empezó todo esto.
+    """
+    from synaptum import Message, Role, Text, Thinking, ToolCall
+    from synaptum.providers.openai_compatible import _message_to_wire
+
+    assert _message_to_wire(Message.assistant(""))[0]["content"] == ""
+    assert _message_to_wire(Message(Role.ASSISTANT, (Text(""),)))[0]["content"] == ""
+
+    # Sin parte de texto no hay sobre, con razonamiento o sin él.
+    assert _message_to_wire(Message(Role.ASSISTANT, ())) == []
+    assert _message_to_wire(Message(Role.ASSISTANT, (Thinking(text="x"),))) == []
+
+    # Y `None` sigue siendo lo que dice «este turno no trae texto», que es lo
+    # normal junto a unas tool calls.
+    solo_tool = _message_to_wire(Message(Role.ASSISTANT, (
+        ToolCall(id="c1", name="leer", arguments={"path": "/x"}),
+    )))[0]
+    assert solo_tool["content"] is None and solo_tool["tool_calls"]
+
+
 # ── VRT-SYN-005 · argumentos que no se pueden leer ───────────────────────────
 
 def test_arguments_that_cannot_be_read_travel_in_the_call_instead_of_killing_the_run():
