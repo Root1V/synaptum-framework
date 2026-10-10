@@ -5,6 +5,21 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ## [Sin publicar]
 
+## [1.0.0rc5] — 2026-10-10
+
+**Cortada porque el segundo consumidor no puede cerrar dos P1 sin ella.** Los dos fallos de esta
+versión los reportó él contra la `rc4`, los verificó contra `main` instalándolo solo para eso, y los
+cierra cuando pueda fijar una versión publicada. El tercer equipo afectado dijo que su mitad ya no
+depende de la nuestra, así que el motivo de la fecha es uno solo y es ése.
+
+**Los dos fallos son de la misma familia:** algo que el modelo escribe mal —un turno sin respuesta,
+unos argumentos ilegibles— mataba el run entero en vez de costar un turno. Y los dos aparecieron
+donde no había corpus que mirara: uno en la dirección del adaptador que el contrato declaraba que no
+había que normalizar, y el otro en una función cuyo propio comentario describía la protección que no
+tenía.
+
+**Sin rupturas de superficie.** Cambian dos conductas, las dos dichas abajo.
+
 ### Añadido
 
 - **`HttpCheckpointer`** — el journal deja de vivir en el proceso y pasa a vivir donde un arnés lo
@@ -85,6 +100,23 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
   El criterio lo lee **una sola función** que usan los dos lectores del dialecto. Dos copias escritas
   a mano del mismo criterio es lo que otro equipo acaba de ver fallar, con las dos perdiendo el campo
   nuevo a la vez.
+
+- **Un turno del asistente que dijo la cadena vacía viaja con `content: ""`**, y solo se queda sin
+  sobre el que no tiene **ninguna** parte de texto. Las dos cosas salían como `null`, que es la forma
+  que el dialecto rechaza. La distinción la midió el equipo del arnés contra su servidor al arreglar
+  su mitad del mismo fallo: `content: ""` devuelve 200 y `null` sin `tool_calls` devuelve 400, así
+  que colapsarlas cambia el cuerpo de peticiones que hoy funcionan.
+
+  Las dos formas quedan fijadas en el corpus compartido, en **dos casos de dirección `request`** —la
+  dirección que el contrato declaraba que no había que normalizar, y donde falló—. El cuerpo de un
+  caso así es un `Request` del vocabulario compartido y lo que se afirma es el cuerpo que sale al
+  cable; sus claves son nuevas a propósito, para que un runner que solo conozca la dirección
+  *response* falle a gritos en vez de saltárselas.
+
+  Y un caso del corpus **sin afirmaciones** ya no pasa: en nuestro runner reventaba por `KeyError`,
+  que es fallar por suerte y no por regla, y ahora lo dice con el mensaje que explica qué hacer. El
+  aviso vino del otro equipo, que lo encontró en el suyo — ahí un caso sin `expect` volvía temprano y
+  pasaba sin comprobar nada.
 
 - **La referencia generada ya no desentrecomilla un valor por defecto.** Quitar las comillas es para
   las anotaciones —`task: 'str'` es ruido—, pero se las quitaba también a lo que viene detrás de un

@@ -29,6 +29,7 @@ from synaptum import (
     MemoryCheckpointer,
     ModelStep,
     Phase,
+    Role,
     RunState,
     SqliteCheckpointer,
     ToolStep,
@@ -467,6 +468,11 @@ def test_the_normalization_corpus_runs_against_the_python_adapter(
     body = root / case["body_file"]
     expected = case["expect"]
 
+    if case.get("direction") == "request":
+        _check_request_direction(adapter, body, expected, case["name"])
+        _assert_every_key_was_read(expected, case["name"])
+        return
+
     if case.get("stream"):
         events: list = []
         try:
@@ -523,6 +529,48 @@ def test_the_normalization_corpus_runs_against_the_python_adapter(
     _assert_every_key_was_read(expected, case["name"])
 
 
+def _check_request_direction(adapter, body: Path, expected: dict, where: str) -> None:
+    """La dirección que el contrato decía que no había que normalizar.
+
+    El cuerpo es un ``Request`` del vocabulario compartido y lo que se fija es
+    el **cuerpo que sale al cable**. Existe desde `VRT-SYN-004`, que falló justo
+    aquí: las dos direcciones no son independientes —la *response* produce la
+    parte que la *request* no sabe mandar— así que ningún caso del corpus podía
+    ver el fallo en ninguno de los dos lenguajes.
+    """
+    from synaptum.core.codec import decode
+    from synaptum.core.types import Request
+
+    wire = adapter.to_wire(decode(Request, json.loads(body.read_text())))
+    mensajes = wire["messages"]
+
+    if "wire_roles" in expected:
+        assert [m["role"] for m in mensajes] == expected["wire_roles"], (
+            f"{where}: los roles del cuerpo\n"
+            f"  esperado: {expected['wire_roles']}\n"
+            f"  salió   : {[m['role'] for m in mensajes]}"
+        )
+
+    if "wire_assistant_contents" in expected:
+        assert [
+            m.get("content") for m in mensajes if m["role"] == "assistant"
+        ] == expected["wire_assistant_contents"], f"{where}: el `content` del asistente"
+
+    if expected.get("assistant_messages_sendable"):
+        # La regla del dialecto, medida contra el servidor real por los dos
+        # lados: `content` tiene que ser una cadena —vacía vale— o haber
+        # `tool_calls`. `null` sin tool calls es un 400 no reintentable, y es
+        # exactamente la forma que se colaba.
+        for mensaje in mensajes:
+            if mensaje["role"] != "assistant":
+                continue
+            contenido = mensaje.get("content")
+            assert isinstance(contenido, (str, list)) or mensaje.get("tool_calls"), (
+                f"{where}: un mensaje del asistente sale sin `content` enviable "
+                f"y sin `tool_calls`: {mensaje}"
+            )
+
+
 #: Las claves de expectativa que este runner sabe comprobar.
 #:
 #: Existe para que una clave **nueva** falle en vez de ignorarse. Un
@@ -541,6 +589,8 @@ CLAVES_QUE_SE_COMPRUEBAN = {
     "event_kinds", "event_kinds_collapsed", "partial_text",
     "stops_at_first_sentinel",
     "usage", "usage_state", "usage_relations",
+    # Dirección request — `VRT-SYN-004`.
+    "wire_roles", "wire_assistant_contents", "assistant_messages_sendable",
 }
 
 
@@ -561,6 +611,39 @@ def _assert_every_key_was_read(expected: dict, where: str) -> None:
 def test_the_normalization_corpus_is_well_formed(name: str, case: dict, root: Path):
     body = root / case["body_file"]
     assert body.exists(), f"{case['name']}: falta el cuerpo {case['body_file']}"
+
+    # Un caso sin afirmaciones no es un caso: es un cuerpo que se parsea y un
+    # verde que no significa nada. Lo avisó Aeon de su propio runner —ahí un
+    # caso sin `expect` vuelve temprano y pasa sin comprobar nada— y en el
+    # nuestro reventaba por `KeyError`, que es fallar por suerte y no por
+    # regla. Dicho como regla, el mensaje explica qué hacer.
+    assert case.get("expect"), (
+        f"{case['name']}: el caso no trae `expect`. Un caso sin afirmaciones "
+        "pasa siempre y no es evidencia de nada: dale afirmaciones o quítalo."
+    )
+
+    direccion = case.get("direction", "response")
+    assert direccion in {"request", "response"}, (
+        f"{case['name']}: dirección {direccion!r} — solo hay request y response"
+    )
+    if direccion == "request":
+        # El cuerpo de esta dirección **no es del cable**: es el vocabulario
+        # compartido, y tiene que poder volver a ser un `Request`. Un cuerpo de
+        # cable puesto aquí por error decodificaría a un `Request` vacío y el
+        # caso pasaría comprobando nada.
+        from synaptum.core.codec import decode
+        from synaptum.core.types import Request
+
+        peticion = decode(Request, json.loads(body.read_text()))
+        assert peticion.messages, (
+            f"{case['name']}: el cuerpo no trae mensajes — ¿es un cuerpo del cable?"
+        )
+        assert not case.get("stream"), (
+            f"{case['name']}: la dirección request no se trocea"
+        )
+        for rol in case["expect"].get("wire_roles", []):
+            Role(rol)
+        return
 
     if case.get("stream"):
         payloads = [
