@@ -874,8 +874,10 @@ def test_a_turn_that_only_reasoned_does_not_kill_the_next_one():
 
     Un modelo de razonamiento contesta a veces solo con `reasoning_content`, sin
     texto y sin llamadas. Ese turno se guarda en el historial y se reenvía al
-    siguiente; el razonamiento no vuelve al proveedor, así que el mensaje salía
-    al cable sin `content` y sin `tool_calls` y llama-server lo rechazaba con un
+    siguiente; el razonamiento vuelve al proveedor pero no hace enviable el
+    turno, así que el mensaje salía al cable sin `content` y sin `tool_calls` —
+    medido por dos equipos contra el mismo servidor— y llama-server lo
+    rechazaba con un
     400 **no reintentable**: el run entero perdido, en el turno siguiente y solo
     cuando el modelo razona sin hablar.
 

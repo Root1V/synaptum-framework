@@ -213,7 +213,7 @@ def _sin_sobres_vacios(body: dict) -> None:
 
 
 def test_an_assistant_turn_with_only_reasoning_is_not_sent_as_an_empty_envelope():
-    """VRT-SYN-004 · El razonamiento no vuelve al proveedor; el sobre tampoco.
+    """VRT-SYN-004 · El razonamiento no hace enviable un turno.
 
     Antes el mensaje salía como `{"role": "assistant", "content": null}`, que el
     propio dialecto declara inválido. No se manda `content: ""` en su lugar:
@@ -328,3 +328,80 @@ def test_arguments_that_cannot_be_read_travel_in_the_call_instead_of_killing_the
     ]))
     troceada = eventos[-1].response.message.tool_calls[0]
     assert troceada.unreadable_arguments == '{"a": "sin'
+
+
+# ── PRM-VRT-003 · el razonamiento vuelve al proveedor ────────────────────────
+#
+# El gateway de inferencia borraba `reasoning_content` de todos los mensajes —su
+# modelo de mensaje no lo nombraba y Pydantic descarta lo que no se nombra— y al
+# arreglarlo nos preguntaron lo obvio: ¿sobrevive ese campo a vuestra
+# serialización? No sobrevivía, y lo peor es que estaba **escrito** que no, con
+# la palabra «a propósito» al lado.
+#
+# El propósito estaba mal. Medido en `llama.cpp#27720`: un modelo de
+# razonamiento al que se le pide continuar desde su propia tool call, sin su
+# canal de análisis, emite cabeceras Harmony mal formadas y el turno se pierde
+# con un 500 del parser. 7 de 120 turnos sin devolverlo, 0 de 120 devolviéndolo.
+# Cerrado como no arreglable en el parser: lo arregla el cliente o no se arregla.
+
+def test_the_assistant_reasoning_goes_back_to_the_provider():
+    """PRM-VRT-003 · Y ningún test lo miraba, que es por lo que duró tanto.
+
+    La suite comprobaba que el razonamiento **llega** —`reasoning_content` se
+    lee y se guarda como `Thinking`— y nunca que volviera. Un campo que entra y
+    no sale no rompe nada visible: el modelo contesta peor, o falla una vez de
+    cada diecisiete, y nadie lo atribuye a esto.
+    """
+    from synaptum import Message, Request, Role, Text, Thinking, ToolCall
+    from synaptum.providers.openai_compatible import OpenAICompatible, _message_to_wire
+
+    con_tool = _message_to_wire(Message(Role.ASSISTANT, (
+        Thinking(text="tengo que mirar el documento"),
+        ToolCall(id="c1", name="leer", arguments={"path": "/x"}),
+    )))[0]
+    assert con_tool["reasoning_content"] == "tengo que mirar el documento", (
+        "es el turno donde está medido que importa: continuar desde su propia tool call"
+    )
+
+    con_texto = _message_to_wire(Message(Role.ASSISTANT, (
+        Thinking(text="ya lo sé"), Text("el total es 42"),
+    )))[0]
+    assert con_texto["reasoning_content"] == "ya lo sé", (
+        "también en los turnos de texto: «se devuelve lo que el proveedor generó» "
+        "no tiene excepción que explicar"
+    )
+
+    # Lo que **no** cambia: el razonamiento no sustituye a `content` ni a
+    # `tool_calls`, así que un turno que solo razona sigue sin viajar. Está
+    # medido por dos equipos contra el mismo servidor, y mandarlo solo da el
+    # mismo 400 de `VRT-SYN-004`.
+    assert _message_to_wire(Message(Role.ASSISTANT, (Thinking(text="mmm"),))) == []
+
+    # Y no se le cuela a nadie más: un turno del usuario no lleva razonamiento.
+    assert "reasoning_content" not in _message_to_wire(Message.user("hola"))[0]
+
+    # El interruptor existe porque esto es una propiedad del proveedor y no del
+    # dialecto: ha habido APIs que rechazaban el campo de vuelta.
+    apagado = OpenAICompatible(echo_reasoning=False).to_wire(Request(
+        model="m",
+        messages=(Message(Role.ASSISTANT, (Thinking(text="x"), Text("hola"))),),
+    ))
+    assert "reasoning_content" not in apagado["messages"][0]
+
+
+def test_encrypted_reasoning_is_refused_instead_of_dropped():
+    """No hay campo donde ponerlo en este dialecto, así que se dice.
+
+    Estaba en la lista de lo transportable **sin que nada lo transportara**, que
+    es la forma exacta del descarte silencioso que esa lista existe para no
+    hacer. Solo puede llegar aquí un mensaje producido por otro dialecto, y
+    entonces negarse es lo correcto: el razonamiento cifrado de un proveedor no
+    significa nada para otro.
+    """
+    from synaptum import ConfigurationError, Message, RedactedThinking, Role, Text
+    from synaptum.providers.openai_compatible import _message_to_wire
+
+    with pytest.raises(ConfigurationError, match="redacted_thinking"):
+        _message_to_wire(Message(Role.ASSISTANT, (
+            RedactedThinking(data="opaco"), Text("hola"),
+        )))

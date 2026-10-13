@@ -196,14 +196,44 @@ async for evento in flujo:
 await flujo.aclose()          # esto es la señal
 ```
 
+## El razonamiento vuelve al proveedor
+
+Un modelo de razonamiento devuelve su análisis en un campo aparte —`reasoning_content`— y el
+adaptador lo guarda como una parte `Thinking` del mensaje del asistente. **Y lo devuelve en el turno
+siguiente**, en todos los turnos del asistente que viajan.
+
+No es cortesía: está medido. Un modelo de razonamiento al que se le pide continuar **desde su propia
+tool call**, sin su canal de análisis, emite cabeceras mal formadas y el turno entero se pierde con
+un error del parser del servidor — **7 turnos fallidos de 120 sin devolverlo, 0 de 120
+devolviéndolo**. El issue de upstream está cerrado como no arreglable en el parser, así que lo
+arregla el cliente o no se arregla. En los modelos que no fallan así, lo que se pierde es calidad en
+silencio, que es peor de diagnosticar.
+
+Cuesta contexto —el razonamiento se reenvía en cada turno posterior— y ese coste se paga con la caché
+de prefijo, que es justo lo que un prefijo estable abarata.
+
+Si te encuentras con un proveedor que **rechaza** el campo de vuelta —ha pasado—, es una propiedad de
+ese proveedor y no del dialecto, así que se apaga sin esperar una versión nuestra:
+
+```python
+from synaptum import providers
+from synaptum.providers.openai_compatible import OpenAICompatible
+
+providers.register(OpenAICompatible(echo_reasoning=False))
+```
+
+El razonamiento **cifrado** (`RedactedThinking`) es otra cosa: este dialecto no tiene campo donde
+ponerlo, así que **se rechaza** en vez de descartarse. Solo puede llegar ahí un mensaje producido por
+otro dialecto, y reenviar el razonamiento opaco de un proveedor a otro no significa nada.
+
 ## Un turno que solo razona
 
 Un modelo de razonamiento contesta a veces solo con su razonamiento: ni texto ni llamada a
 herramienta. Ese turno no se descarta —queda en el diario, con su razonamiento y su consumo— pero
 hay dos reglas sobre él, y las dos existen porque sin ellas el run se pierde o se vacía:
 
-- **No sale al cable un sobre vacío.** El razonamiento no se devuelve al proveedor, así que un
-  mensaje del asistente que solo lo lleva no tiene nada que mandar — y
+- **No sale al cable un sobre vacío.** El razonamiento vuelve al proveedor, pero **no hace enviable
+  un turno**: un mensaje del asistente que solo lo lleva no tiene nada que mandar — y
   `{"role": "assistant", "content": null}` es un mensaje que el propio dialecto declara inválido: un
   servidor compatible con OpenAI lo rechaza con un **400 no reintentable**, en el turno *siguiente* y
   solo cuando el modelo razonó sin hablar. Devolver el razonamiento en su lugar tampoco vale, y está

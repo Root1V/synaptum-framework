@@ -56,7 +56,31 @@ _FINISH = {
 
 
 class OpenAICompatible:
+    """Adaptador del dialecto OpenAI-compatible.
+
+    Args:
+        echo_reasoning: si el razonamiento del asistente vuelve al proveedor
+            como ``reasoning_content``. Por defecto **sí**, y está medido:
+            quitarlo hace que un modelo de razonamiento al que se le pide
+            continuar desde su propia tool call emita cabeceras mal formadas —
+            7 turnos fallidos de 120 sin devolverlo, 0 de 120 devolviéndolo
+            (`llama.cpp#27720`, cerrado como no arreglable en el parser).
+
+            Existe el interruptor porque esto es una propiedad del proveedor y
+            no del dialecto: ha habido APIs que **rechazaban** el campo de
+            vuelta con un 400, así que quien se encuentre con una lo apaga sin
+            esperar una versión::
+
+                from synaptum import providers
+                from synaptum.providers.openai_compatible import OpenAICompatible
+
+                providers.register(OpenAICompatible(echo_reasoning=False))
+    """
+
     name = "openai-compatible"
+
+    def __init__(self, *, echo_reasoning: bool = True) -> None:
+        self.echo_reasoning = echo_reasoning
 
     # ── Request ───────────────────────────────────────────────────────────────
 
@@ -69,7 +93,9 @@ class OpenAICompatible:
             body["messages"].append({"role": "system", "content": request.system})
 
         for message in request.messages:
-            body["messages"].extend(_message_to_wire(message))
+            body["messages"].extend(
+                _message_to_wire(message, echo_reasoning=self.echo_reasoning)
+            )
 
         if request.tools:
             body["tools"] = [
@@ -322,7 +348,9 @@ def _usage_from_wire(body: Mapping[str, Any]) -> Usage:
     return Usage()
 
 
-def _message_to_wire(message: Message) -> list[dict[str, Any]]:
+def _message_to_wire(
+    message: Message, *, echo_reasoning: bool = True
+) -> list[dict[str, Any]]:
     if message.role is Role.TOOL:
         return [
             {
@@ -350,10 +378,13 @@ def _message_to_wire(message: Message) -> list[dict[str, Any]]:
 
     if message.role is Role.ASSISTANT and not (dijo_algo or calls or imagenes):
         # **Un turno del asistente que no lleva nada enviable no se envuelve.**
-        # El caso real: el modelo contesta solo con `reasoning_content`, la
-        # respuesta se normaliza a un mensaje cuya única parte es `Thinking`, y
-        # el razonamiento no se devuelve al proveedor —eso está decidido arriba,
-        # en `_TRANSPORTABLE`—.  Lo que quedaba era el sobre vacío,
+        # El caso real: el modelo contesta solo con `reasoning_content` y la
+        # respuesta se normaliza a un mensaje cuya única parte es `Thinking`.
+        # El razonamiento **sí** vuelve al proveedor desde `SYN-94`, pero no
+        # hace enviable un turno: está medido por dos equipos contra el mismo
+        # servidor que `reasoning_content` **no sustituye** a `content` ni a
+        # `tool_calls` — mandarlo solo, sin ninguno de los dos, da el mismo 400.
+        # Lo que quedaba era el sobre vacío,
         # `{"role": "assistant", "content": null}`, que **el propio dialecto
         # declara inválido**: un mensaje del asistente lleva `content` o
         # `tool_calls`.  llama-server lo rechaza con un 400 no reintentable y se
@@ -400,13 +431,47 @@ def _message_to_wire(message: Message) -> list[dict[str, Any]]:
             }
             for call in calls
         ]
+
+    # **El razonamiento vuelve al proveedor.**  Durante mucho tiempo esto se
+    # omitía «a propósito», y el propósito estaba mal: no era una decisión sobre
+    # qué es transportable, era no haber medido qué pasa sin él.
+    #
+    # Lo que pasa, medido en `llama.cpp#27720`: un modelo de razonamiento al que
+    # se le pide continuar **desde su propia tool call**, sin su canal de
+    # análisis, emite cabeceras mal formadas y el turno entero se pierde con un
+    # 500 del parser.  7 de 120 turnos sin devolverlo, 0 de 120 devolviéndolo.
+    # El issue está cerrado como no arreglable en el parser, así que esto es el
+    # arreglo: lo hace el cliente o no se hace.
+    #
+    # Lo mandamos en **todos** los turnos del asistente que viajan y no solo en
+    # los que llevan tool calls, que es donde está medido: la regla «se devuelve
+    # lo que el proveedor generó» no tiene excepción que explicar, y el campo
+    # solo existe porque ese mismo proveedor lo puso en su respuesta.  Cuesta
+    # contexto —el razonamiento se reenvía en cada turno posterior— y ese coste
+    # se paga con caché de prefijo, que es justo lo que un prefijo estable hace
+    # barato.
+    if echo_reasoning and message.role is Role.ASSISTANT:
+        razonamiento = "".join(
+            parte.text for parte in message.content if parte.kind == "thinking"
+        )
+        if razonamiento:
+            wire["reasoning_content"] = razonamiento
+
     return [wire]
 
 
-#: Lo que este adaptador sabe poner en el cable.  El razonamiento se omite a
-#: propósito —no se devuelve al proveedor— y por eso no cuenta como pérdida.
+#: Lo que este adaptador sabe poner en el cable, y **todo lo de aquí tiene forma
+#: de cable de verdad**: el razonamiento visible viaja como `reasoning_content`
+#: desde `SYN-94`.
+#:
+#: El razonamiento **cifrado** sale de la lista en el mismo cambio, y no por
+#: simetría: este dialecto no tiene campo donde ponerlo, así que estaba en la
+#: lista de lo transportable sin que nada lo transportara — la forma exacta del
+#: descarte silencioso que esta función existe para no hacer.  Solo puede llegar
+#: aquí un mensaje producido por otro dialecto, y entonces negarse es correcto:
+#: reenviar el razonamiento de un proveedor a otro no significa nada.
 _TRANSPORTABLE = {
-    "text", "image", "tool_call", "tool_result", "thinking", "redacted_thinking",
+    "text", "image", "tool_call", "tool_result", "thinking",
 }
 
 
