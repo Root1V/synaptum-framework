@@ -5,6 +5,18 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ## [Sin publicar]
 
+## [1.0.0rc6] — 2026-10-14
+
+**Un solo arreglo, y la cortamos porque el consumidor va a medirla.** Veritium corre un banco con 4
+documentos reales y valores verificados a mano, intercalado, tres corridas por lado: exactitud,
+tokens de salida, los 500 del parser del servidor y los turnos que llegan al tope de contexto. Esta
+versión existe para que ese «antes y después» tenga un «después» instalable.
+
+**Lo que se arregla no lo reportó quien lo sufría**, y por eso duró: lo encontró el equipo de
+inferencia arreglando el mismo fallo en su gateway, y preguntó a los tres andamiajes que usa si el
+campo sobrevivía a su serialización. En los tres no sobrevivía. La forma del fallo es la misma en los
+tres sitios: **un campo que entra y no sale no rompe nada visible.**
+
 ### Corregido
 
 - **El razonamiento del asistente vuelve al proveedor** (`reasoning_content`), en todos los turnos
