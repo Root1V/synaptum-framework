@@ -1855,10 +1855,11 @@ Turno que **solo** razona: ni texto ni llamadas.
 
 Pasa de verdad con los modelos de razonamiento —el servidor devuelve
 `reasoning_content` y nada más—, y es el turno que rompía el run siguiente:
-el razonamiento no se devuelve al proveedor, así que el mensaje salía al
-cable sin `content` y sin `tool_calls`, y un servidor compatible con OpenAI
-lo rechaza con un 400 no reintentable (VRT-SYN-004).  Sin esto en el kit, el
-caso solo se alcanzaba con un modelo real y de forma intermitente.
+el razonamiento viaja de vuelta al proveedor pero **no hace enviable un
+turno**, así que el mensaje salía al cable sin `content` y sin `tool_calls`,
+y un servidor compatible con OpenAI lo rechaza con un 400 no reintentable
+(VRT-SYN-004).  Sin esto en el kit, el caso solo se alcanzaba con un modelo
+real y de forma intermitente.
 
 ### `split_sse`
 

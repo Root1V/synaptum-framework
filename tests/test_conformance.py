@@ -556,6 +556,15 @@ def _check_request_direction(adapter, body: Path, expected: dict, where: str) ->
             m.get("content") for m in mensajes if m["role"] == "assistant"
         ] == expected["wire_assistant_contents"], f"{where}: el `content` del asistente"
 
+    if "wire_assistant_reasoning" in expected:
+        # Que el razonamiento **vuelva**. Los 14 casos de la dirección response
+        # comprueban que llega, y ninguno que vuelva: un campo que entra y no
+        # sale no rompe nada visible —el modelo contesta peor, o falla un turno
+        # de cada diecisiete— y así estuvo (`PRM-VRT-003`).
+        assert [
+            m.get("reasoning_content") for m in mensajes if m["role"] == "assistant"
+        ] == expected["wire_assistant_reasoning"], f"{where}: el razonamiento devuelto"
+
     if expected.get("assistant_messages_sendable"):
         # La regla del dialecto, medida contra el servidor real por los dos
         # lados: `content` tiene que ser una cadena —vacía vale— o haber
@@ -589,8 +598,9 @@ CLAVES_QUE_SE_COMPRUEBAN = {
     "event_kinds", "event_kinds_collapsed", "partial_text",
     "stops_at_first_sentinel",
     "usage", "usage_state", "usage_relations",
-    # Dirección request — `VRT-SYN-004`.
+    # Dirección request — `VRT-SYN-004` y `PRM-VRT-003`.
     "wire_roles", "wire_assistant_contents", "assistant_messages_sendable",
+    "wire_assistant_reasoning",
 }
 
 

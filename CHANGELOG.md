@@ -5,6 +5,35 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ## [Sin publicar]
 
+### Corregido
+
+- **El razonamiento del asistente vuelve al proveedor** (`reasoning_content`), en todos los turnos
+  del asistente que viajan. No volvía, y estaba **escrito** que no volvía con la palabra «a
+  propósito» al lado: el propósito era una decisión sobre qué cuenta como transportable, tomada sin
+  medir qué pasa sin él.
+
+  Lo que pasa, medido en [`llama.cpp#27720`](https://github.com/ggml-org/llama.cpp/issues/27720): un
+  modelo de razonamiento al que se le pide continuar **desde su propia tool call**, sin su canal de
+  análisis, emite cabeceras mal formadas y el turno entero se pierde con un error del parser —
+  **7 turnos fallidos de 120** sin devolverlo, **0 de 120** devolviéndolo. El issue está cerrado como
+  no arreglable en el parser. En los modelos que no fallan así se pierde calidad en silencio.
+
+  Lo encontró el equipo de inferencia arreglando el suyo: su modelo de mensaje no nombraba el campo,
+  y lo borraba de todo mensaje de todo cliente. Al arreglarlo preguntaron a los frameworks si el
+  campo sobrevivía a su serialización. No sobrevivía — y **ningún test lo miraba**: la suite
+  comprobaba que el razonamiento *llega* y ninguno que vuelva.
+
+  Se puede apagar, porque esto es una propiedad del proveedor y no del dialecto —ha habido APIs que
+  rechazaban el campo de vuelta—: `providers.register(OpenAICompatible(echo_reasoning=False))`.
+
+  **No cambia nada del sobre vacío:** el razonamiento no sustituye a `content` ni a `tool_calls`, así
+  que un turno que solo razona sigue sin viajar. Está medido por dos equipos contra el mismo
+  servidor. Y queda fijado en el corpus compartido con un tercer caso de dirección `request`.
+
+- **El razonamiento cifrado (`RedactedThinking`) se rechaza en vez de descartarse.** Estaba en la
+  lista de lo transportable **sin que nada lo transportara**, que es la forma exacta del descarte
+  silencioso que esa lista existe para evitar. Este dialecto no tiene campo donde ponerlo.
+
 ## [1.0.0rc5] — 2026-10-10
 
 **Cortada porque el segundo consumidor no puede cerrar dos P1 sin ella.** Los dos fallos de esta
