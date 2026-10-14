@@ -1641,7 +1641,7 @@ Codifica binario para los campos ``data`` de las partes de contenido.
 
 ### `__version__`
 
-`__version__ = '1.0.0rc5'`
+`__version__ = '1.0.0rc6'`
 
 str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
 
