@@ -728,6 +728,45 @@ def test_the_normalization_cases_are_actually_being_read():
     assert NORMALIZATION_CASES, "no se leyó ningún caso de normalización"
 
 
+def test_the_copy_of_the_contract_we_read_knows_whether_it_is_stale():
+    """Una copia que no puede notar que está rancia es el defecto, no la copia.
+
+    El corpus vive fuera de este repositorio porque es un artefacto conjunto, y
+    hay equipos que lo **vendorizan** dentro del suyo. Eso ya se cobró dos
+    cosas: una copia vendorizada del `spec.md` se quedó atrás, y la cabecera de
+    la compartida mantuvo dieciocho días en `BLOCKED` una fila de otro equipo
+    esperando un documento que ya existía. Las dos veces el documento afirmaba
+    un estado que había dejado de ser el suyo, y nada falló.
+
+    Prohibir las copias no es una opción —no controlamos el repositorio de
+    nadie— así que lo que se arregla es la otra mitad: el fixture declara el
+    `sha256` del `spec.md` canónico, y cualquiera que tenga una copia puede
+    hacer **esta misma comprobación de tres líneas** y enterarse. Es el patrón
+    que ya usamos para todo lo demás en este canal: no confiar en que alguien se
+    acuerde, dejar que falle.
+    """
+    if _NORMALIZATION is None:
+        pytest.skip(SIN_CONTRATOS)
+
+    documento = json.loads((_NORMALIZATION / "openai-compatible.json").read_text())
+    declarada = documento.get("spec_sha256")
+    assert declarada, (
+        "el fixture no declara `spec_sha256`: entonces una copia de este contrato "
+        "no tiene forma de saber si está al día"
+    )
+
+    spec = _NORMALIZATION.parent / "spec.md"
+    real = hashlib.sha256(spec.read_bytes()).hexdigest()
+    assert real == declarada, (
+        "la copia del contrato que leemos no coincide con la que el fixture declara.\n"
+        f"  spec.md     : {real}\n"
+        f"  fixture dice: {declarada}\n"
+        "Si acabas de editar `spec.md`, actualiza `spec_sha256` en el mismo cambio. "
+        "Si no lo has editado tú, tu copia o la canónica están atrasadas: compáralas "
+        "antes de implementar, no después de que un caso pase por el motivo equivocado."
+    )
+
+
 def test_the_inclusive_input_convention_holds_in_the_recorded_bodies():
     """``input`` incluye lo cacheado, y quien lo demuestra son los cuerpos.
 
