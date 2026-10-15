@@ -5,6 +5,20 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ## [Sin publicar]
 
+### Añadido
+
+- **La copia del contrato compartido que leemos sabe si está rancia.** El corpus vive fuera de este
+  repositorio porque es un artefacto de varios equipos, y hay equipos que lo **vendorizan** dentro
+  del suyo. Eso ya se cobró dos cosas: una copia vendorizada del `spec.md` se quedó atrás, y la
+  cabecera de la compartida mantuvo dieciocho días en `BLOCKED` una fila de otro equipo esperando un
+  documento que ya existía. Las dos veces el documento afirmaba un estado que había dejado de ser el
+  suyo y **nada falló**.
+
+  Prohibir las copias no es una opción —no controlamos el repositorio de nadie— así que se arregla la
+  otra mitad: el fixture declara el `sha256` del `spec.md` canónico y la suite lo comprueba. Cualquier
+  equipo con una copia puede hacer esa misma comprobación de tres líneas y enterarse. Comprobado al
+  revés: tocando un byte del spec, el test falla y dice qué hacer.
+
 ## [1.0.0rc6] — 2026-10-14
 
 **Un solo arreglo, y la cortamos porque el consumidor va a medirla.** Veritium corre un banco con 4
