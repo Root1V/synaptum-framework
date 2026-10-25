@@ -1119,7 +1119,7 @@ Args:
         diferencia haría creer a quien corta por presupuesto que está
         ahorrando cuando ya ha pagado la respuesta entera.
     tools: herramientas decoradas con ``@tool``, que se ejecutan de verdad.
-    policy: política simulada, opcional.
+    policy: qué decidiría un gateway real, opcional. **Puede ser `async`**: ver `Policy`.
     warn: pon ``False`` solo si ya sabes que esto no aplica nada.
 
 ### `Check`

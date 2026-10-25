@@ -30,6 +30,7 @@ Uso::
 
 from __future__ import annotations
 
+import inspect
 import warnings
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Awaitable, Callable, Mapping, Sequence
@@ -67,9 +68,19 @@ Lo segundo es opcional y se detecta **una vez, al construir**. Existe porque hay
 proveedores que pueden aprovechar la identidad del paso —una clave de
 idempotencia, una traza— y obligar a todos a aceptar un parámetro que la mayoría
 ignora sería peor que mirar la firma una vez."""
-Policy = Callable[["Check"], Decision]
-"""Política simulada.  Permite ver los tres caminos de denegación en local, con
-la advertencia de que aquí no aplican nada."""
+Policy = Callable[["Check"], "Decision | Awaitable[Decision | None] | None"]
+"""Qué decidiría un gateway real. Permite ver los tres caminos de denegación en
+local, con la advertencia de que aquí no se aplica nada.
+
+**Puede ser `async`**, y no es una comodidad: una decisión de gobierno de verdad
+se consulta por red —un `POST` a un motor de políticas— y con un hook síncrono
+eso bloquea el bucle de eventos mientras la decisión viaja. Un agente con cinco
+herramientas pagaría esa parada en cada llamada, y quien lo escribiera no lo
+vería hasta tener concurrencia.
+
+Así que esto no es solo el doble de desarrollo: es el punto donde se puede atar
+un motor de políticas real mientras el `Gateway` gobernado completo no exista
+(`VRT-SYN-003` S-4, bloqueada por la forma de los endpoints del arnés)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,7 +123,7 @@ class LocalGateway:
             diferencia haría creer a quien corta por presupuesto que está
             ahorrando cuando ya ha pagado la respuesta entera.
         tools: herramientas decoradas con ``@tool``, que se ejecutan de verdad.
-        policy: política simulada, opcional.
+        policy: qué decidiría un gateway real, opcional. **Puede ser `async`**: ver `Policy`.
         warn: pon ``False`` solo si ya sabes que esto no aplica nada.
     """
 
@@ -152,13 +163,13 @@ class LocalGateway:
         )
 
     async def invoke_model(self, request: Request, ctx: CallContext) -> Response:
-        self._check("model", request.model, ctx.step_id, Risk.READ)
+        await self._check("model", request.model, ctx.step_id, Risk.READ)
         if self._model_wants_ctx:
             return await self._model(request, ctx)
         return await self._model(request)
 
     async def stream_model(self, request: Request, ctx: CallContext) -> AsyncIterator[StreamEvent]:
-        self._check("model", request.model, ctx.step_id, Risk.READ)
+        await self._check("model", request.model, ctx.step_id, Risk.READ)
 
         if self._stream is not None:
             fuente = (
@@ -204,7 +215,7 @@ class LocalGateway:
         risk: Risk = Risk.READ,
         tool_ref: str | None = None,
     ) -> ToolResult:
-        self._check("tool", call.name, ctx.step_id, risk, arguments=dict(call.arguments))
+        await self._check("tool", call.name, ctx.step_id, risk, arguments=dict(call.arguments))
 
         target = self.tools.get(call.name)
         if target is None:
@@ -218,7 +229,7 @@ class LocalGateway:
 
     # ── Registro de decisiones ────────────────────────────────────────────────
 
-    def _check(
+    async def _check(
         self,
         kind: str,
         name: str,
@@ -234,6 +245,12 @@ class LocalGateway:
         }
         check = Check(**comun)
         decision = self.policy(check) if self.policy else None
+        if inspect.isawaitable(decision):
+            # Una política de verdad se consulta por red. Si el hook fuera solo
+            # síncrono, quien la atase bloquearía el bucle de eventos mientras
+            # la decisión viaja — y lo descubriría al tener concurrencia, no al
+            # escribirlo.
+            decision = await decision
         if decision is not None:
             check = Check(**comun, decision=decision)
         self.checks.append(check)

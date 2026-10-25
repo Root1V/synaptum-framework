@@ -61,6 +61,19 @@ un proceso aparte que tiene las credenciales y puede denegar.
 > comprobaciones son advisorias: las cumple un bucle correcto y se las salta uno con un fallo. Marca
 > cada decisión con `enforced=False` para que nadie confunda su informe con una auditoría.
 
+**La política puede ser `async`**, y eso es lo que permite atar un motor de verdad mientras no haya
+un gateway gobernado completo:
+
+```python
+async def mi_politica(check):
+    respuesta = await cliente.post("/check-policy", json={"tool": check.name, **check.arguments})
+    return Decision(**respuesta.json())
+```
+
+No es una comodidad: una decisión de gobierno se consulta por red, y con un hook solo síncrono esa
+espera bloquea el bucle de eventos en cada llamada a herramienta. Quien lo escribiera no lo vería
+hasta tener concurrencia.
+
 `Gateway` es un `typing.Protocol` de cuatro métodos. Quien lo implemente no hereda ni importa nada
 nuestro, y puede estar escrito en otro lenguaje al otro lado de un socket.
 

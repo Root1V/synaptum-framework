@@ -252,6 +252,15 @@ un proceso aparte que tiene las credenciales y puede denegar.</p>
 comprobaciones son advisorias: las cumple un bucle correcto y se las salta uno con un fallo. Marca
 cada decisión con <code>enforced=False</code> para que nadie confunda su informe con una auditoría.</p>
 </blockquote>
+<p><strong>La política puede ser <code>async</code></strong>, y eso es lo que permite atar un motor de verdad mientras no haya
+un gateway gobernado completo:</p>
+<pre data-lenguaje="python"><code><span class="p-k">async</span> <span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">mi_politica</span><span class="p-p">(</span><span class="p-n">check</span><span class="p-p">):</span>
+    <span class="p-n">respuesta</span> <span class="p-o">=</span> <span class="p-k">await</span> <span class="p-n">cliente</span><span class="p-o">.</span><span class="p-n">post</span><span class="p-p">(</span><span class="p-s2">"/check-policy"</span><span class="p-p">,</span> <span class="p-n">json</span><span class="p-o">=</span><span class="p-p">{</span><span class="p-s2">"tool"</span><span class="p-p">:</span> <span class="p-n">check</span><span class="p-o">.</span><span class="p-n">name</span><span class="p-p">,</span> <span class="p-o">**</span><span class="p-n">check</span><span class="p-o">.</span><span class="p-n">arguments</span><span class="p-p">})</span>
+    <span class="p-k">return</span> <span class="p-n">Decision</span><span class="p-p">(</span><span class="p-o">**</span><span class="p-n">respuesta</span><span class="p-o">.</span><span class="p-n">json</span><span class="p-p">())</span>
+</code></pre>
+<p>No es una comodidad: una decisión de gobierno se consulta por red, y con un hook solo síncrono esa
+espera bloquea el bucle de eventos en cada llamada a herramienta. Quien lo escribiera no lo vería
+hasta tener concurrencia.</p>
 <p><code>Gateway</code> es un <code>typing.Protocol</code> de cuatro métodos. Quien lo implemente no hereda ni importa nada
 nuestro, y puede estar escrito en otro lenguaje al otro lado de un socket.</p>
 <h2>El checkpointer — el diario del run</h2>
