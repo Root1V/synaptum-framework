@@ -7,6 +7,16 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ### Añadido
 
+- **La política del `LocalGateway` puede ser `async`.** Una decisión de gobierno de verdad se
+  consulta por red, y con un hook solo síncrono esa espera **bloquea el bucle de eventos** en cada
+  llamada a herramienta — un agente con cinco paga la parada cinco veces, y quien lo escribe no lo
+  ve hasta tener concurrencia. Antes no fallaba al atarla sino al consultarla, con
+  `AttributeError: 'coroutine' object has no attribute 'disposition'`.
+
+  Es lo que hace usable el punto de atadura mientras el `Gateway` gobernado completo no exista: su
+  cliente sigue bloqueado por la forma de los endpoints del arnés, y esto permite atar un motor de
+  políticas real sin esperarlo. Lo que cambia es cómo se consulta la decisión, no qué se registra.
+
 - **La copia del contrato compartido que leemos sabe si está rancia.** El corpus vive fuera de este
   repositorio porque es un artefacto de varios equipos, y hay equipos que lo **vendorizan** dentro
   del suyo. Eso ya se cobró dos cosas: una copia vendorizada del `spec.md` se quedó atrás, y la

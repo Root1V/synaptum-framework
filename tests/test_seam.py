@@ -318,3 +318,52 @@ def test_a_tool_policy_sees_the_arguments_it_decides_on():
 
 async def _sin_modelo(request):  # pragma: no cover - no se llama
     raise AssertionError("este test no invoca el modelo")
+
+
+def test_the_policy_hook_can_be_async_because_a_real_one_travels():
+    """`VRT-SYN-003` S-4 · Lo que hace usable el punto de atadura mientras no hay cliente.
+
+    Una decisión de gobierno de verdad se consulta por red. Con un hook solo
+    síncrono, quien ate un motor de políticas real **bloquea el bucle de
+    eventos** mientras la decisión viaja: un agente con cinco herramientas paga
+    esa parada en cada llamada, y quien lo escribe no lo ve hasta tener
+    concurrencia.
+
+    Antes de esto, una política `async` no fallaba al atarla: fallaba al
+    consultarla, con `AttributeError: 'coroutine' object has no attribute
+    'disposition'` — medido quitando el `await`. Ruidoso, no silencioso, y
+    exactamente en el camino que un gateway real necesita.
+    """
+    import asyncio
+
+    from synaptum import ALLOW, CallContext, Decision, Disposition, LocalGateway, Risk, ToolCall
+
+    consultas: list = []
+
+    async def politica_remota(check):
+        # Lo que haría una de verdad: una llamada a `/check-policy`.
+        await asyncio.sleep(0)
+        consultas.append((check.kind, check.name))
+        if check.risk is Risk.DESTRUCTIVE:
+            return Decision(disposition=Disposition.DENY_STEP, reason_code="cedar")
+        return ALLOW
+
+    gateway = LocalGateway(model=_sin_modelo, policy=politica_remota, warn=False)
+    ctx = CallContext(run_id="r", step_id="000001-tool")
+
+    async def llamar(nombre: str, risk: Risk):
+        return await gateway.invoke_tool(
+            ToolCall(id="c1", name=nombre), ctx, risk=risk
+        )
+
+    resultado = asyncio.run(llamar("leer", Risk.READ))
+    assert consultas == [("tool", "leer")], "la política asíncrona se consultó"
+    assert resultado.is_error, "no existe la tool, pero la política la dejó pasar"
+
+    with pytest.raises(Denied):
+        asyncio.run(llamar("borrar", Risk.DESTRUCTIVE))
+
+    # Y la decisión queda en el informe como cualquier otra: lo que cambia es
+    # cómo se consulta, no qué se registra.
+    assert gateway.checks[-1].decision is not None
+    assert gateway.checks[-1].decision.reason_code == "cedar"
