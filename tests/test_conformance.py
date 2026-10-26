@@ -40,7 +40,7 @@ from synaptum import (
     make_step_id,
 )
 
-from contratos import SIN_CONTRATOS, corpus
+from contratos import SIN_CONTRATOS, corpus, grabaciones
 
 _FIXTURES = corpus("costura-durabilidad", "fixtures")
 
@@ -722,6 +722,234 @@ def test_the_normalization_corpus_is_well_formed(name: str, case: dict, root: Pa
         assert expected.get("event_kinds", ["finish"])[-1] == "finish", (
             f"{case['name']}: un stream que termina bien acaba en 'finish'"
         )
+
+
+# ── Gobierno · `SYN-AEON-002`/`003` ──────────────────────────────────────────
+#
+# Esta costura **no tiene contrato**: ninguno de los cuatro de `contratos/` es el
+# de gobierno, y el equipo que la sirve lo dice en el propio fichero —«publicada
+# como evidencia y no como contrato»—. Así que esto no comprueba un acuerdo:
+# comprueba que nuestro cliente se escribió contra la forma que **existe**, que
+# es lo que pedimos cuando llevábamos dieciséis días suponiéndola.
+
+_GOBIERNO = grabaciones("gobierno", "rechazo-por-techo.json")
+
+
+def _decision_de_aeon(status, cuerpo):
+    """Cómo se lee un rechazo de **ese** arnés.
+
+    Vive en el test y no en el paquete, igual que los nombres de sus cabeceras:
+    `denied_by`, `disposition` y el bloque `aeon` son su vocabulario, y nuestro
+    test de independencia rechazaría meterlo dentro — con razón.
+
+    Las dos superficies traen los mismos hechos en sitios distintos: la
+    OpenAI-compatible los pone en un bloque propio junto al sobre de error del
+    dialecto, y `/decide` **es** el rechazo entero. Un lector que solo entienda
+    una es el fallo que la grabación existe para evitar, así que entiende las dos.
+    """
+    from synaptum import Decision, Disposition
+
+    hechos = cuerpo.get("aeon") if isinstance(cuerpo.get("aeon"), dict) else cuerpo
+    disposicion = hechos.get("disposition")
+    if not disposicion:
+        return None
+    return Decision(
+        disposition=Disposition(disposicion),
+        reason_code=hechos.get("denied_by") or "",
+        message=str(hechos.get("error") or ""),
+    )
+
+
+@pytest.mark.skipif(_GOBIERNO is None, reason=SIN_CONTRATOS)
+def test_a_budget_refusal_from_the_harness_stops_the_run_as_governance():
+    """`VRT-SYN-003` S-4 · «Un e2e en el que un `Denied` del techo detiene el run».
+
+    Es el criterio de aceptación tal como lo escribió el consumidor, y hasta hoy
+    **no se cumplía**: el transporte veía un no-2xx y levantaba `ProviderError`,
+    así que el run se paraba *como un backend con un mal día* — sin decisión en
+    el diario, sin desenlace de denegación y sin poder distinguir las tres
+    disposiciones, que es justo lo que separa un gobierno de una caída.
+
+    Lo que lo desbloqueó no fue código sino un dato: con qué estado y qué cuerpo
+    contesta el arnés cuando deniega. Ahora el cuerpo trae `disposition`, que es
+    el vocabulario sobre el que el bucle ya sabe actuar, y el run se cierra
+    **con la decisión dentro del diario** sin una línea nueva en el bucle.
+    """
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).parent / "servidores"))
+    from rechazo_http import Grabado  # noqa: PLC0415
+
+    from synaptum import (  # noqa: PLC0415
+        Agent, Disposition, LocalGateway, MemoryCheckpointer, ModelStep, Outcome, Session,
+    )
+    from synaptum.run.transport import HttpModel  # noqa: PLC0415
+
+    grabado = json.loads(_GOBIERNO.read_text())
+    servidor = Grabado(grabado["exchanges"])
+    try:
+        store = MemoryCheckpointer()
+        modelo = HttpModel(
+            servidor.url,
+            path="/v1/chat/completions",
+            provider="openai-compatible",
+            denial=_decision_de_aeon,
+        )
+        agente = Agent("extractor", model="openai-compatible:governed-test")
+        eventos = asyncio.run(_drenar(
+            agente, "hi", Session("run-techo", LocalGateway(model=modelo, warn=False), store)
+        ))
+
+        final = eventos[-1]
+        assert final.kind == "final", "el run se cierra, y lo cierra el gobierno"
+        assert final.output is None, "no hubo salida: el run no llegó a producir nada"
+        # El cierre lleva el motivo donde quien consume el stream lo lee.
+        assert final.meta["disposition"] == Disposition.TERMINATE_RUN.value, (
+            "el techo es del run entero: no hay otra cosa que el bucle pueda probar"
+        )
+        assert final.meta["reason_code"] == "budget"
+
+        # Y lo que hace que esto sirva en una auditoría: está **en el diario**.
+        paso = [
+            e for e in asyncio.run(store.load("run-techo")).events
+            if isinstance(e, ModelStep) and e.decision is not None
+        ]
+        assert len(paso) == 1, "el paso denegado queda registrado una vez"
+        assert paso[0].outcome is Outcome.DENIED_BY_POLICY, (
+            "no es un resultado: es una denegación, y el desenlace lo dice"
+        )
+        assert paso[0].response is None, "no hubo generación que pagar"
+    finally:
+        servidor.cerrar()
+
+
+@pytest.mark.skipif(_GOBIERNO is None, reason=SIN_CONTRATOS)
+def test_without_a_reader_the_same_refusal_is_just_a_provider_error():
+    """El control, y es lo que mide que el arreglo arregla algo.
+
+    Sin lector de rechazos el cuerpo es el mismo y el run se para igual — pero
+    se para como un error del proveedor. Es exactamente la conducta que
+    describimos al reportarlo, y la que este cambio sustituye.
+    """
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).parent / "servidores"))
+    from rechazo_http import Grabado  # noqa: PLC0415
+
+    from synaptum import Agent, LocalGateway, ProviderError, Session  # noqa: PLC0415
+    from synaptum.run.transport import HttpModel  # noqa: PLC0415
+
+    grabado = json.loads(_GOBIERNO.read_text())
+    servidor = Grabado(grabado["exchanges"])
+    try:
+        modelo = HttpModel(
+            servidor.url, path="/v1/chat/completions", provider="openai-compatible"
+        )
+        agente = Agent("extractor", model="openai-compatible:governed-test")
+        with pytest.raises(ProviderError) as fallo:
+            asyncio.run(_drenar(
+                agente, "hi", Session("run-techo", LocalGateway(model=modelo, warn=False))
+            ))
+        assert fallo.value.status == 402
+        assert not fallo.value.retryable, "un techo no se reintenta: la siguiente cae igual"
+    finally:
+        servidor.cerrar()
+
+
+_SUB_RUN = corpus("costura-durabilidad", "fixtures", "grabacion-sub-run.json")
+
+
+@pytest.mark.skipif(_SUB_RUN is None, reason=SIN_CONTRATOS)
+def test_our_journal_client_sends_what_the_recorded_route_received():
+    """`VRT-SYN-003` S-5 · «Los casos dorados pasan contra el endpoint real».
+
+    Hasta hoy esto se comprobaba contra **nuestro doble**, y el doble era
+    correcto: filtraba por `sub_run_id` cuando el servidor real todavía no lo
+    hacía. Un instrumento correcto hizo invisible el defecto — con el
+    comportamiento viejo, un sub-run reanudado habría resuelto `000000-model`
+    contra el paso del padre y reproducido su respuesta, y nada habría fallado.
+
+    Lo que esta grabación añade es el lado que faltaba: la produce y la verifica
+    un test del otro equipo contra Postgres real, así que lo que fija es lo que
+    su servidor hace y no lo que un documento afirma.
+
+    Y se comprueba la **dirección que nadie miraba**: no solo que sepamos leer
+    su respuesta, sino que lo que mandamos sea lo que su ruta recibió. Ahí vivía
+    la decisión que importaba —el sub-run **omitido** y no vacío cuando no hay—.
+    """
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).parent / "servidores"))
+    from rechazo_http import Grabado  # noqa: PLC0415
+
+    from synaptum import HttpCheckpointer, MemoryCheckpointer, ModelStep, Phase  # noqa: PLC0415
+
+    grabado = json.loads(_SUB_RUN.read_text())
+    RUN = "caso-7"
+
+    # El `payload` es **opaco para el arnés** por contrato, así que no es una de
+    # las cosas que la grabación fija —lo dice su propio `$volatiles`—. Se
+    # sustituye por un evento nuestro de verdad para poder recorrer la lectura
+    # entera; lo que se compara contra la grabación es el sobre.
+    paso = ModelStep(run_id=RUN, step_id="s1", step_seq=0, phase=Phase.COMPLETED, at=1.0)
+    sobre = json.loads(dumps(paso))
+
+    intercambios = []
+    for e in grabado["exchanges"]:
+        copia = dict(e)
+        copia["path"] = e["path"].replace("{run_id}", RUN)
+        respuesta = json.loads(json.dumps(e["response"]).replace("{run_id}", RUN))
+        for fila in respuesta.get("records", ()):
+            fila["payload"] = sobre
+        copia["response"] = respuesta
+        intercambios.append(copia)
+
+    servidor = Grabado(intercambios)
+    try:
+        diario = HttpCheckpointer(servidor.url)
+
+        # 1 · La raíz escribe sin mandar `sub_run_id` **en absoluto**.
+        raiz = asyncio.run(diario.append(RUN, paso))
+        enviado = servidor.peticiones[-1]["body"]
+        assert "sub_run_id" not in enviado, (
+            "omitido y no vacío: el otro lado distingue «no sé de sub-runs» de "
+            "«digo que no hay», y su columna tiene defecto para el primero"
+        )
+        assert raiz.seq == 0 and not raiz.duplicate
+
+        # 2 · Un sub-run escribe **el mismo `step_id`** y no es un duplicado.
+        hijo = asyncio.run(diario.append(f"{RUN}/child-a", paso))
+        assert servidor.peticiones[-1]["body"]["sub_run_id"] == "child-a"
+        assert servidor.peticiones[-1]["body"]["step_id"] == enviado["step_id"]
+        assert hijo.seq == 1 and not hijo.duplicate, (
+            "el mismo paso en dos sub-runs son dos filas: sin el sub-run en la "
+            "clave, la segunda entra como duplicado — y un duplicado es un no-op"
+        )
+
+        # 3 · Las dos lecturas, cada una por su ruta, y cada una con lo suyo.
+        asyncio.run(diario.load(RUN))
+        assert servidor.peticiones[-1]["path"] == f"/runs/{RUN}/checkpoints", (
+            "la raíz lee sin parámetro"
+        )
+        asyncio.run(diario.load(f"{RUN}/child-a"))
+        assert servidor.peticiones[-1]["path"] == (
+            f"/runs/{RUN}/checkpoints?sub_run_id=child-a"
+        ), "el sub-run viaja en la query, no en la ruta: una barra cruda no enruta"
+
+        # Y la grabación trae **las tres** lecturas que su servidor sirve, así
+        # que la que no hacemos queda dicha: `?sub_run_id=` vacío es la raíz,
+        # igual que omitido. Nuestro cliente nunca la manda —omite— y por eso
+        # está aquí: para que se vea que la decisión es nuestra y no una
+        # casualidad de la forma del cliente.
+        rutas = {e["path"] for e in intercambios if e.get("method") == "GET"}
+        assert f"/runs/{RUN}/checkpoints?sub_run_id=" in rutas
+        assert not isinstance(diario, MemoryCheckpointer)
+    finally:
+        servidor.cerrar()
+
+
+async def _drenar(agente, tarea, sesion) -> list:
+    return [e async for e in agente.run(tarea, session=sesion)]
 
 
 def test_the_normalization_cases_are_actually_being_read():

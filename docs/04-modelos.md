@@ -34,6 +34,34 @@ OpenAI.
 > proceso**: sale por la costura hacia quien tiene las credenciales y puede denegar. Un transporte
 > dentro del proceso tiene la clave en su memoria y llama a quien le digan.
 
+#### Cuando el otro extremo deniega
+
+Si el endpoint está gobernado, un «no» suyo **no es un error del proveedor**, y la diferencia se paga
+en el diario: un error para el run como un backend con un mal día, y un rechazo lo cierra con su
+decisión registrada. Para que llegue como lo segundo hay que decirle al transporte **cómo se lee un
+rechazo en ese despliegue**:
+
+```python
+def rechazo(status, cuerpo):
+    hechos = cuerpo.get("gov") or cuerpo        # el nombre del bloque es suyo
+    if not hechos.get("disposition"):
+        return None                            # no es un «no»: sigue como error
+    return Decision(
+        disposition=Disposition(hechos["disposition"]),
+        reason_code=hechos.get("denied_by", ""),
+        message=hechos.get("error", ""),
+    )
+
+modelo = HttpModel("http://gateway/v1", denial=rechazo)
+```
+
+Es una función y no una forma fija nuestra por lo mismo que las cabeceras: **cómo se llama un rechazo
+lo decide quien lo manda**. Con eso, el bucle hace lo que ya sabía — cierra, suspende o se lo
+devuelve al modelo según la disposición— y la decisión queda en el diario con su desenlace.
+
+Un cuerpo que no parsea nunca es un rechazo: se deja seguir por la taxonomía de errores, que es donde
+un `502` con el HTML de un proxy tiene que acabar.
+
 ### Un SDK de plataforma
 
 Cuando la inferencia está gobernada y un SDK es la única puerta legítima —credenciales, catálogo,
