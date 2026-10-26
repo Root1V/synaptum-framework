@@ -1097,7 +1097,24 @@ class Agent:
         ``require_approval`` suspende: emite un ``ApprovalStep`` y termina el
         stream **sin** cerrar el run.  Volver a llamar con el mismo ``run_id``
         retoma donde quedó.  ``terminate_run`` cierra de verdad.
+
+        **El desenlace se pone aquí y no en cada sitio que llama**, y hubo que
+        aprenderlo: el paso denegado se registraba con su decisión dentro y con
+        ``outcome`` en su valor por defecto, que es ``RESULT`` — «el paso ocurrió
+        y dejó resultado», justo lo que no pasó.  Quien consultara el diario
+        buscando denegaciones por desenlace encontraba las de herramienta
+        denegadas por paso y **no** las del modelo ni las cerradas por techo.
+        Lo destapó una grabación de un rechazo real: el tipo lo decía desde el
+        principio —*«un desenlace denegado es un hecho registrado, no la
+        ausencia de uno»*— y lo escribía bien solo una de las dos rutas.
         """
+        if denial.disposition is not Disposition.REQUIRE_APPROVAL:
+            # `require_approval` no es una denegación: el paso queda esperando, y
+            # lo que pasó con él lo dirá el `ApprovalStep` —concedido, denegado
+            # o expirado—. Marcarlo aquí como denegado por política sería cerrar
+            # con un hecho que todavía no ha ocurrido.
+            step = replace(step, outcome=Outcome.DENIED_BY_POLICY)
+
         await journal.record(step)
         yield step
 

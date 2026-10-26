@@ -21,7 +21,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-__all__ = ["CONTRACTS", "corpus", "SIN_CONTRATOS"]
+__all__ = ["CONTRACTS", "corpus", "grabaciones", "SIN_CONTRATOS"]
 
 
 def _raiz() -> Path | None:
@@ -53,4 +53,20 @@ def corpus(*partes: str) -> Path | None:
     if CONTRACTS is None:
         return None
     ruta = CONTRACTS.joinpath(*partes)
+    return ruta if ruta.exists() else None
+
+
+def grabaciones(*partes: str) -> Path | None:
+    """Una carpeta de **grabaciones** de otro equipo, o ``None`` si no están.
+
+    Viven al lado de los contratos y no dentro, y la diferencia es deliberada:
+    un contrato es un acuerdo y una grabación es evidencia de lo que un
+    despliegue sirve hoy. Lo dice el README de quien las publica —*«publicada
+    como evidencia y no como contrato … de una grabación no se deduce
+    compromiso de estabilidad»*— y mezclarlas haría que un cliente leyera un
+    compromiso donde solo hay una medición.
+    """
+    if CONTRACTS is None:
+        return None
+    ruta = CONTRACTS.parent.joinpath("grabaciones-aeon", *partes)
     return ruta if ruta.exists() else None

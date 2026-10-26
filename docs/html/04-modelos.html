@@ -214,6 +214,28 @@ OpenAI.</p>
 proceso</strong>: sale por la costura hacia quien tiene las credenciales y puede denegar. Un transporte
 dentro del proceso tiene la clave en su memoria y llama a quien le digan.</p>
 </blockquote>
+<h4>Cuando el otro extremo deniega</h4>
+<p>Si el endpoint está gobernado, un «no» suyo <strong>no es un error del proveedor</strong>, y la diferencia se paga
+en el diario: un error para el run como un backend con un mal día, y un rechazo lo cierra con su
+decisión registrada. Para que llegue como lo segundo hay que decirle al transporte <strong>cómo se lee un
+rechazo en ese despliegue</strong>:</p>
+<pre data-lenguaje="python"><code><span class="p-k">def</span><span class="p-w"> </span><span class="p-nf">rechazo</span><span class="p-p">(</span><span class="p-n">status</span><span class="p-p">,</span> <span class="p-n">cuerpo</span><span class="p-p">):</span>
+    <span class="p-n">hechos</span> <span class="p-o">=</span> <span class="p-n">cuerpo</span><span class="p-o">.</span><span class="p-n">get</span><span class="p-p">(</span><span class="p-s2">"gov"</span><span class="p-p">)</span> <span class="p-ow">or</span> <span class="p-n">cuerpo</span>        <span class="p-c1"># el nombre del bloque es suyo</span>
+    <span class="p-k">if</span> <span class="p-ow">not</span> <span class="p-n">hechos</span><span class="p-o">.</span><span class="p-n">get</span><span class="p-p">(</span><span class="p-s2">"disposition"</span><span class="p-p">):</span>
+        <span class="p-k">return</span> <span class="p-kc">None</span>                            <span class="p-c1"># no es un «no»: sigue como error</span>
+    <span class="p-k">return</span> <span class="p-n">Decision</span><span class="p-p">(</span>
+        <span class="p-n">disposition</span><span class="p-o">=</span><span class="p-n">Disposition</span><span class="p-p">(</span><span class="p-n">hechos</span><span class="p-p">[</span><span class="p-s2">"disposition"</span><span class="p-p">]),</span>
+        <span class="p-n">reason_code</span><span class="p-o">=</span><span class="p-n">hechos</span><span class="p-o">.</span><span class="p-n">get</span><span class="p-p">(</span><span class="p-s2">"denied_by"</span><span class="p-p">,</span> <span class="p-s2">""</span><span class="p-p">),</span>
+        <span class="p-n">message</span><span class="p-o">=</span><span class="p-n">hechos</span><span class="p-o">.</span><span class="p-n">get</span><span class="p-p">(</span><span class="p-s2">"error"</span><span class="p-p">,</span> <span class="p-s2">""</span><span class="p-p">),</span>
+    <span class="p-p">)</span>
+
+<span class="p-n">modelo</span> <span class="p-o">=</span> <span class="p-n">HttpModel</span><span class="p-p">(</span><span class="p-s2">"http://gateway/v1"</span><span class="p-p">,</span> <span class="p-n">denial</span><span class="p-o">=</span><span class="p-n">rechazo</span><span class="p-p">)</span>
+</code></pre>
+<p>Es una función y no una forma fija nuestra por lo mismo que las cabeceras: <strong>cómo se llama un rechazo
+lo decide quien lo manda</strong>. Con eso, el bucle hace lo que ya sabía — cierra, suspende o se lo
+devuelve al modelo según la disposición— y la decisión queda en el diario con su desenlace.</p>
+<p>Un cuerpo que no parsea nunca es un rechazo: se deja seguir por la taxonomía de errores, que es donde
+un <code>502</code> con el HTML de un proxy tiene que acabar.</p>
 <h3>Un SDK de plataforma</h3>
 <p>Cuando la inferencia está gobernada y un SDK es la única puerta legítima —credenciales, catálogo,
 cuotas y facturación viven ahí— tiene prioridad. Ir al endpoint por detrás se salta todo eso.</p>

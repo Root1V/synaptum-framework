@@ -1246,7 +1246,7 @@ Tres respuestas posibles para cada paso, y la tercera es la interesante:
 Llama a un endpoint HTTP y devuelve respuestas ya normalizadas.
 
 ```python
-HttpModel(base_url: str, *, api_key: str | None = None, provider: str | None = None, path: str = '/chat/completions', headers: Mapping[str, str] | Callable[[Any], Mapping[str, str]] | None = None, timeout: float = 120.0) -> None
+HttpModel(base_url: str, *, api_key: str | None = None, provider: str | None = None, path: str = '/chat/completions', headers: Mapping[str, str] | Callable[[Any], Mapping[str, str]] | None = None, denial: "Callable[[int, Mapping[str, Any]], Decision | None] | None" = None, timeout: float = 120.0) -> None
 ```
 
 | Miembro | Firma | |
@@ -1263,6 +1263,12 @@ Args:
         que el agente ya escribe.
     path: ruta del endpoint de chat, relativa a ``base_url``.
     headers: cabeceras extra. Se mandan tal cual.
+    denial: **cómo se lee un rechazo de gobierno** en las respuestas de este
+        despliegue: ``(status, cuerpo) -> Decision | None``. Si devuelve una
+        decisión, se levanta ``Denied`` y el bucle la trata como gobierno —
+        cierra el run, suspende, o se la devuelve al modelo según la
+        disposición, y **la decisión queda en el diario**. Si devuelve
+        ``None``, el fallo sigue su camino por la taxonomía de errores.
     timeout: segundos de espera **por lectura**, no por respuesta completa.
         Un modelo de razonamiento puede tardar mucho en emitir el primer
         token y eso no es un fallo.

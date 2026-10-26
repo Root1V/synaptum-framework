@@ -7,6 +7,34 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versionado 
 
 ### Añadido
 
+- **`HttpModel(denial=…)`: un «no» de gobierno deja de llegar como un error del proveedor.** Un
+  rechazo por techo del arnés llegaba como `ProviderError`, así que el run se paraba **como un
+  backend con un mal día**: sin decisión en el diario, sin desenlace de denegación y sin distinguir
+  las tres disposiciones, que es lo que separa un gobierno de una caída. Ahora el transporte lee la
+  decisión y levanta `Denied`, y el bucle hace lo que ya sabía hacer.
+
+  Es una función —`(status, cuerpo) -> Decision | None`— por lo mismo que `headers`: la forma de un
+  rechazo la decide quien lo manda, y escribirla aquí metería el vocabulario de un arnés concreto
+  dentro del framework.
+
+  Lo desbloqueó un dato y no una idea: **una grabación** del rechazo real, con su estado y su cuerpo,
+  pedida en el canal y entregada por el equipo que lo sirve. Es el criterio de aceptación que el
+  consumidor escribió en `VRT-SYN-003` S-4 —*«un e2e en el que un `Denied` del techo detiene el
+  run»*— y hasta hoy no se cumplía.
+
+### Corregido
+
+- **Un paso denegado ya no se registra como si hubiera dado resultado.** El paso se escribía con su
+  decisión dentro y con `outcome` en su valor por defecto, `RESULT` — «el paso ocurrió y dejó
+  resultado», justo lo que no pasó. Quien consultara el diario buscando denegaciones por desenlace
+  encontraba las de herramienta denegadas por paso y **no** las del modelo ni las cerradas por techo:
+  media verdad, sin un error a la vista. El tipo lo decía desde el principio —*«un desenlace denegado
+  es un hecho registrado, no la ausencia de uno»*— y lo escribía bien solo una de las dos rutas.
+  Ahora lo pone el cierre, que es quien conoce la disposición; `require_approval` se queda fuera a
+  propósito, porque un paso suspendido no está denegado y lo que le pasó lo dirá su `ApprovalStep`.
+
+  Lo encontró la grabación del párrafo anterior, al primer intento.
+
 - **La política del `LocalGateway` puede ser `async`.** Una decisión de gobierno de verdad se
   consulta por red, y con un hook solo síncrono esa espera **bloquea el bucle de eventos** en cada
   llamada a herramienta — un agente con cinco paga la parada cinco veces, y quien lo escribe no lo

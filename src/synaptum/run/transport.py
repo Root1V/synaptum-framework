@@ -43,7 +43,8 @@ import urllib.error
 import urllib.request
 from typing import Any, AsyncIterator, Callable, Iterator, Mapping
 
-from ..core.errors import NetworkError, ProviderError, RequestTimeoutError
+from ..core.errors import Denied, NetworkError, ProviderError, RequestTimeoutError
+from ..core.events import Decision
 from ..core.types import Request, Response, StreamEvent, dumps
 from ..providers import base as _providers
 
@@ -65,6 +66,12 @@ class HttpModel:
             que el agente ya escribe.
         path: ruta del endpoint de chat, relativa a ``base_url``.
         headers: cabeceras extra. Se mandan tal cual.
+        denial: **cómo se lee un rechazo de gobierno** en las respuestas de este
+            despliegue: ``(status, cuerpo) -> Decision | None``. Si devuelve una
+            decisión, se levanta ``Denied`` y el bucle la trata como gobierno —
+            cierra el run, suspende, o se la devuelve al modelo según la
+            disposición, y **la decisión queda en el diario**. Si devuelve
+            ``None``, el fallo sigue su camino por la taxonomía de errores.
         timeout: segundos de espera **por lectura**, no por respuesta completa.
             Un modelo de razonamiento puede tardar mucho en emitir el primer
             token y eso no es un fallo.
@@ -78,6 +85,7 @@ class HttpModel:
         provider: str | None = None,
         path: str = "/chat/completions",
         headers: Mapping[str, str] | Callable[[Any], Mapping[str, str]] | None = None,
+        denial: Callable[[int, Mapping[str, Any]], "Decision | None"] | None = None,
         timeout: float = 120.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -95,6 +103,21 @@ class HttpModel:
         #: se llaman esas cabeceras lo decide el arnés que las recibe, y
         #: escribirlas aquí metería su vocabulario dentro del framework.
         self._extra = headers if callable(headers) else dict(headers or {})
+        #: Cómo se lee un rechazo de gobierno, si este despliegue los manda.
+        #:
+        #: **Un «no» de gobierno no es un error del proveedor**, y sin esto
+        #: llegaba como uno: el transporte veía un no-2xx y levantaba
+        #: `ProviderError`, así que el run se paraba **como un backend con un
+        #: mal día** — sin decisión en el diario, sin `outcome` de denegación, y
+        #: sin distinguir las tres disposiciones, que es justo lo que hace que
+        #: un gobierno sea gobierno y no una caída. Medido contra un arnés real
+        #: y confirmado por el equipo que lo sirve (`SYN-AEON-002`/`003`).
+        #:
+        #: Es una función por lo mismo que `headers`: la forma de un rechazo
+        #: —el nombre del bloque, cómo se llama la disposición— la decide quien
+        #: lo manda, y escribirla aquí metería el vocabulario de un arnés
+        #: concreto dentro del framework.
+        self._denial = denial
 
     # ── Respuesta completa ────────────────────────────────────────────────────
 
@@ -230,7 +253,17 @@ class HttpModel:
         try:
             return urllib.request.urlopen(self._request(body, ctx), timeout=self.timeout)
         except urllib.error.HTTPError as fallo:
-            detalle = fallo.read().decode(errors="replace")[:500]
+            crudo = fallo.read().decode(errors="replace")
+            detalle = crudo[:500]
+
+            # Antes que nada: ¿es un «no» de gobierno? Se pregunta aquí porque
+            # es el único sitio por donde pasan los fallos HTTP de las dos
+            # superficies —completa y stream—, así que una respuesta denegada no
+            # puede entrar por una y no por la otra.
+            decision = self._gobierno(fallo.code, crudo)
+            if decision is not None:
+                raise Denied(decision) from fallo
+
             # El estado decide si se reintenta, y lo decide el tipo del error:
             # un 4xx repetido cuesta lo mismo y da lo mismo.
             raise ProviderError(
@@ -244,6 +277,24 @@ class HttpModel:
             if isinstance(fallo.reason, TimeoutError):
                 raise RequestTimeoutError(f"sin respuesta en {self.timeout}s") from fallo
             raise NetworkError(f"no se pudo llegar a {self.base_url}: {fallo.reason}") from fallo
+
+    def _gobierno(self, status: int, crudo: str) -> "Decision | None":
+        """La decisión de gobierno que trae esta respuesta, si trae alguna.
+
+        Un cuerpo que no parsea **no es un rechazo**: se deja seguir por la
+        taxonomía de errores, que es donde un 502 con HTML de un proxy tiene
+        que acabar. Preguntárselo al lector y que explote sería convertir una
+        caída de infraestructura en un fallo nuestro.
+        """
+        if self._denial is None:
+            return None
+        try:
+            cuerpo = json.loads(crudo)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(cuerpo, Mapping):
+            return None
+        return self._denial(status, cuerpo)
 
     def _post(self, body: Mapping[str, Any], ctx: Any = None) -> str:
         with self._open(body, ctx) as respuesta:
